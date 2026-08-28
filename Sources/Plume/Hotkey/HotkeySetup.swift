@@ -1,7 +1,7 @@
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    // Défauts ⌃⌥C / ⌃⌥P, reconfigurables dans les Réglages.
+    // Défauts ⌃⌥C / ⌃⌥P / ⌃⌥S, reconfigurables dans les Réglages.
     static let correctSelection = Self(
         "correctSelection",
         initial: .init(.c, modifiers: [.control, .option])
@@ -9,6 +9,10 @@ extension KeyboardShortcuts.Name {
     static let structurePrompt = Self(
         "structurePrompt",
         initial: .init(.p, modifiers: [.control, .option])
+    )
+    static let expertPrompt = Self(
+        "expertPrompt",
+        initial: .init(.s, modifiers: [.control, .option])
     )
 }
 
@@ -20,6 +24,9 @@ enum HotkeySetup {
         }
         KeyboardShortcuts.onKeyUp(for: .structurePrompt) { [weak coordinator] in
             coordinator?.trigger(action: .makePrompt)
+        }
+        KeyboardShortcuts.onKeyUp(for: .expertPrompt) { [weak coordinator] in
+            coordinator?.trigger(action: .expertPrompt)
         }
     }
 }

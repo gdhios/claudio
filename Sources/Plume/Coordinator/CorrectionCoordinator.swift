@@ -65,7 +65,7 @@ final class CorrectionCoordinator {
         let action = session.action
         do {
             let result = try await client.streamCompletion(
-                of: session.originalText,
+                of: action.userMessage(forText: session.originalText),
                 system: action.system,
                 maxTokens: action.maxTokens(forText: session.originalText,
                                             multiplier: session.maxTokensMultiplier)

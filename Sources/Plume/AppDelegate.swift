@@ -57,6 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         makePrompt.target = self
         menu.addItem(makePrompt)
 
+        let expertPrompt = NSMenuItem(title: PlumeAction.expertPrompt.menuTitle, action: #selector(expertPromptFromMenu), keyEquivalent: "")
+        expertPrompt.target = self
+        menu.addItem(expertPrompt)
+
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -70,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func correctFromMenu() { triggerFromMenu(.correct) }
     @objc private func makePromptFromMenu() { triggerFromMenu(.makePrompt) }
+    @objc private func expertPromptFromMenu() { triggerFromMenu(.expertPrompt) }
 
     private func triggerFromMenu(_ action: PlumeAction) {
         // Laisse le menu se refermer et l'app précédente reprendre le focus.

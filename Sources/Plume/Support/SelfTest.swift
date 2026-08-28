@@ -27,7 +27,7 @@ enum SelfTest {
         Task.detached {
             do {
                 let result = try await client.streamCompletion(
-                    of: sample,
+                    of: PlumeAction.correct.userMessage(forText: sample),
                     system: PlumeAction.correct.system,
                     maxTokens: PlumeAction.correct.maxTokens(forText: sample)
                 ) { piece in
