@@ -1,9 +1,24 @@
 #!/bin/bash
 # Compile Plume en release et assemble Plume.app (par défaut dans /Applications).
 #
+# Usage :
+#   Scripts/build_app.sh              build local (certificat « Plume Local Dev »)
+#   NOTARIZE=1 Scripts/build_app.sh   build partageable : Developer ID + hardened
+#                                     runtime + notarisation Apple + zip dans dist/
+#
 # Variables d'environnement :
-#   SIGN_IDENTITY  identité de signature (défaut : "Plume Local Dev")
-#   DEST           dossier d'installation (défaut : /Applications)
+#   SIGN_IDENTITY    identité locale (défaut : "Plume Local Dev")
+#   DEV_ID_IDENTITY  identité Developer ID (défaut : auto-détectée dans le Trousseau)
+#   NOTARY_PROFILE   profil notarytool (défaut : "plume-notary")
+#   DEST             dossier d'installation (défaut : /Applications)
+#
+# Prérequis notarisation, une seule fois (compte Apple Developer requis) :
+#   1. Certificat : Xcode → Settings… → Accounts → Manage Certificates… →
+#      + → « Developer ID Application ».
+#   2. Identifiants : mot de passe d'app sur https://account.apple.com, puis
+#      xcrun notarytool store-credentials plume-notary \
+#        --apple-id <apple-id> --team-id <TEAMID> --password <mdp-app>
+#      (le TEAMID est entre parenthèses dans le nom du certificat)
 #
 # ⚠️ Sans certificat stable, la signature ad-hoc change à chaque build et macOS
 # re-demande la permission Accessibilité + l'accès Trousseau après chaque rebuild.
@@ -14,6 +29,7 @@ APP_NAME="Plume"
 BUNDLE_ID="com.guillaumedhios.plume"
 VERSION="1.0.0"
 SIGN_IDENTITY="${SIGN_IDENTITY:-Plume Local Dev}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-plume-notary}"
 DEST="${DEST:-/Applications}"
 APP="$DEST/$APP_NAME.app"
 
@@ -59,20 +75,69 @@ fi
 
 xattr -cr "$APP" 2>/dev/null || true
 
-echo "→ Signature…"
-# Tentative directe : un certificat auto-signé fonctionne même marqué
-# CSSMERR_TP_NOT_TRUSTED (que `find-identity -v` ne listerait pas).
-if codesign --force --sign "$SIGN_IDENTITY" "$APP" 2>/dev/null; then
-    echo "   Signé avec « $SIGN_IDENTITY »."
+if [ "${NOTARIZE:-0}" = "1" ]; then
+    echo "→ Signature Developer ID (hardened runtime)…"
+    if [ -z "${DEV_ID_IDENTITY:-}" ]; then
+        DEV_ID_IDENTITY=$(security find-identity -v -p codesigning \
+            | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+    fi
+    if [ -z "$DEV_ID_IDENTITY" ]; then
+        echo "❌ Aucun certificat « Developer ID Application » dans le Trousseau."
+        echo "   À créer une seule fois : Xcode → Settings… → Accounts →"
+        echo "   Manage Certificates… → + → « Developer ID Application »."
+        exit 1
+    fi
+    echo "   Identité : $DEV_ID_IDENTITY"
+    codesign --force --sign "$DEV_ID_IDENTITY" --options runtime --timestamp "$APP"
+    codesign --verify --strict "$APP"
+
+    echo "→ Notarisation Apple (quelques minutes)…"
+    mkdir -p dist
+    UPLOAD_ZIP="dist/.upload.zip"
+    rm -f "$UPLOAD_ZIP"
+    ditto -c -k --keepParent "$APP" "$UPLOAD_ZIP"
+    if ! SUBMIT_OUT=$(xcrun notarytool submit "$UPLOAD_ZIP" \
+            --keychain-profile "$NOTARY_PROFILE" --wait 2>&1); then
+        echo "$SUBMIT_OUT"
+        echo "❌ Soumission impossible. Si le profil « $NOTARY_PROFILE » n'existe pas,"
+        echo "   le créer une seule fois (mot de passe d'app sur account.apple.com) :"
+        echo "   xcrun notarytool store-credentials $NOTARY_PROFILE \\"
+        echo "     --apple-id <apple-id> --team-id <TEAMID> --password <mdp-app>"
+        rm -f "$UPLOAD_ZIP"
+        exit 1
+    fi
+    echo "$SUBMIT_OUT"
+    rm -f "$UPLOAD_ZIP"
+    if ! echo "$SUBMIT_OUT" | grep -q "status: Accepted"; then
+        SUBMISSION_ID=$(echo "$SUBMIT_OUT" | sed -n 's/^ *id: //p' | head -1)
+        echo "❌ Notarisation refusée. Détail du rapport :"
+        echo "   xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE"
+        exit 1
+    fi
+
+    echo "→ Agrafage du ticket…"
+    xcrun stapler staple "$APP"
+
+    SHARE_ZIP="dist/$APP_NAME-$VERSION.zip"
+    rm -f "$SHARE_ZIP"
+    ditto -c -k --keepParent "$APP" "$SHARE_ZIP"
+    echo "✅ $SHARE_ZIP prêt à partager (dézipper dans /Applications, double-clic)."
 else
-    echo "⚠️  Certificat « $SIGN_IDENTITY » introuvable → signature ad-hoc."
-    echo "    macOS re-demandera Accessibilité/Trousseau après chaque rebuild."
-    echo "    Pour créer le certificat (une seule fois) : Trousseau d'accès →"
-    echo "    Assistant de certification → Créer un certificat… →"
-    echo "    nom « $SIGN_IDENTITY », type « Signature de code », racine auto-signée."
-    codesign --force --sign - "$APP"
+    echo "→ Signature locale…"
+    # Tentative directe : un certificat auto-signé fonctionne même marqué
+    # CSSMERR_TP_NOT_TRUSTED (que `find-identity -v` ne listerait pas).
+    if codesign --force --sign "$SIGN_IDENTITY" "$APP" 2>/dev/null; then
+        echo "   Signé avec « $SIGN_IDENTITY »."
+    else
+        echo "⚠️  Certificat « $SIGN_IDENTITY » introuvable → signature ad-hoc."
+        echo "    macOS re-demandera Accessibilité/Trousseau après chaque rebuild."
+        echo "    Pour créer le certificat (une seule fois) : Trousseau d'accès →"
+        echo "    Assistant de certification → Créer un certificat… →"
+        echo "    nom « $SIGN_IDENTITY », type « Signature de code », racine auto-signée."
+        codesign --force --sign - "$APP"
+    fi
+    codesign --verify --strict "$APP"
 fi
-codesign --verify --strict "$APP"
 
 touch "$APP"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" >/dev/null 2>&1 || true
