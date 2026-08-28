@@ -49,9 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: "Plume")
 
         let menu = NSMenu()
-        let correct = NSMenuItem(title: "Corriger la sélection", action: #selector(correctFromMenu), keyEquivalent: "")
+        let correct = NSMenuItem(title: PlumeAction.correct.menuTitle, action: #selector(correctFromMenu), keyEquivalent: "")
         correct.target = self
         menu.addItem(correct)
+
+        let makePrompt = NSMenuItem(title: PlumeAction.makePrompt.menuTitle, action: #selector(makePromptFromMenu), keyEquivalent: "")
+        makePrompt.target = self
+        menu.addItem(makePrompt)
 
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
@@ -64,11 +68,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    @objc private func correctFromMenu() {
+    @objc private func correctFromMenu() { triggerFromMenu(.correct) }
+    @objc private func makePromptFromMenu() { triggerFromMenu(.makePrompt) }
+
+    private func triggerFromMenu(_ action: PlumeAction) {
         // Laisse le menu se refermer et l'app précédente reprendre le focus.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 250_000_000)
-            coordinator.trigger()
+            coordinator.trigger(action: action)
         }
     }
 

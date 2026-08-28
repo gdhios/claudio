@@ -1,13 +1,15 @@
 # Plume
 
-Mini-app macOS (barre de menus) qui reproduit la fonctionnalité « AI Command sur sélection » de Raycast Pro : un raccourci global capture la sélection courante dans n'importe quelle app, l'envoie à Claude pour corriger l'orthographe/la grammaire et améliorer légèrement la formulation, affiche le résultat en streaming dans un panneau flottant, puis le colle à la place de la sélection.
+Mini-app macOS (barre de menus) qui reproduit la fonctionnalité « AI Command sur sélection » de Raycast Pro : un raccourci global capture la sélection courante dans n'importe quelle app, la transforme via Claude, affiche le résultat en streaming dans un panneau flottant, puis le colle à la place de la sélection.
 
 ## Usage
 
 1. Sélectionner du texte dans n'importe quelle app.
-2. **⌃⌥C** (Contrôle + Option + C) — reconfigurable dans les Réglages.
-3. Le panneau apparaît près du pointeur et la correction s'écrit en streaming.
-4. **Entrée** (ou bouton « Coller ») → colle le texte corrigé à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
+2. Déclencher une action (raccourcis reconfigurables dans les Réglages) :
+   - **⌃⌥C** — *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
+   - **⌃⌥P** — *Structurer en prompt* : transforme une idée brute en prompt clair et efficace, prêt à envoyer à un assistant IA (objectif, contexte, contraintes, format explicités ; espaces réservés `[préciser…]` si une info manque).
+3. Le panneau apparaît près du pointeur et le résultat s'écrit en streaming.
+4. **Entrée** (ou bouton « Coller ») → colle le résultat à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
 
 L'app source garde le focus pendant tout le cycle : le panneau ne « vole » jamais la fenêtre active.
 
@@ -36,7 +38,9 @@ Le script l'utilise automatiquement (sinon il se replie sur ad-hoc avec un avert
 - **Modèle** : `claude-haiku-4-5` (constante dans `Sources/Plume/Support/Constants.swift`), streaming SSE. Coût ≈ 0,2 centime par correction courte.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
+- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Plume/AI/PlumeAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.
 - **Prompt** : toutes les instructions vivent dans le message `system` ; le texte sélectionné part tel quel en `user` (limite l'injection de prompt). La langue du texte est préservée.
+- **Icône** : régénérable via `Scripts/make_icon.sh` (dessin AppKit → `icon/AppIcon.icns`, embarquée par `build_app.sh`).
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
 - **Test CLI sans UI** :
 

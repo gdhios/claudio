@@ -34,9 +34,10 @@ struct AnthropicClient: Sendable {
         let truncated: Bool
     }
 
-    func streamCorrection(
+    func streamCompletion(
         of text: String,
-        maxTokensMultiplier: Int = 1,
+        system: String,
+        maxTokens: Int,
         onDelta: @escaping @Sendable (String) async -> Void
     ) async throws -> StreamResult {
         var request = URLRequest(url: Constants.apiURL)
@@ -50,9 +51,9 @@ struct AnthropicClient: Sendable {
 
         let body: [String: Any] = [
             "model": Constants.model,
-            "max_tokens": CorrectionPrompt.maxTokens(forText: text, multiplier: maxTokensMultiplier),
+            "max_tokens": maxTokens,
             "temperature": Constants.temperature,
-            "system": CorrectionPrompt.system,
+            "system": system,
             "stream": true,
             "messages": [["role": "user", "content": text]]
         ]
