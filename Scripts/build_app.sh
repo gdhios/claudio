@@ -60,8 +60,9 @@ fi
 xattr -cr "$APP" 2>/dev/null || true
 
 echo "→ Signature…"
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
-    codesign --force --sign "$SIGN_IDENTITY" "$APP"
+# Tentative directe : un certificat auto-signé fonctionne même marqué
+# CSSMERR_TP_NOT_TRUSTED (que `find-identity -v` ne listerait pas).
+if codesign --force --sign "$SIGN_IDENTITY" "$APP" 2>/dev/null; then
     echo "   Signé avec « $SIGN_IDENTITY »."
 else
     echo "⚠️  Certificat « $SIGN_IDENTITY » introuvable → signature ad-hoc."
