@@ -23,7 +23,7 @@ enum SelfTest {
         // Semaphore + Task.detached : le travail reste hors du main thread
         // (bloqué par wait()), aucun saut vers le MainActor dans ce chemin.
         let semaphore = DispatchSemaphore(value: 0)
-        let client = AnthropicClient(apiKey: apiKey)
+        let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
         Task.detached {
             do {
                 let result = try await client.streamCorrection(of: sample) { piece in

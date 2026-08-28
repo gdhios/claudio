@@ -61,7 +61,7 @@ final class CorrectionCoordinator {
         session.truncated = false
         session.justCopied = false
 
-        let client = AnthropicClient(apiKey: apiKey)
+        let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
         do {
             let result = try await client.streamCorrection(
                 of: session.originalText,

@@ -14,6 +14,7 @@ enum Constants {
     static let keychainService = "com.guillaumedhios.plume"
     static let keychainAccount = "anthropic-api-key"
     static let apiKeyEnvVar = "ANTHROPIC_API_KEY"
+    static let workspaceIDEnvVar = "ANTHROPIC_WORKSPACE_ID"
 
     // Capture de sélection via ⌘C simulé
     static let copyPollIntervalNs: UInt64 = 20_000_000        // 20 ms entre deux sondages du pasteboard
