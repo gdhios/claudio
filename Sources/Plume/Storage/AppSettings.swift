@@ -22,4 +22,26 @@ enum AppSettings {
         }
         return workspaceID
     }
+
+    // MARK: - Prompts système personnalisés
+
+    private static func systemPromptKey(for action: PlumeAction) -> String {
+        "systemPrompt.\(action.rawValue)"
+    }
+
+    /// Prompt système personnalisé de l'action (nil = prompt par défaut du code).
+    static func customSystemPrompt(for action: PlumeAction) -> String? {
+        let value = UserDefaults.standard.string(forKey: systemPromptKey(for: action))
+        return (value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? value : nil
+    }
+
+    /// nil ou chaîne vide → retour au prompt par défaut.
+    static func setCustomSystemPrompt(_ prompt: String?, for action: PlumeAction) {
+        let key = systemPromptKey(for: action)
+        if let prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            UserDefaults.standard.set(prompt, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
 }

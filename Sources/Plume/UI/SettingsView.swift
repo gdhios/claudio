@@ -2,6 +2,18 @@ import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsView: View {
+    var body: some View {
+        TabView {
+            GeneralSettingsTab()
+                .tabItem { Label("Général", systemImage: "gearshape") }
+            PromptSettingsTab()
+                .tabItem { Label("Prompts", systemImage: "text.quote") }
+        }
+        .frame(width: 520, height: 560)
+    }
+}
+
+private struct GeneralSettingsTab: View {
     @State private var apiKeyField = ""
     @State private var hasStoredKey = KeychainStore.loadAPIKey() != nil
     @State private var workspaceIDField = AppSettings.workspaceID ?? ""
@@ -54,6 +66,7 @@ struct SettingsView: View {
             Section("Raccourcis") {
                 KeyboardShortcuts.Recorder("Corriger la sélection :", name: .correctSelection)
                 KeyboardShortcuts.Recorder("Structurer en prompt :", name: .structurePrompt)
+                KeyboardShortcuts.Recorder("Structurer en prompt expert :", name: .expertPrompt)
             }
 
             Section("Général") {
@@ -76,6 +89,59 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 490)
+    }
+}
+
+private struct PromptSettingsTab: View {
+    @State private var selectedAction: PlumeAction = .correct
+    @State private var promptText: String = PlumeAction.correct.system
+
+    private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Action", selection: $selectedAction) {
+                    ForEach(PlumeAction.allCases, id: \.self) { action in
+                        Text(action.menuTitle).tag(action)
+                    }
+                }
+                .onChange(of: selectedAction) {
+                    promptText = selectedAction.system
+                }
+            }
+
+            Section("Prompt système") {
+                TextEditor(text: $promptText)
+                    .font(.callout)
+                    .frame(minHeight: 280)
+                    .onChange(of: promptText) {
+                        // Identique au défaut → on retire l'override (suit les mises à jour de l'app).
+                        AppSettings.setCustomSystemPrompt(isCustomized ? promptText : nil,
+                                                          for: selectedAction)
+                    }
+                HStack {
+                    if isCustomized {
+                        Label("Personnalisé", systemImage: "pencil")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Label("Prompt par défaut", systemImage: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Réinitialiser") {
+                        AppSettings.setCustomSystemPrompt(nil, for: selectedAction)
+                        promptText = selectedAction.defaultSystem
+                    }
+                    .disabled(!isCustomized)
+                }
+                Text("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part — balisé <texte_source> pour les actions de prompt — ce prompt ne définit que la tâche.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
