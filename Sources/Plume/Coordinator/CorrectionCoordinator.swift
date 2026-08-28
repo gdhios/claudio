@@ -30,7 +30,6 @@ final class CorrectionCoordinator {
 
         let session = CorrectionSession()
         self.session = session
-        showPanel(for: session)
 
         streamTask = Task { [weak self] in
             await self?.runCorrection(session: session)
@@ -38,8 +37,13 @@ final class CorrectionCoordinator {
     }
 
     private func runCorrection(session: CorrectionSession) async {
-        guard let text = await SelectionCapture.capture(),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        // Capture AVANT d'afficher le panneau : une fois key, le panneau
+        // intercepterait le ⌘C simulé destiné à l'app source.
+        let text = await SelectionCapture.capture()
+        guard self.session === session else { return }  // re-déclenché/fermé entre-temps
+        showPanel(for: session)
+
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             session.phase = .noSelection
             return
         }
