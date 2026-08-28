@@ -26,7 +26,11 @@ enum SelfTest {
         let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
         Task.detached {
             do {
-                let result = try await client.streamCorrection(of: sample) { piece in
+                let result = try await client.streamCompletion(
+                    of: sample,
+                    system: PlumeAction.correct.system,
+                    maxTokens: PlumeAction.correct.maxTokens(forText: sample)
+                ) { piece in
                     print(piece, terminator: "")
                 }
                 print("\n---")

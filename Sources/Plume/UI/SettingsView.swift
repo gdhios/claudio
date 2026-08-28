@@ -51,8 +51,9 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Raccourci") {
+            Section("Raccourcis") {
                 KeyboardShortcuts.Recorder("Corriger la sélection :", name: .correctSelection)
+                KeyboardShortcuts.Recorder("Structurer en prompt :", name: .structurePrompt)
             }
 
             Section("Général") {
@@ -75,6 +76,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 460)
+        .frame(width: 440, height: 490)
     }
 }

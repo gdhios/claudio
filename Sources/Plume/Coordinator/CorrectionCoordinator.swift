@@ -14,8 +14,8 @@ final class CorrectionCoordinator {
 
     // MARK: - Déclenchement
 
-    func trigger() {
-        dismiss()  // idempotent : un ⌃⌥C pendant qu'un panneau est ouvert repart de zéro
+    func trigger(action: PlumeAction) {
+        dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
 
         guard AccessibilityPermission.isGranted else {
             AccessibilityPermission.request()
@@ -28,7 +28,7 @@ final class CorrectionCoordinator {
         previousApp = (frontmost?.bundleIdentifier == Bundle.main.bundleIdentifier) ? nil : frontmost
         clipboardSnapshot = PasteboardSnapshot.capture()
 
-        let session = CorrectionSession()
+        let session = CorrectionSession(action: action)
         self.session = session
 
         streamTask = Task { [weak self] in
@@ -62,10 +62,13 @@ final class CorrectionCoordinator {
         session.justCopied = false
 
         let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
+        let action = session.action
         do {
-            let result = try await client.streamCorrection(
+            let result = try await client.streamCompletion(
                 of: session.originalText,
-                maxTokensMultiplier: session.maxTokensMultiplier
+                system: action.system,
+                maxTokens: action.maxTokens(forText: session.originalText,
+                                            multiplier: session.maxTokensMultiplier)
             ) { @MainActor piece in
                 session.correctedText += piece
             }

@@ -11,6 +11,9 @@ final class CorrectionSession: ObservableObject {
         case error(String)
     }
 
+    let action: PlumeAction
+    init(action: PlumeAction) { self.action = action }
+
     @Published var phase: Phase = .capturing
     @Published var correctedText = ""
     @Published var truncated = false
@@ -48,6 +51,9 @@ struct ResultPanelView: View {
         HStack(spacing: 8) {
             Image(systemName: "wand.and.stars").foregroundStyle(.secondary)
             Text("Plume").font(.headline)
+            Text(session.action.panelTitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             Spacer()
             statusLabel
         }
@@ -66,7 +72,7 @@ struct ResultPanelView: View {
         case .streaming:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Correction…")
+                Text(session.action.progressLabel)
             }
             .font(.caption).foregroundStyle(.secondary)
         case .done:
