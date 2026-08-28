@@ -49,17 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: "Plume")
 
         let menu = NSMenu()
-        let correct = NSMenuItem(title: PlumeAction.correct.menuTitle, action: #selector(correctFromMenu), keyEquivalent: "")
-        correct.target = self
-        menu.addItem(correct)
-
-        let makePrompt = NSMenuItem(title: PlumeAction.makePrompt.menuTitle, action: #selector(makePromptFromMenu), keyEquivalent: "")
-        makePrompt.target = self
-        menu.addItem(makePrompt)
-
-        let expertPrompt = NSMenuItem(title: PlumeAction.expertPrompt.menuTitle, action: #selector(expertPromptFromMenu), keyEquivalent: "")
-        expertPrompt.target = self
-        menu.addItem(expertPrompt)
+        for action in PlumeAction.allCases {
+            let item = NSMenuItem(title: action.menuTitle, action: #selector(actionFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = action.rawValue
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
 
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
@@ -72,9 +68,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    @objc private func correctFromMenu() { triggerFromMenu(.correct) }
-    @objc private func makePromptFromMenu() { triggerFromMenu(.makePrompt) }
-    @objc private func expertPromptFromMenu() { triggerFromMenu(.expertPrompt) }
+    @objc private func actionFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let action = PlumeAction(rawValue: raw) else { return }
+        triggerFromMenu(action)
+    }
 
     private func triggerFromMenu(_ action: PlumeAction) {
         // Laisse le menu se refermer et l'app précédente reprendre le focus.
