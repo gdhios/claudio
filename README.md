@@ -34,6 +34,27 @@ Trousseau d'accès → menu Trousseau d'accès → Assistant de certification �
 
 Le script l'utilise automatiquement (sinon il se replie sur ad-hoc avec un avertissement).
 
+### Partager l'app (notarisation Apple)
+
+Pour donner l'app à quelqu'un sans avertissement Gatekeeper. Prérequis, une seule fois (compte Apple Developer requis) :
+
+1. **Certificat « Developer ID Application »** : Xcode → Settings… → Accounts → sélectionner le compte → Manage Certificates… → **+** → « Developer ID Application ».
+2. **Identifiants notarytool** : créer un mot de passe d'application sur [account.apple.com](https://account.apple.com) (Connexion et sécurité → Mots de passe d'app), puis l'enregistrer dans le Trousseau (le `TEAMID` est entre parenthèses dans le nom du certificat, visible via `security find-identity -v -p codesigning`) :
+
+```bash
+xcrun notarytool store-credentials plume-notary --apple-id guillaume.dhios@gmail.com --team-id TEAMID --password xxxx-xxxx-xxxx-xxxx
+```
+
+Ensuite, à chaque version à partager :
+
+```bash
+NOTARIZE=1 Scripts/build_app.sh
+```
+
+→ signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Plume-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique — aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
+
+Note : Developer ID étant une identité différente de « Plume Local Dev », macOS redemande une fois Accessibilité/Trousseau sur ta machine quand tu alternes entre build local et build notarisé.
+
 ## Détails
 
 - **Modèle** : `claude-haiku-4-5` (constante dans `Sources/Plume/Support/Constants.swift`), streaming SSE. Coût ≈ 0,2 centime par correction courte.
