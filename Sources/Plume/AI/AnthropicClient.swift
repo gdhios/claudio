@@ -26,6 +26,8 @@ enum AnthropicError: LocalizedError {
 /// (Pas de SDK Swift officiel Anthropic → HTTP brut via URLSession.)
 struct AnthropicClient: Sendable {
     let apiKey: String
+    /// Requis par les clés « liées à l'identité » (identity-linked), sinon 400.
+    var workspaceID: String? = nil
 
     struct StreamResult: Sendable {
         let text: String
@@ -42,6 +44,9 @@ struct AnthropicClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(Constants.anthropicVersion, forHTTPHeaderField: "anthropic-version")
+        if let workspaceID, !workspaceID.isEmpty {
+            request.setValue(workspaceID, forHTTPHeaderField: "anthropic-workspace-id")
+        }
 
         let body: [String: Any] = [
             "model": Constants.model,

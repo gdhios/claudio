@@ -4,6 +4,7 @@ import KeyboardShortcuts
 struct SettingsView: View {
     @State private var apiKeyField = ""
     @State private var hasStoredKey = KeychainStore.loadAPIKey() != nil
+    @State private var workspaceIDField = AppSettings.workspaceID ?? ""
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
 
@@ -40,6 +41,14 @@ struct SettingsView: View {
                 Link("Créer une clé sur console.anthropic.com",
                      destination: URL(string: "https://console.anthropic.com/settings/keys")!)
                     .font(.caption)
+
+                TextField("Espace de travail", text: $workspaceIDField, prompt: Text("wrkspc_…"))
+                    .onChange(of: workspaceIDField) {
+                        AppSettings.workspaceID = workspaceIDField
+                    }
+                Text("Requis uniquement si ta clé est « liée à l'identité » (erreur 400 sinon). Console → Réglages → Workspaces → copier l'ID de l'espace.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Raccourci") {
@@ -66,6 +75,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 400)
+        .frame(width: 440, height: 460)
     }
 }
