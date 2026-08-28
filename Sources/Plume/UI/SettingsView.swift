@@ -9,7 +9,7 @@ struct SettingsView: View {
             PromptSettingsTab()
                 .tabItem { Label("Prompts", systemImage: "text.quote") }
         }
-        .frame(width: 520, height: 560)
+        .frame(width: 520, height: 600)
     }
 }
 
@@ -64,9 +64,9 @@ private struct GeneralSettingsTab: View {
             }
 
             Section("Raccourcis") {
-                KeyboardShortcuts.Recorder("Corriger la sélection :", name: .correctSelection)
-                KeyboardShortcuts.Recorder("Structurer en prompt :", name: .structurePrompt)
-                KeyboardShortcuts.Recorder("Structurer en prompt expert :", name: .expertPrompt)
+                ForEach(PlumeAction.allCases, id: \.self) { action in
+                    KeyboardShortcuts.Recorder("\(action.menuTitle) :", name: action.shortcutName)
+                }
             }
 
             Section("Général") {

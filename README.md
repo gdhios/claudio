@@ -9,6 +9,10 @@ Mini-app macOS (barre de menus) qui reproduit la fonctionnalité « AI Command s
    - **⌃⌥C** — *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
    - **⌃⌥P** — *Structurer en prompt* : reformule une idée brute en demande claire et directe, compacte, sans y répondre.
    - **⌃⌥S** — *Structurer en prompt expert* : produit un prompt complet selon les bonnes pratiques Anthropic (rôle, contexte, tâche, contraintes, format de sortie, balises pour les données, espaces réservés `[préciser : …]` si une info manque).
+   - **⌃⌥F** — *Traduire en français* : traduction naturelle et idiomatique, ton et mise en forme préservés.
+   - **⌃⌥E** — *Traduire en anglais* : idem vers l'anglais (dicter en français, envoyer en anglais).
+   - **⌃⌥T** — *Ton professionnel* : réécrit la sélection en message courtois et professionnel prêt à envoyer, sans en changer le fond.
+   - **⌃⌥R** — *Résumer* : condense le texte en quelques phrases ou puces fidèles (résultat plutôt à copier qu'à coller).
 3. Le panneau apparaît près du pointeur et le résultat s'écrit en streaming.
 4. **Entrée** (ou bouton « Coller ») → colle le résultat à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
 
