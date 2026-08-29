@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let item = NSMenuItem(title: "Mise à jour \(feed.version) disponible…",
-                              action: #selector(openUpdateURL(_:)), keyEquivalent: "")
+                              action: #selector(installUpdate(_:)), keyEquivalent: "")
         item.target = self
         item.tag = updateMenuItemTag
         item.representedObject = feed.url
@@ -93,9 +93,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.insertItem(.separator(), at: 1)
     }
 
-    @objc private func openUpdateURL(_ sender: NSMenuItem) {
-        guard let url = sender.representedObject as? URL else { return }
-        NSWorkspace.shared.open(url)
+    /// Installe la mise à jour à la place de l'app puis relance, après accord
+    /// explicite : remplacer l'app installée n'est pas anodin.
+    @objc private func installUpdate(_ sender: NSMenuItem) {
+        guard let feed = UpdateChecker.shared.availableUpdate else { return }
+
+        let confirm = NSAlert()
+        confirm.messageText = "Installer Claudio \(feed.version) ?"
+        confirm.informativeText = "Claudio télécharge la nouvelle version, remplace l'app installée, puis redémarre."
+        confirm.addButton(withTitle: "Installer et redémarrer")
+        confirm.addButton(withTitle: "Annuler")
+        NSApp.activate(ignoringOtherApps: true)
+        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+
+        let title = sender.title
+        sender.title = "Téléchargement de la mise à jour…"
+        sender.isEnabled = false
+        Task { @MainActor in
+            do {
+                let newApp = try await UpdateInstaller.prepare(from: feed.url)
+                try UpdateInstaller.installAndRelaunch(newApp)
+            } catch {
+                sender.title = title
+                sender.isEnabled = true
+                let failed = NSAlert()
+                failed.messageText = "Mise à jour impossible"
+                failed.informativeText = error.localizedDescription
+                failed.addButton(withTitle: "OK")
+                failed.addButton(withTitle: "Télécharger dans le navigateur")
+                NSApp.activate(ignoringOtherApps: true)
+                if failed.runModal() == .alertSecondButtonReturn {
+                    NSWorkspace.shared.open(feed.url)
+                }
+            }
+        }
     }
 
     @objc private func actionFromMenu(_ sender: NSMenuItem) {
