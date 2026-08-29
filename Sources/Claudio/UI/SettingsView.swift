@@ -224,7 +224,7 @@ private struct PromptsPane: View {
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text("\(selectedModel.costHint) — \(selectedModel == selectedAction.defaultModel ? "modèle par défaut pour cette action." : "modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).")")
+                Text("\(selectedModel.costHint). \(selectedModel == selectedAction.defaultModel ? "Modèle par défaut pour cette action." : "Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -255,7 +255,7 @@ private struct PromptsPane: View {
                     }
                     .disabled(!isCustomized)
                 }
-                Text("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part — balisé <texte_source> pour les actions de prompt — ce prompt ne définit que la tâche.")
+                Text("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part, balisé <texte_source> pour les actions de prompt : ce prompt ne définit que la tâche.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -308,7 +308,7 @@ private struct AboutPane: View {
                                 updateMessage = "Mise à jour \(feed.version) disponible."
                                 updateURL = feed.url
                             case .failed:
-                                updateMessage = "Vérification impossible — réessayez plus tard."
+                                updateMessage = "Vérification impossible, réessayez plus tard."
                                 updateURL = nil
                             }
                             checking = false
@@ -326,7 +326,7 @@ private struct AboutPane: View {
                 if let updateMessage {
                     Text(updateMessage).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Vérification automatique une fois par jour — une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée.")
+                Text("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -344,7 +344,7 @@ private struct AboutPane: View {
             }
 
             Section {
-                Text("Fait main en Swift. Projet indépendant, non affilié à Anthropic — Claude est une marque d'Anthropic, PBC.")
+                Text("Fait main en Swift. Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

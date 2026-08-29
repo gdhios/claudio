@@ -6,14 +6,14 @@ Mini-app macOS (barre de menus) qui capture la sélection courante dans n'import
 
 1. Sélectionner du texte dans n'importe quelle app.
 2. Déclencher une action (raccourcis reconfigurables dans les Réglages) :
-   - **⌃⌥⌘I** — *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
-   - **⌃⌥⌘P** — *Structurer en prompt* : reformule une idée brute en demande claire et directe, compacte, sans y répondre.
-   - **⌃⌥⌘^** — *Structurer en prompt expert* : produit un prompt complet selon les bonnes pratiques Anthropic (rôle, contexte, tâche, contraintes, format de sortie, balises pour les données, espaces réservés `[préciser : …]` si une info manque).
-   - **⌃⌥⌘F** — *Traduire en français* : traduction naturelle et idiomatique, ton et mise en forme préservés.
-   - **⌃⌥⌘E** — *Traduire en anglais* : idem vers l'anglais (dicter en français, envoyer en anglais).
-   - **⌃⌥⌘T** — *Ton professionnel* : réécrit la sélection en message courtois et professionnel prêt à envoyer, sans en changer le fond.
-   - **⌃⌥⌘R** — *Résumer* : condense le texte en quelques phrases ou puces fidèles (résultat plutôt à copier qu'à coller).
-   - **⌃⌥⌘L** — *Lapacompris* : réexplique un texte dense ou jargonneux beaucoup plus simplement, comme à un ami — les faits (chemins, commandes, nombres, décisions) restent exacts.
+   - **⌃⌥⌘I** *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
+   - **⌃⌥⌘P** *Structurer en prompt* : reformule une idée brute en demande claire et directe, compacte, sans y répondre.
+   - **⌃⌥⌘^** *Structurer en prompt expert* : produit un prompt complet selon les bonnes pratiques Anthropic (rôle, contexte, tâche, contraintes, format de sortie, balises pour les données, espaces réservés `[préciser : …]` si une info manque).
+   - **⌃⌥⌘F** *Traduire en français* : traduction naturelle et idiomatique, ton et mise en forme préservés.
+   - **⌃⌥⌘E** *Traduire en anglais* : idem vers l'anglais (dicter en français, envoyer en anglais).
+   - **⌃⌥⌘T** *Ton professionnel* : réécrit la sélection en message courtois et professionnel prêt à envoyer, sans en changer le fond.
+   - **⌃⌥⌘R** *Résumer* : condense le texte en quelques phrases ou puces fidèles (résultat plutôt à copier qu'à coller).
+   - **⌃⌥⌘L** *Lapacompris* : réexplique un texte dense ou jargonneux beaucoup plus simplement, comme à un ami, en gardant les faits exacts (chemins, commandes, nombres, décisions).
 3. Le panneau apparaît près du pointeur et le résultat s'écrit en streaming.
 4. **Entrée** (ou bouton « Coller ») → colle le résultat à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
 
@@ -28,8 +28,8 @@ open /Applications/Claudio.app
 
 Au premier lancement :
 
-1. **Clé API** — la fenêtre Réglages s'ouvre si aucune clé n'est configurée. Créer une clé sur [console.anthropic.com](https://console.anthropic.com/settings/keys) et la coller dans le champ (stockée dans le Trousseau). En dev, la variable d'environnement `ANTHROPIC_API_KEY` prime sur le Trousseau.
-2. **Accessibilité** — au premier raccourci, macOS demande l'autorisation (Réglages Système → Confidentialité et sécurité → Accessibilité). Nécessaire pour lire la sélection et simuler ⌘C/⌘V.
+1. **Clé API** : la fenêtre Réglages s'ouvre si aucune clé n'est configurée. Créer une clé sur [console.anthropic.com](https://console.anthropic.com/settings/keys) et la coller dans le champ (stockée dans le Trousseau). En dev, la variable d'environnement `ANTHROPIC_API_KEY` prime sur le Trousseau.
+2. **Accessibilité** : au premier raccourci, macOS demande l'autorisation (Réglages Système → Confidentialité et sécurité → Accessibilité). Nécessaire pour lire la sélection et simuler ⌘C/⌘V.
 
 ### Certificat de signature stable (recommandé)
 
@@ -56,7 +56,7 @@ Ensuite, à chaque version à partager :
 NOTARIZE=1 Scripts/build_app.sh
 ```
 
-→ signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Claudio-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique — aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
+→ signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Claudio-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique, sans aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
 
 Note : Developer ID étant une identité différente de « Plume Local Dev », macOS redemande une fois Accessibilité/Trousseau sur ta machine quand tu alternes entre build local et build notarisé.
 
@@ -65,11 +65,11 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 - **Modèle** : choix par action dans Réglages → Prompts (Haiku 4.5 par défaut, Sonnet 5 ou Opus 5 au choix), streaming SSE. Coût ≈ 0,2 centime par correction courte avec Haiku.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
-- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.
+- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` ; en ajouter une nouvelle = un cas d'enum + un raccourci.
 - **Prompts éditables** : l'onglet Prompts des Réglages affiche le prompt système de chaque action et permet de le modifier (stocké dans UserDefaults ; « Réinitialiser » revient au prompt du code, qui suit alors les mises à jour de l'app).
-- **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user` — sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
+- **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user`. Sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
 - **Icône** : `icon/AppIcon.icns`, embarquée par `build_app.sh`. Les sources de l'icône ne sont pas versionnées (`Scripts/make_icon.sh` sert à la régénérer en local).
-- **Mises à jour** : vérification automatique une fois par jour (simple lecture de `version.json` sur claudio.okonoma.com — aucune donnée envoyée) + bouton « Vérifier maintenant » dans Réglages → À propos. Une mise à jour disponible apparaît en tête du menu de la barre.
+- **Mises à jour** : vérification automatique une fois par jour (simple lecture de `version.json` sur claudio.okonoma.com, aucune donnée envoyée) + bouton « Vérifier maintenant » dans Réglages → À propos. Une mise à jour disponible apparaît en tête du menu de la barre.
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
 - **Test CLI sans UI** :
 
@@ -84,6 +84,6 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "un texte avec de
 
 ## Licence et soutien
 
-Claudio est open source sous licence [MIT](LICENSE). Projet indépendant, non affilié à Anthropic — Claude est une marque d'Anthropic, PBC.
+Claudio est open source sous licence [MIT](LICENSE). Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.
 
 Si l'app vous rend service : [offrez-moi un café](https://buymeacoffee.com/gdhios) ☕
