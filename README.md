@@ -13,6 +13,7 @@ Mini-app macOS (barre de menus) qui capture la sélection courante dans n'import
    - **⌃⌥⌘E** — *Traduire en anglais* : idem vers l'anglais (dicter en français, envoyer en anglais).
    - **⌃⌥⌘T** — *Ton professionnel* : réécrit la sélection en message courtois et professionnel prêt à envoyer, sans en changer le fond.
    - **⌃⌥⌘R** — *Résumer* : condense le texte en quelques phrases ou puces fidèles (résultat plutôt à copier qu'à coller).
+   - **⌃⌥⌘L** — *Lapacompris* : réexplique un texte dense ou jargonneux beaucoup plus simplement, comme à un ami — les faits (chemins, commandes, nombres, décisions) restent exacts.
 3. Le panneau apparaît près du pointeur et le résultat s'écrit en streaming.
 4. **Entrée** (ou bouton « Coller ») → colle le résultat à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
 
@@ -68,6 +69,7 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 - **Prompts éditables** : l'onglet Prompts des Réglages affiche le prompt système de chaque action et permet de le modifier (stocké dans UserDefaults ; « Réinitialiser » revient au prompt du code, qui suit alors les mises à jour de l'app).
 - **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user` — sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
 - **Icône** : `icon/AppIcon.icns`, embarquée par `build_app.sh`. Les sources de l'icône ne sont pas versionnées (`Scripts/make_icon.sh` sert à la régénérer en local).
+- **Mises à jour** : vérification automatique une fois par jour (simple lecture de `version.json` sur claudio.okonoma.com — aucune donnée envoyée) + bouton « Vérifier maintenant » dans Réglages → À propos. Une mise à jour disponible apparaît en tête du menu de la barre.
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
 - **Test CLI sans UI** :
 

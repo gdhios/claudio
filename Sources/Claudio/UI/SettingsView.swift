@@ -269,6 +269,10 @@ private struct PromptsPane: View {
 // MARK: - À propos
 
 private struct AboutPane: View {
+    @State private var checking = false
+    @State private var updateMessage: String?
+    @State private var updateURL: URL?
+
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
@@ -291,6 +295,42 @@ private struct AboutPane: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section("Mises à jour") {
+                HStack {
+                    Button("Vérifier maintenant") {
+                        checking = true
+                        Task { @MainActor in
+                            switch await UpdateChecker.shared.checkNow() {
+                            case .upToDate:
+                                updateMessage = "Claudio est à jour (version \(version))."
+                                updateURL = nil
+                            case .updateAvailable(let feed):
+                                updateMessage = "Mise à jour \(feed.version) disponible."
+                                updateURL = feed.url
+                            case .failed:
+                                updateMessage = "Vérification impossible — réessayez plus tard."
+                                updateURL = nil
+                            }
+                            checking = false
+                        }
+                    }
+                    .disabled(checking)
+                    if checking {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                    if let updateURL {
+                        Link("Télécharger", destination: updateURL)
+                    }
+                }
+                if let updateMessage {
+                    Text(updateMessage).font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Vérification automatique une fois par jour — une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

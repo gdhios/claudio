@@ -29,7 +29,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Claudio"
 BUNDLE_ID="com.guillaumedhios.claudio"
-VERSION="1.1.0"
+VERSION="1.2.0"
 SIGN_IDENTITY="${SIGN_IDENTITY:-Plume Local Dev}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-claudio-notary}"
 DEST="${DEST:-/Applications}"

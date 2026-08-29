@@ -3,6 +3,8 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
+    private let updateMenuItemTag = 777
     private let coordinator = CorrectionCoordinator()
     private let settingsController = SettingsWindowController()
 
@@ -11,6 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)
+
+        UpdateChecker.shared.onUpdateFound = { [weak self] feed in
+            self?.showUpdateMenuItem(feed)
+        }
+        UpdateChecker.shared.startPeriodicChecks()
 
         // Premier lancement sans clé : ouvrir directement les Réglages.
         if KeychainStore.currentAPIKey() == nil {
@@ -66,6 +73,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         statusItem = item
+        statusMenu = menu
+    }
+
+    /// Item « Mise à jour X disponible… » en tête du menu status.
+    private func showUpdateMenuItem(_ feed: UpdateChecker.Feed) {
+        guard let menu = statusMenu else { return }
+        if let existing = menu.item(withTag: updateMenuItemTag) {
+            existing.title = "Mise à jour \(feed.version) disponible…"
+            existing.representedObject = feed.url
+            return
+        }
+        let item = NSMenuItem(title: "Mise à jour \(feed.version) disponible…",
+                              action: #selector(openUpdateURL(_:)), keyEquivalent: "")
+        item.target = self
+        item.tag = updateMenuItemTag
+        item.representedObject = feed.url
+        menu.insertItem(item, at: 0)
+        menu.insertItem(.separator(), at: 1)
+    }
+
+    @objc private func openUpdateURL(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func actionFromMenu(_ sender: NSMenuItem) {
