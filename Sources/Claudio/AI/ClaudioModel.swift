@@ -20,6 +20,16 @@ enum ClaudioModel: String, CaseIterable, Sendable {
     var supportsTemperature: Bool {
         self == .haiku45
     }
+
+    /// Ordre de grandeur pour une action courte (~200 tokens entrée/sortie),
+    /// d'après les tarifs publics par MTok — à rafraîchir si Anthropic les change.
+    var costHint: String {
+        switch self {
+        case .haiku45: "≈ 0,2 centime par action courte"
+        case .sonnet5: "≈ 0,5 centime par action courte (~3× Haiku)"
+        case .opus5: "≈ 1 centime par action courte (~5× Haiku)"
+        }
+    }
 }
 
 extension ClaudioAction {
