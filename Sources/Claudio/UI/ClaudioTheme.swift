@@ -32,7 +32,7 @@ extension ClaudioAction {
         case .translateEN: "globe.americas.fill"
         case .professionalTone: "briefcase.fill"
         case .summarize: "list.bullet.rectangle.fill"
-        case .simplify: "lightbulb.fill"
+        case .simplify: "hare.fill"
         }
     }
 
@@ -45,7 +45,7 @@ extension ClaudioAction {
         case .translateEN: .teal
         case .professionalTone: .brown
         case .summarize: .green
-        case .simplify: .yellow
+        case .simplify: .pink
         }
     }
 }

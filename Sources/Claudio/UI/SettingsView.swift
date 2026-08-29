@@ -101,7 +101,7 @@ private struct GeneralPane: View {
 
             Section("Modèle") {
                 LabeledContent("Modèle Claude", value: "réglable par action")
-                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Environ 0,2 centime par correction courte avec Haiku. La clé et la consommation se gèrent sur console.anthropic.com.")
+                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Ordre de grandeur par action courte : ≈ 0,2 centime avec Haiku, ≈ 0,5 centime avec Sonnet, ≈ 1 centime avec Opus. La clé et la consommation se gèrent sur console.anthropic.com.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -224,9 +224,7 @@ private struct PromptsPane: View {
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text(selectedModel == selectedAction.defaultModel
-                     ? "Modèle par défaut pour cette action."
-                     : "Modèle personnalisé — le défaut est \(selectedAction.defaultModel.displayName).")
+                Text("\(selectedModel.costHint) — \(selectedModel == selectedAction.defaultModel ? "modèle par défaut pour cette action." : "modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
