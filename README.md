@@ -1,4 +1,4 @@
-# Plume
+# Claudio
 
 Mini-app macOS (barre de menus) qui reproduit la fonctionnalité « AI Command sur sélection » de Raycast Pro : un raccourci global capture la sélection courante dans n'importe quelle app, la transforme via Claude, affiche le résultat en streaming dans un panneau flottant, puis le colle à la place de la sélection.
 
@@ -22,7 +22,7 @@ L'app source garde le focus pendant tout le cycle : le panneau ne « vole » jam
 
 ```bash
 Scripts/build_app.sh
-open /Applications/Plume.app
+open /Applications/Claudio.app
 ```
 
 Au premier lancement :
@@ -46,7 +46,7 @@ Pour donner l'app à quelqu'un sans avertissement Gatekeeper. Prérequis, une se
 2. **Identifiants notarytool** : créer un mot de passe d'application sur [account.apple.com](https://account.apple.com) (Connexion et sécurité → Mots de passe d'app), puis l'enregistrer dans le Trousseau (le `TEAMID` est entre parenthèses dans le nom du certificat, visible via `security find-identity -v -p codesigning`) :
 
 ```bash
-xcrun notarytool store-credentials plume-notary --apple-id guillaume.dhios@gmail.com --team-id TEAMID --password xxxx-xxxx-xxxx-xxxx
+xcrun notarytool store-credentials claudio-notary --apple-id guillaume.dhios@gmail.com --team-id TEAMID --password xxxx-xxxx-xxxx-xxxx
 ```
 
 Ensuite, à chaque version à partager :
@@ -55,16 +55,16 @@ Ensuite, à chaque version à partager :
 NOTARIZE=1 Scripts/build_app.sh
 ```
 
-→ signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Plume-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique — aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
+→ signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Claudio-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique — aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
 
 Note : Developer ID étant une identité différente de « Plume Local Dev », macOS redemande une fois Accessibilité/Trousseau sur ta machine quand tu alternes entre build local et build notarisé.
 
 ## Détails
 
-- **Modèle** : `claude-haiku-4-5` (constante dans `Sources/Plume/Support/Constants.swift`), streaming SSE. Coût ≈ 0,2 centime par correction courte.
+- **Modèle** : `claude-haiku-4-5` (constante dans `Sources/Claudio/Support/Constants.swift`), streaming SSE. Coût ≈ 0,2 centime par correction courte.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
-- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Plume/AI/PlumeAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.
+- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.
 - **Prompts éditables** : l'onglet Prompts des Réglages affiche le prompt système de chaque action et permet de le modifier (stocké dans UserDefaults ; « Réinitialiser » revient au prompt du code, qui suit alors les mises à jour de l'app).
 - **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user` — sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
 - **Icône** : régénérable via `Scripts/make_icon.sh` (dessin AppKit → `icon/AppIcon.icns`, embarquée par `build_app.sh`).
@@ -72,7 +72,7 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 - **Test CLI sans UI** :
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-… .build/release/Plume --selftest "un texte avec des faute"
+ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "un texte avec des faute"
 ```
 
 ## Limites connues

@@ -19,10 +19,10 @@ enum AccessibilityPermission {
         let alert = NSAlert()
         alert.messageText = "Autorisation Accessibilité requise"
         alert.informativeText = """
-        Plume a besoin de l'autorisation « Accessibilité » pour lire la sélection \
+        Claudio a besoin de l'autorisation « Accessibilité » pour lire la sélection \
         et coller le texte corrigé.
 
-        Réglages Système → Confidentialité et sécurité → Accessibilité → activer Plume, \
+        Réglages Système → Confidentialité et sécurité → Accessibilité → activer Claudio, \
         puis relance le raccourci.
         """
         alert.addButton(withTitle: "Ouvrir les Réglages Système")

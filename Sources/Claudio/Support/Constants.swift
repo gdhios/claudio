@@ -1,7 +1,7 @@
 import AppKit
 
 enum Constants {
-    static let appName = "Plume"
+    static let appName = "Claudio"
 
     // ⚠️ `temperature` est accepté sur Haiku 4.5 mais rejeté (400) sur les
     // modèles des générations 4.6+/5 — le retirer du body si on change de modèle.
@@ -11,7 +11,7 @@ enum Constants {
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
     static let anthropicVersion = "2023-06-01"
 
-    static let keychainService = "com.guillaumedhios.plume"
+    static let keychainService = "com.guillaumedhios.claudio"
     static let keychainAccount = "anthropic-api-key"
     static let apiKeyEnvVar = "ANTHROPIC_API_KEY"
     static let workspaceIDEnvVar = "ANTHROPIC_WORKSPACE_ID"

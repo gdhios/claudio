@@ -11,8 +11,8 @@ final class CorrectionSession: ObservableObject {
         case error(String)
     }
 
-    let action: PlumeAction
-    init(action: PlumeAction) { self.action = action }
+    let action: ClaudioAction
+    init(action: ClaudioAction) { self.action = action }
 
     @Published var phase: Phase = .capturing
     @Published var correctedText = ""
@@ -50,7 +50,7 @@ struct ResultPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: "wand.and.stars").foregroundStyle(.secondary)
-            Text("Plume").font(.headline)
+            Text("Claudio").font(.headline)
             Text(session.action.panelTitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

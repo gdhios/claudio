@@ -14,7 +14,7 @@ final class CorrectionCoordinator {
 
     // MARK: - Déclenchement
 
-    func trigger(action: PlumeAction) {
+    func trigger(action: ClaudioAction) {
         dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
 
         guard AccessibilityPermission.isGranted else {

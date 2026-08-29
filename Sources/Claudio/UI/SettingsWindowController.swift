@@ -9,7 +9,7 @@ final class SettingsWindowController {
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView())
             let win = NSWindow(contentViewController: hosting)
-            win.title = "Réglages Plume"
+            win.title = "Réglages Claudio"
             win.styleMask = [.titled, .closable]
             win.isReleasedWhenClosed = false
             window = win

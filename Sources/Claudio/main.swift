@@ -1,6 +1,6 @@
 import AppKit
 
-// Mode auto-test en ligne de commande : `Plume --selftest [texte]`
+// Mode auto-test en ligne de commande : `Claudio --selftest [texte]`
 // (utilise la clé de l'env ANTHROPIC_API_KEY ou du Trousseau, aucune UI).
 if CommandLine.arguments.contains("--selftest") {
     SelfTest.runBlocking()
