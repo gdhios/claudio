@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: "Quitter Plume", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenu.addItem(NSMenuItem(title: "Quitter Claudio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
@@ -46,10 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: "Plume")
+        item.button?.image = NSImage(systemSymbolName: "mustache.fill", accessibilityDescription: "Claudio")
 
         let menu = NSMenu()
-        for action in PlumeAction.allCases {
+        for action in ClaudioAction.allCases {
             let item = NSMenuItem(title: action.menuTitle, action: #selector(actionFromMenu(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = action.rawValue
@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(settings)
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quitter Plume", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quitter Claudio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         item.menu = menu
         statusItem = item
@@ -70,11 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func actionFromMenu(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String,
-              let action = PlumeAction(rawValue: raw) else { return }
+              let action = ClaudioAction(rawValue: raw) else { return }
         triggerFromMenu(action)
     }
 
-    private func triggerFromMenu(_ action: PlumeAction) {
+    private func triggerFromMenu(_ action: ClaudioAction) {
         // Laisse le menu se refermer et l'app précédente reprendre le focus.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 250_000_000)

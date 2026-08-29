@@ -1,6 +1,6 @@
 import Foundation
 
-/// `Plume --selftest [texte]` : teste le client streaming en CLI, sans UI.
+/// `Claudio --selftest [texte]` : teste le client streaming en CLI, sans UI.
 enum SelfTest {
     static func runBlocking() {
         let arguments = CommandLine.arguments
@@ -27,9 +27,9 @@ enum SelfTest {
         Task.detached {
             do {
                 let result = try await client.streamCompletion(
-                    of: PlumeAction.correct.userMessage(forText: sample),
-                    system: PlumeAction.correct.system,
-                    maxTokens: PlumeAction.correct.maxTokens(forText: sample)
+                    of: ClaudioAction.correct.userMessage(forText: sample),
+                    system: ClaudioAction.correct.system,
+                    maxTokens: ClaudioAction.correct.maxTokens(forText: sample)
                 ) { piece in
                     print(piece, terminator: "")
                 }

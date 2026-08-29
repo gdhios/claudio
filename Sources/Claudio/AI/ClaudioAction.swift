@@ -1,9 +1,9 @@
 import Foundation
 
-/// Une action Plume = un prompt système + un budget de tokens + ses libellés.
+/// Une action Claudio = un prompt système + un budget de tokens + ses libellés.
 /// Le rawValue sert de clé de stockage pour les prompts personnalisés : ne pas le changer.
 /// L'ordre de déclaration est celui du menu, des Réglages et du sélecteur de prompts.
-enum PlumeAction: String, CaseIterable, Sendable {
+enum ClaudioAction: String, CaseIterable, Sendable {
     case correct
     case makePrompt
     case expertPrompt

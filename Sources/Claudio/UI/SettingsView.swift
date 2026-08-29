@@ -64,7 +64,7 @@ private struct GeneralSettingsTab: View {
             }
 
             Section("Raccourcis") {
-                ForEach(PlumeAction.allCases, id: \.self) { action in
+                ForEach(ClaudioAction.allCases, id: \.self) { action in
                     KeyboardShortcuts.Recorder("\(action.menuTitle) :", name: action.shortcutName)
                 }
             }
@@ -93,8 +93,8 @@ private struct GeneralSettingsTab: View {
 }
 
 private struct PromptSettingsTab: View {
-    @State private var selectedAction: PlumeAction = .correct
-    @State private var promptText: String = PlumeAction.correct.system
+    @State private var selectedAction: ClaudioAction = .correct
+    @State private var promptText: String = ClaudioAction.correct.system
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
 
@@ -102,7 +102,7 @@ private struct PromptSettingsTab: View {
         Form {
             Section {
                 Picker("Action", selection: $selectedAction) {
-                    ForEach(PlumeAction.allCases, id: \.self) { action in
+                    ForEach(ClaudioAction.allCases, id: \.self) { action in
                         Text(action.menuTitle).tag(action)
                     }
                 }

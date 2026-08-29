@@ -32,7 +32,7 @@ extension KeyboardShortcuts.Name {
     )
 }
 
-extension PlumeAction {
+extension ClaudioAction {
     /// Raccourci global associé à l'action.
     var shortcutName: KeyboardShortcuts.Name {
         switch self {
@@ -50,7 +50,7 @@ extension PlumeAction {
 @MainActor
 enum HotkeySetup {
     static func install(coordinator: CorrectionCoordinator) {
-        for action in PlumeAction.allCases {
+        for action in ClaudioAction.allCases {
             KeyboardShortcuts.onKeyUp(for: action.shortcutName) { [weak coordinator] in
                 coordinator?.trigger(action: action)
             }

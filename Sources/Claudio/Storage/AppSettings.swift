@@ -25,18 +25,18 @@ enum AppSettings {
 
     // MARK: - Prompts système personnalisés
 
-    private static func systemPromptKey(for action: PlumeAction) -> String {
+    private static func systemPromptKey(for action: ClaudioAction) -> String {
         "systemPrompt.\(action.rawValue)"
     }
 
     /// Prompt système personnalisé de l'action (nil = prompt par défaut du code).
-    static func customSystemPrompt(for action: PlumeAction) -> String? {
+    static func customSystemPrompt(for action: ClaudioAction) -> String? {
         let value = UserDefaults.standard.string(forKey: systemPromptKey(for: action))
         return (value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? value : nil
     }
 
     /// nil ou chaîne vide → retour au prompt par défaut.
-    static func setCustomSystemPrompt(_ prompt: String?, for action: PlumeAction) {
+    static func setCustomSystemPrompt(_ prompt: String?, for action: ClaudioAction) {
         let key = systemPromptKey(for: action)
         if let prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             UserDefaults.standard.set(prompt, forKey: key)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compile Plume en release et assemble Plume.app (par défaut dans /Applications).
+# Compile Claudio en release et assemble Claudio.app (par défaut dans /Applications).
 #
 # Usage :
 #   Scripts/build_app.sh              build local (certificat « Plume Local Dev »)
@@ -7,16 +7,18 @@
 #                                     runtime + notarisation Apple + zip dans dist/
 #
 # Variables d'environnement :
-#   SIGN_IDENTITY    identité locale (défaut : "Plume Local Dev")
+#   SIGN_IDENTITY    identité locale (défaut : "Plume Local Dev" — nom historique
+#                    du certificat auto-signé dans le Trousseau ; indépendant du
+#                    nom de l'app, le garder évite de recréer un certificat)
 #   DEV_ID_IDENTITY  identité Developer ID (défaut : auto-détectée dans le Trousseau)
-#   NOTARY_PROFILE   profil notarytool (défaut : "plume-notary")
+#   NOTARY_PROFILE   profil notarytool (défaut : "claudio-notary")
 #   DEST             dossier d'installation (défaut : /Applications)
 #
 # Prérequis notarisation, une seule fois (compte Apple Developer requis) :
 #   1. Certificat : Xcode → Settings… → Accounts → Manage Certificates… →
 #      + → « Developer ID Application ».
 #   2. Identifiants : mot de passe d'app sur https://account.apple.com, puis
-#      xcrun notarytool store-credentials plume-notary \
+#      xcrun notarytool store-credentials claudio-notary \
 #        --apple-id <apple-id> --team-id <TEAMID> --password <mdp-app>
 #      (le TEAMID est entre parenthèses dans le nom du certificat)
 #
@@ -25,11 +27,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME="Plume"
-BUNDLE_ID="com.guillaumedhios.plume"
+APP_NAME="Claudio"
+BUNDLE_ID="com.guillaumedhios.claudio"
 VERSION="1.0.0"
 SIGN_IDENTITY="${SIGN_IDENTITY:-Plume Local Dev}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-plume-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-claudio-notary}"
 DEST="${DEST:-/Applications}"
 APP="$DEST/$APP_NAME.app"
 

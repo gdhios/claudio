@@ -1,4 +1,5 @@
-// Dessine l'icône maître de Plume en PNG 1024×1024.
+// Dessine l'icône maître de Claudio en PNG 1024×1024 :
+// petit robot original (PAS la mascotte d'Anthropic) avec une grosse moustache.
 // Usage : swift Scripts/draw_icon.swift <sortie.png>
 // (exécuté par Scripts/make_icon.sh, qui décline ensuite en .icns)
 
@@ -63,37 +64,97 @@ borderPath.lineWidth = 6
 NSColor.white.withAlphaComponent(0.18).setStroke()
 borderPath.stroke()
 
-// Symbole wand.and.stars teinté blanc — le même que dans la barre de menus.
-let symbolConfig = NSImage.SymbolConfiguration(pointSize: 460, weight: .medium)
-guard let symbol = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: nil)?
-    .withSymbolConfiguration(symbolConfig) else {
-    FileHandle.standardError.write(Data("❌ Symbole wand.and.stars introuvable\n".utf8))
-    exit(1)
+// ---- Robot moustachu ----
+// Toutes les cotes sont relatives au côté S du squircle, origine squircleRect.
+let S = squircleRect.width
+func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
+    NSPoint(x: squircleRect.minX + x * S, y: squircleRect.minY + y * S)
 }
-let tinted = NSImage(size: symbol.size, flipped: false) { rect in
-    symbol.draw(in: rect)
-    NSColor.white.set()
-    rect.fill(using: .sourceAtop)
-    return true
+let cx: CGFloat = 0.5
+
+let robotWhite = NSColor(calibratedWhite: 0.98, alpha: 1)
+let eyeColor = NSColor(calibratedRed: 0.24, green: 0.17, blue: 0.55, alpha: 1)
+let mustacheColor = NSColor(calibratedRed: 0.12, green: 0.09, blue: 0.16, alpha: 1)
+
+// Le robot entier projette une ombre douce sur la tuile.
+NSGraphicsContext.current?.saveGraphicsState()
+let robotShadow = NSShadow()
+robotShadow.shadowColor = NSColor.black.withAlphaComponent(0.32)
+robotShadow.shadowBlurRadius = 20
+robotShadow.shadowOffset = NSSize(width: 0, height: -9)
+robotShadow.set()
+
+// Antenne : tige + boule au sommet.
+let stemW = 0.026 * S
+let stemRect = NSRect(x: pt(cx, 0).x - stemW / 2, y: pt(0, 0.665).y, width: stemW, height: 0.075 * S)
+robotWhite.setFill()
+NSBezierPath(roundedRect: stemRect, xRadius: stemW / 2, yRadius: stemW / 2).fill()
+let bulbD = 0.075 * S
+let bulbRect = NSRect(x: pt(cx, 0).x - bulbD / 2, y: pt(0, 0.735).y - bulbD / 2 + bulbD / 2, width: bulbD, height: bulbD)
+NSBezierPath(ovalIn: bulbRect).fill()
+
+// Oreilles latérales.
+let earW = 0.055 * S, earH = 0.16 * S
+for side: CGFloat in [-1, 1] {
+    let earX = pt(cx, 0).x + side * (0.25 * S + earW / 2) - earW / 2
+    let earRect = NSRect(x: earX, y: pt(0, 0.490).y - earH / 2, width: earW, height: earH)
+    NSBezierPath(roundedRect: earRect, xRadius: earW / 2, yRadius: earW / 2).fill()
 }
 
-let targetWidth = squircleRect.width * 0.62
-let scale = targetWidth / tinted.size.width
-let targetSize = NSSize(width: targetWidth, height: tinted.size.height * scale)
-let symbolRect = NSRect(
-    x: squircleRect.midX - targetSize.width / 2,
-    y: squircleRect.midY - targetSize.height / 2,
-    width: targetSize.width,
-    height: targetSize.height
-)
+// Tête : rectangle arrondi.
+let headW = 0.50 * S, headH = 0.38 * S
+let headRect = NSRect(x: pt(cx, 0).x - headW / 2, y: pt(0, 0.490).y - headH / 2, width: headW, height: headH)
+NSBezierPath(roundedRect: headRect, xRadius: 0.09 * S, yRadius: 0.09 * S).fill()
+
+NSGraphicsContext.current?.restoreGraphicsState()
+
+// Yeux ronds, au-dessus de la moustache.
+eyeColor.setFill()
+let eyeD = 0.085 * S
+for side: CGFloat in [-1, 1] {
+    let center = pt(cx + side * 0.105, 0.545)
+    let eyeRect = NSRect(x: center.x - eyeD / 2, y: center.y - eyeD / 2, width: eyeD, height: eyeD)
+    NSBezierPath(ovalIn: eyeRect).fill()
+}
+// Petit éclat blanc dans chaque œil.
+NSColor.white.withAlphaComponent(0.85).setFill()
+let glintD = 0.026 * S
+for side: CGFloat in [-1, 1] {
+    let center = pt(cx + side * 0.105 + 0.018, 0.562)
+    let glintRect = NSRect(x: center.x - glintD / 2, y: center.y - glintD / 2, width: glintD, height: glintD)
+    NSBezierPath(ovalIn: glintRect).fill()
+}
+
+// Grosse moustache en guidon : deux moitiés symétriques, pointes relevées.
+// Elle chevauche le bas de la tête et déborde plus large que la tête.
+func mustacheHalf(side: CGFloat) -> NSBezierPath {
+    let oy: CGFloat = 0.390  // ligne médiane de la moustache
+    func m(_ x: CGFloat, _ y: CGFloat) -> NSPoint { pt(cx + side * x, oy + y) }
+    let path = NSBezierPath()
+    // Bord supérieur : du creux central vers la pointe externe relevée.
+    path.move(to: m(0, 0.045))
+    path.curve(to: m(0.17, 0.050), controlPoint1: m(0.06, 0.075), controlPoint2: m(0.12, 0.072))
+    path.curve(to: m(0.315, 0.130), controlPoint1: m(0.235, 0.030), controlPoint2: m(0.290, 0.055))
+    // Pointe : petit retour serré vers l'intérieur.
+    path.curve(to: m(0.258, 0.030), controlPoint1: m(0.325, 0.105), controlPoint2: m(0.300, 0.050))
+    // Bord inférieur : retour vers le centre, plus bas (épaisseur).
+    path.curve(to: m(0.10, -0.058), controlPoint1: m(0.215, -0.010), controlPoint2: m(0.16, -0.048))
+    path.curve(to: m(0, -0.052), controlPoint1: m(0.055, -0.065), controlPoint2: m(0.02, -0.060))
+    path.close()
+    return path
+}
 
 NSGraphicsContext.current?.saveGraphicsState()
-let symbolShadow = NSShadow()
-symbolShadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-symbolShadow.shadowBlurRadius = 18
-symbolShadow.shadowOffset = NSSize(width: 0, height: -8)
-symbolShadow.set()
-tinted.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1)
+let mustacheShadow = NSShadow()
+mustacheShadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+mustacheShadow.shadowBlurRadius = 12
+mustacheShadow.shadowOffset = NSSize(width: 0, height: -6)
+mustacheShadow.set()
+mustacheColor.setFill()
+let mustache = NSBezierPath()
+mustache.append(mustacheHalf(side: 1))
+mustache.append(mustacheHalf(side: -1))
+mustache.fill()
 NSGraphicsContext.current?.restoreGraphicsState()
 
 ctx.flushGraphics()
