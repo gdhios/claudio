@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Claudio step by step: API key and Accessibility permission</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,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">
+<link rel="canonical" href="https://claudio.okonoma.com/en/help/">
+<link rel="alternate" hreflang="fr" href="https://claudio.okonoma.com/aide/">
+<link rel="alternate" hreflang="en" href="https://claudio.okonoma.com/en/help/">
+<link rel="alternate" hreflang="x-default" href="https://claudio.okonoma.com/aide/">
+<meta name="description" content="Claudio install guide: download the app, create an Anthropic account and API key, grant the Accessibility permission. All explained step by step, in five minutes.">
+<style>
+  :root {
+    --bg: #0d0b14;
+    --bg-soft: #141020;
+    --card: #191428;
+    --card-border: #2b2344;
+    --text: #ece9f6;
+    --muted: #a49bc4;
+    --indigo: #5e35a6;
+    --violet: #3e106f;
+    --accent-soft: rgba(94, 53, 166, 0.22);
+    --kbd-bg: #221b38;
+    --kbd-border: #3a2f5c;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(13, 11, 20, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .nav-inner {
+    display: flex; align-items: center; gap: 28px;
+    padding: 14px 24px; max-width: 1080px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 7px; }
+  .nav-links { display: flex; gap: 22px; margin-left: auto; align-items: center; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-size: 0.92rem; transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a.lang {
+    border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 4px 10px; font-size: 0.8rem; font-weight: 600;
+  }
+
+  header.hero { padding: 64px 0 30px; text-align: center; position: relative; overflow: hidden; }
+  .hero-glow {
+    position: absolute; inset: -60% -20% auto;
+    height: 420px; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 0%, rgba(92, 77, 237, 0.22), transparent 70%);
+  }
+  .kicker {
+    text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.78rem; font-weight: 700;
+    color: #9d8bff;
+  }
+  h1 { font-size: clamp(1.9rem, 5vw, 2.7rem); font-weight: 800; letter-spacing: -0.02em; margin: 10px 0 14px; }
+  .sub { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 1.02rem; }
+
+  main { padding: 34px 0 70px; }
+  .gstep {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    padding: 30px 28px; margin-top: 26px;
+  }
+  .gstep-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .gstep-num {
+    display: inline-flex; width: 38px; height: 38px; flex: none;
+    align-items: center; justify-content: center;
+    background: linear-gradient(120deg, var(--indigo), var(--violet)); color: #fff;
+    border-radius: 50%; font-weight: 700; font-size: 1.05rem;
+  }
+  .gstep h2 { font-size: 1.35rem; font-weight: 720; letter-spacing: -0.01em; }
+  .gstep p, .gstep li { color: var(--muted); font-size: 0.97rem; }
+  .gstep p strong, .gstep li strong { color: var(--text); font-weight: 650; }
+  .gstep ol { margin: 14px 0 0 22px; }
+  .gstep ol li { margin-bottom: 12px; }
+  .gstep p + p { margin-top: 12px; }
+  .gstep a { color: #b39dff; }
+  .note {
+    background: var(--accent-soft); border-radius: 12px;
+    padding: 14px 18px; margin-top: 18px; font-size: 0.92rem; color: var(--muted);
+  }
+  .note strong { color: var(--text); }
+  .sub-h { font-size: 1.02rem; font-weight: 700; margin: 24px 0 12px; color: var(--text); }
+  .table-wrap { overflow-x: auto; }
+  table.pricing { width: 100%; border-collapse: collapse; font-size: 0.93rem; min-width: 470px; }
+  table.pricing th, table.pricing td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--card-border); }
+  table.pricing thead th { color: var(--text); font-weight: 650; font-size: 0.86rem; }
+  table.pricing th span, table.pricing td span { color: var(--muted); font-weight: 400; font-size: 0.82rem; }
+  table.pricing td { color: var(--muted); white-space: nowrap; }
+  table.pricing tbody td:first-child { color: var(--text); white-space: normal; }
+  table.pricing tbody tr:last-child td { border-bottom: none; }
+  .gstep p.fine { font-size: 0.86rem; opacity: 0.85; }
+  kbd {
+    font-family: inherit; font-size: 0.85em; font-weight: 600;
+    background: var(--kbd-bg); border: 1px solid var(--kbd-border); border-bottom-width: 2px;
+    border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 0.98rem;
+    text-decoration: none; transition: transform .12s;
+    background: linear-gradient(120deg, var(--indigo), var(--violet)); color: #fff;
+    margin-top: 14px;
+  }
+  .btn:hover { transform: translateY(-1px); }
+
+  .trouble { margin-top: 54px; }
+  .trouble h2 { font-size: 1.5rem; font-weight: 750; text-align: center; margin-bottom: 22px; }
+  details {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+    padding: 18px 22px; margin-bottom: 12px;
+  }
+  summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  summary::after { content: "+"; color: #9d8bff; font-size: 1.3rem; font-weight: 400; }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--muted); margin-top: 12px; font-size: 0.95rem; }
+  details a { color: #b39dff; }
+
+  footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 36px 0 44px; text-align: center; color: var(--muted); font-size: 0.88rem;
+  }
+  footer a { color: #b39dff; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="/en/"><img src="data:image/png;base64,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" alt="Claudio icon"> Claudio</a>
+    <div class="nav-links">
+      <a href="/en/">← Back to the site</a>
+      <a class="lang" href="/aide/" lang="fr" hreflang="fr" title="Version française">FR</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-glow"></div>
+  <div class="wrap">
+    <p class="kicker">Install guide</p>
+    <h1>Install Claudio step by step</h1>
+    <p class="sub">Two steps deserve a little hand-holding: the Anthropic API key and the Accessibility permission. Nothing hard: count five minutes, once.</p>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="gstep">
+      <div class="gstep-head"><span class="gstep-num">1</span><h2>Install the app</h2></div>
+      <ol>
+        <li><a href="https://claudio.okonoma.com/Claudio.zip" download>Download Claudio</a> (zip file).</li>
+        <li>Double-click the zip to unpack it, then drag <strong>Claudio.app</strong> into your <strong>Applications</strong> folder.</li>
+        <li>Double-click Claudio: the mustache appears in the menu bar, at the top right of your screen.</li>
+      </ol>
+      <p class="note"><strong>No security warning:</strong> the app is signed and notarized by Apple. If macOS still shows a warning, the download came from another source: go back through this site or GitHub.</p>
+    </div>
+
+    <div class="gstep">
+      <div class="gstep-head"><span class="gstep-num">2</span><h2>Create your Anthropic API key</h2></div>
+      <p>The API key is what connects Claudio to Anthropic's Claude engine. It's yours: you pay only what you use, with no subscription, and a short action costs less than a cent. No Claude subscription needed: the API console is a separate service with its own free account.</p>
+      <ol>
+        <li>Create an account on <a href="https://console.anthropic.com" rel="noopener">console.anthropic.com</a> (email or Google account). It's Anthropic's "developer" console. Don't be intimidated: you'll only make three clicks there.</li>
+        <li>Add credit: <strong>Settings → Billing</strong>, then buy credits ($5 minimum, enough for months of daily use).</li>
+        <li>Create the key: <strong>Settings → API keys → Create key</strong>. Give it a name ("Claudio") and copy the key starting with <strong>sk-ant-…</strong>: it's shown only once.</li>
+        <li>In Claudio: click the mustache in the menu bar → <strong>Settings…</strong> → <strong>API key</strong> tab → paste the key → <strong>Save</strong>.</li>
+      </ol>
+      <h3 class="sub-h">What it actually costs</h3>
+      <div class="table-wrap">
+        <table class="pricing">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>One short action<br><span>a text, a title</span></th>
+              <th>A long text<br><span>a whole email</span></th>
+              <th>20 actions a day<br><span>over a month</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Haiku 4.5</strong><br><span>default model</span></td><td>≈ 0.2¢</td><td>≈ 0.5¢</td><td>≈ $1.50</td></tr>
+            <tr><td><strong>Sonnet 5</strong><br><span>tricky texts</span></td><td>≈ 0.5¢</td><td>≈ 2¢</td><td>≈ $4</td></tr>
+            <tr><td><strong>Opus 5</strong><br><span>most capable</span></td><td>≈ 1¢</td><td>≈ 3¢</td><td>≈ $7</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>In other words: with the default model, your first $5 of credit easily lasts several months. The model is picked per action in Settings → Prompts, and Haiku does the job just fine for proofreading or translating; Sonnet and Opus earn their keep on long or delicate texts.</p>
+      <p class="fine">Rounded-up ballpark figures, based on Anthropic's public pricing in August 2026 (Sonnet costs about 3× Haiku, Opus about 5×). Real billing depends on how long your texts are; your exact usage is in the Anthropic console, Usage tab.</p>
+      <p class="note"><strong>Where does the key go?</strong> Into the macOS Keychain, encrypted by the system. Claudio has no server: your key and your text only travel from your Mac to the Anthropic API, over HTTPS. The code is open source: anyone can check.</p>
+    </div>
+
+    <div class="gstep">
+      <div class="gstep-head"><span class="gstep-num">3</span><h2>Grant Accessibility</h2></div>
+      <p>This is the official macOS mechanism that lets Claudio read the text you select in another app, then paste the result back. Without this permission, nothing can work.</p>
+      <ol>
+        <li>Select a word in any app and press <kbd>⌃⌥⌘I</kbd> (control + option + command + I): macOS shows a permission request.</li>
+        <li>Click <strong>Open System Settings</strong> and flip the switch next to <strong>Claudio</strong> in the Accessibility list.</li>
+        <li>Press the shortcut again: this time, the panel appears.</li>
+      </ol>
+      <p>If the request doesn't show up: open <strong>System Settings → Privacy &amp; Security → Accessibility</strong>, click <strong>+</strong>, pick Claudio in Applications, and flip the switch. Then quit and relaunch Claudio (mustache → Quit Claudio).</p>
+    </div>
+
+    <div class="gstep">
+      <div class="gstep-head"><span class="gstep-num">✓</span><h2>You're set, try it</h2></div>
+      <p>Open Notes, type a sentence with a couple of typos, select it, press <kbd>⌃⌥⌘I</kbd>. The panel appears, the fix writes itself before your eyes, and <kbd>⏎</kbd> pastes it over your text. All shortcuts are listed (and customizable) in Settings.</p>
+    </div>
+
+    <div class="trouble">
+      <h2>If something goes wrong</h2>
+      <details>
+        <summary>The shortcut does nothing</summary>
+        <p>Check that Claudio is enabled in System Settings → Privacy &amp; Security → Accessibility. After changing the permission, quit and relaunch Claudio (mustache → Quit Claudio, then reopen the app). Also check that another app isn't already using the same shortcut.</p>
+      </details>
+      <details>
+        <summary>"Error 401" in the panel</summary>
+        <p>The API key is invalid: mistyped, truncated, or revoked. Create a new key on <a href="https://console.anthropic.com/settings/keys" rel="noopener">console.anthropic.com</a> and paste it again in Settings → API key.</p>
+      </details>
+      <details>
+        <summary>"Error 400" mentioning a workspace</summary>
+        <p>Your key is "identity-bound": fill in the <strong>Workspace</strong> field in Settings → API key (the <strong>wrkspc_…</strong> ID is in the Anthropic console, Settings → Workspaces).</p>
+      </details>
+      <details>
+        <summary>"Credit balance is too low"</summary>
+        <p>Your API credits are used up: top up in the Anthropic console, Settings → Billing.</p>
+      </details>
+      <details>
+        <summary>The panel says "No selection"</summary>
+        <p>The text must be selected (highlighted) when you trigger the shortcut. Select first, trigger second.</p>
+      </details>
+    </div>
+
+    <p style="text-align: center; margin-top: 44px;">
+      <a class="btn" href="/en/">← Back to the site</a>
+    </p>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>© 2026 Guillaume Dhios · <a href="/en/">claudio.okonoma.com</a> · <a href="https://github.com/gdhios/claudio" rel="noopener">Source code</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
