@@ -10,12 +10,14 @@ final class SettingsWindowController {
             let hosting = NSHostingController(rootView: SettingsView())
             let win = NSWindow(contentViewController: hosting)
             win.title = "Réglages Claudio"
-            win.styleMask = [.titled, .closable]
+            win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            win.setContentSize(NSSize(width: 740, height: 520))
+            win.setFrameAutosaveName("ClaudioSettings")
             win.isReleasedWhenClosed = false
             window = win
         }
         NSApp.activate(ignoringOtherApps: true)
-        window?.center()
+        if window?.isVisible != true { window?.center() }
         window?.makeKeyAndOrderFront(nil)
     }
 }

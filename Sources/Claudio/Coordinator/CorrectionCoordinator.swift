@@ -145,7 +145,7 @@ final class CorrectionCoordinator {
     // MARK: - Panneau
 
     private func showPanel(for session: CorrectionSession) {
-        let view = ResultPanelView(
+        let panel = ResultPanel.make(
             session: session,
             onPaste: { [weak self] in self?.pasteResult() },
             onCopy: { [weak self] in self?.copyResult() },
@@ -155,10 +155,6 @@ final class CorrectionCoordinator {
                 self?.openSettings?()
             }
         )
-        let hosting = NSHostingView(rootView: view)
-        hosting.frame = NSRect(origin: .zero, size: Constants.panelSize)
-
-        let panel = ResultPanel(contentView: hosting)
         panel.onEnter = { [weak self] in self?.pasteResult() }
         panel.onEscape = { [weak self] in self?.dismiss() }
         panel.onCopyShortcut = { [weak self] in self?.copyResult() }

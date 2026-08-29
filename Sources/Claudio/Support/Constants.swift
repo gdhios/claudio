@@ -26,5 +26,7 @@ enum Constants {
                                                               // (augmenter si une app lit le pasteboard lentement)
     static let restoreClipboardAfterPaste = true
 
-    static let panelSize = NSSize(width: 460, height: 300)
+    // Panneau : largeur fixe, hauteur adaptée au contenu (zone de texte bornée).
+    static let panelWidth: CGFloat = 460
+    static let panelMaxTextHeight: CGFloat = 380
 }

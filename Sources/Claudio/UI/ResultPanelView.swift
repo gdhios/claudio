@@ -24,64 +24,95 @@ final class CorrectionSession: ObservableObject {
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
 }
 
+/// Hauteur idéale du panneau entier — remontée à la fenêtre pour qu'elle
+/// épouse le contenu (fini le grand rectangle à moitié vide).
+private struct PanelHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Hauteur du texte dans le ScrollView — sert à borner la zone de contenu.
+private struct TextHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct ResultPanelView: View {
     @ObservedObject var session: CorrectionSession
     let onPaste: () -> Void
     let onCopy: () -> Void
     let onRetry: () -> Void
     let onOpenSettings: () -> Void
+    var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
+
+    @State private var textHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            ClaudioTheme.panelSeparator.frame(height: 1)
             content
-            Divider()
+            ClaudioTheme.panelSeparator.frame(height: 1)
             footer
         }
-        .frame(width: Constants.panelSize.width, height: Constants.panelSize.height)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: Constants.panelWidth)
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: PanelHeightKey.self, value: geo.size.height)
+            }
+        }
+        .onPreferenceChange(PanelHeightKey.self) { [onHeightChange] height in
+            Task { @MainActor in onHeightChange?(height) }
+        }
+        .background(ClaudioTheme.panelBackground,
+                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.separator, lineWidth: 1)
+            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
+                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
         )
+        .environment(\.colorScheme, .dark)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "wand.and.stars").foregroundStyle(.secondary)
+            ClaudioBadge()
             Text("Claudio").font(.headline)
-            Text(session.action.panelTitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            StatusPill {
+                Image(systemName: session.action.symbolName)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(session.action.tint)
+                Text(session.action.panelTitle)
+            }
             Spacer()
             statusLabel
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 11)
     }
 
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .capturing:
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
+            StatusPill {
+                ProgressView().controlSize(.mini)
                 Text("Capture…")
             }
-            .font(.caption).foregroundStyle(.secondary)
         case .streaming:
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
+            StatusPill {
+                ProgressView().controlSize(.mini)
                 Text(session.action.progressLabel)
             }
-            .font(.caption).foregroundStyle(.secondary)
         case .done:
             if session.truncated {
-                Label("Réponse tronquée", systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
+                StatusPill(background: .orange.opacity(0.18), foreground: .orange) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9))
+                    Text("Réponse tronquée")
+                }
             } else {
-                Label("Prêt", systemImage: "checkmark.circle")
-                    .font(.caption).foregroundStyle(.green)
+                StatusPill(background: .green.opacity(0.16), foreground: .green) {
+                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
+                    Text("Prêt")
+                }
             }
         case .noSelection, .missingKey, .error:
             EmptyView()
@@ -105,17 +136,42 @@ struct ResultPanelView: View {
         default:
             ScrollViewReader { proxy in
                 ScrollView {
-                    Text(session.correctedText.isEmpty ? " " : session.correctedText)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                    Color.clear.frame(height: 1).id("bottom")
+                    VStack(spacing: 0) {
+                        resultText
+                            .font(.body)
+                            .foregroundStyle(.white.opacity(0.92))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                        Color.clear.frame(height: 1).id("bottom")
+                    }
+                    .background {
+                        GeometryReader { geo in
+                            Color.clear.preference(key: TextHeightKey.self, value: geo.size.height)
+                        }
+                    }
+                }
+                .frame(height: min(max(textHeight, 52), Constants.panelMaxTextHeight))
+                .onPreferenceChange(TextHeightKey.self) { height in
+                    Task { @MainActor in textHeight = height }
                 }
                 .onChange(of: session.correctedText) {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
             }
+        }
+    }
+
+    /// Texte en streaming avec caret clignotant ; texte simple une fois terminé.
+    @ViewBuilder private var resultText: some View {
+        if session.phase == .capturing || session.phase == .streaming {
+            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
+                Text(session.correctedText)
+                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
+            }
+        } else {
+            Text(session.correctedText)
         }
     }
 
@@ -128,8 +184,9 @@ struct ResultPanelView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(20)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 26)
     }
 
     private var footer: some View {
@@ -139,17 +196,29 @@ struct ResultPanelView: View {
             switch session.phase {
             case .missingKey:
                 Button("Réglages…", action: onOpenSettings)
+                    .buttonStyle(PanelPillButtonStyle())
             case .error:
                 Button("Réessayer", action: onRetry)
+                    .buttonStyle(PanelPillButtonStyle())
             case .done:
                 if session.truncated {
                     Button("Réessayer +", action: onRetry)
+                        .buttonStyle(PanelPillButtonStyle())
                         .help("Relance avec un budget de tokens doublé")
                 }
-                Button(session.justCopied ? "Copié ✓" : "Copier", action: onCopy)
-                Button("Coller ⏎", action: onPaste)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!session.canPaste)
+                Button(action: onCopy) {
+                    if session.justCopied {
+                        Text("Copié ✓")
+                    } else {
+                        Text("Copier ") + Text("⌘C").foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(PanelPillButtonStyle())
+                Button(action: onPaste) {
+                    Text("Coller ") + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
+                }
+                .buttonStyle(ClaudioProminentButtonStyle())
+                .disabled(!session.canPaste)
             default:
                 EmptyView()
             }
