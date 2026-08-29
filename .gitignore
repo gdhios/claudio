@@ -3,3 +3,7 @@
 *.app
 .DS_Store
 dist/
+
+# Sources de l'icône (non publiées)
+icon/*.svg
+*.af

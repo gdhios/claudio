@@ -184,6 +184,11 @@
     background: var(--accent-soft); border-radius: 11px; font-size: 1.25rem; margin-bottom: 14px;
   }
 
+  .benefit { margin-top: 52px; }
+  .benefit:first-of-type { margin-top: 0; }
+  .benefit-title { font-size: 1.35rem; font-weight: 720; margin-bottom: 8px; }
+  .benefit-sub { color: var(--muted); max-width: 640px; margin-bottom: 22px; font-size: 0.98rem; }
+
   /* ---- Étapes ---- */
   .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; counter-reset: step; }
   .step { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 26px 24px; }
@@ -288,17 +293,36 @@
 
 <section id="fonctionnalites">
   <div class="wrap">
-    <p class="kicker">Fonctionnalités</p>
-    <h2>Une action, un raccourci</h2>
-    <p class="section-sub">Corriger, traduire, résumer, reformuler… Chaque action a son raccourci global reconfigurable et son prompt éditable dans les Réglages.</p>
-    <div class="grid">
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘I</kbd></span><span class="emoji">✏️</span><h3>Corriger</h3><p>Orthographe, grammaire et formulation légèrement améliorée — langue et ton conservés. Parfait après une dictée vocale.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘F</kbd></span><span class="emoji">🇫🇷</span><h3>Traduire en français</h3><p>Traduction naturelle et idiomatique, mise en forme préservée.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘E</kbd></span><span class="emoji">🇬🇧</span><h3>Traduire en anglais</h3><p>Rédigez en français, envoyez en anglais — mails, messages, documentation.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘T</kbd></span><span class="emoji">👔</span><h3>Ton professionnel</h3><p>Transforme un brouillon abrupt en message courtois et clair, prêt à envoyer, sans en changer le fond.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘R</kbd></span><span class="emoji">📋</span><h3>Résumer</h3><p>Quelques phrases ou des puces fidèles, selon la longueur du texte. Idéal pour digérer un long fil ou un article.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘P</kbd></span><span class="emoji">💬</span><h3>Structurer en prompt</h3><p>Reformule une idée en vrac en demande claire et directe pour une IA — sans y répondre.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘^</kbd></span><span class="emoji">🧠</span><h3>Prompt expert</h3><p>Produit un prompt complet selon les bonnes pratiques : rôle, contexte, contraintes, format de sortie attendu.</p></div>
+    <p class="kicker">Au quotidien</p>
+    <h2>Trois réflexes qui changent tout</h2>
+    <p class="section-sub">Chaque action a son raccourci global reconfigurable et son prompt éditable dans les Réglages. Le tout rodé à l’usage, tous les jours, en conditions réelles.</p>
+
+    <div class="benefit">
+      <h3 class="benefit-title">✉️ Communiquer sans fausse note</h3>
+      <p class="benefit-sub">Ce que vous envoyez part propre&nbsp;: corrigé, bien formulé, au bon ton — en une seconde, sans relecture fastidieuse.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘I</kbd></span><span class="emoji">✏️</span><h3>Corriger</h3><p>Orthographe, grammaire et formulation légèrement améliorée — langue et ton conservés. Parfait après une dictée vocale.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘T</kbd></span><span class="emoji">👔</span><h3>Ton professionnel</h3><p>Transforme un brouillon abrupt en message courtois et clair, prêt à envoyer, sans en changer le fond.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘R</kbd></span><span class="emoji">📋</span><h3>Résumer</h3><p>Quelques phrases ou des puces fidèles, selon la longueur du texte. Idéal pour digérer un long fil ou un article.</p></div>
+      </div>
+    </div>
+
+    <div class="benefit">
+      <h3 class="benefit-title">🌍 Traduire sans se prendre la tête</h3>
+      <p class="benefit-sub">Rédigez dans votre langue, envoyez dans l’autre. La traduction devient un réflexe, plus une corvée.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘F</kbd></span><span class="emoji">🇫🇷</span><h3>Traduire en français</h3><p>Traduction naturelle et idiomatique, mise en forme préservée.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘E</kbd></span><span class="emoji">🇬🇧</span><h3>Traduire en anglais</h3><p>Rédigez en français, envoyez en anglais — mails, messages, documentation.</p></div>
+      </div>
+    </div>
+
+    <div class="benefit">
+      <h3 class="benefit-title">🤖 Tirer le meilleur des IA</h3>
+      <p class="benefit-sub">Une idée en vrac devient un prompt structuré et efficace&nbsp;: vos conversations avec les IA partent du bon pied, et leurs réponses s’en ressentent.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘P</kbd></span><span class="emoji">💬</span><h3>Structurer en prompt</h3><p>Reformule une idée en vrac en demande claire et directe pour une IA — sans y répondre.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘^</kbd></span><span class="emoji">🧠</span><h3>Prompt expert</h3><p>Produit un prompt complet selon les bonnes pratiques&nbsp;: rôle, contexte, contraintes, format de sortie attendu.</p></div>
+      </div>
     </div>
   </div>
 </section>

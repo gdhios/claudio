@@ -67,7 +67,7 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 - **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.
 - **Prompts éditables** : l'onglet Prompts des Réglages affiche le prompt système de chaque action et permet de le modifier (stocké dans UserDefaults ; « Réinitialiser » revient au prompt du code, qui suit alors les mises à jour de l'app).
 - **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user` — sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
-- **Icône** : régénérable via `Scripts/make_icon.sh` (SVG maîtres dans `icon/` → `icon/AppIcon.icns`, embarquée par `build_app.sh` ; nécessite `brew install librsvg`).
+- **Icône** : `icon/AppIcon.icns`, embarquée par `build_app.sh`. Les sources de l'icône ne sont pas versionnées (`Scripts/make_icon.sh` sert à la régénérer en local).
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
 - **Test CLI sans UI** :
 

@@ -184,6 +184,11 @@
     background: var(--accent-soft); border-radius: 11px; font-size: 1.25rem; margin-bottom: 14px;
   }
 
+  .benefit { margin-top: 52px; }
+  .benefit:first-of-type { margin-top: 0; }
+  .benefit-title { font-size: 1.35rem; font-weight: 720; margin-bottom: 8px; }
+  .benefit-sub { color: var(--muted); max-width: 640px; margin-bottom: 22px; font-size: 0.98rem; }
+
   /* ---- Steps ---- */
   .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; counter-reset: step; }
   .step { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 26px 24px; }
@@ -288,17 +293,36 @@
 
 <section id="features">
   <div class="wrap">
-    <p class="kicker">Features</p>
-    <h2>One action, one shortcut</h2>
-    <p class="section-sub">Proofread, translate, summarize, rephrase… Every action has its own reconfigurable global shortcut, and its prompt can be edited in Settings.</p>
-    <div class="grid">
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘I</kbd></span><span class="emoji">✏️</span><h3>Proofread</h3><p>Spelling, grammar and slightly improved phrasing — language and tone preserved. Perfect after voice dictation.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘F</kbd></span><span class="emoji">🇫🇷</span><h3>Translate to French</h3><p>Natural, idiomatic translation with formatting preserved.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘E</kbd></span><span class="emoji">🇬🇧</span><h3>Translate to English</h3><p>Draft in your language, send in English — emails, messages, documentation.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘T</kbd></span><span class="emoji">👔</span><h3>Professional tone</h3><p>Turns a blunt draft into a clear, courteous message that's ready to send — without changing what it says.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘R</kbd></span><span class="emoji">📋</span><h3>Summarize</h3><p>A few faithful sentences or bullet points, depending on length. Great for digesting a long thread or article.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘P</kbd></span><span class="emoji">💬</span><h3>Turn into a prompt</h3><p>Rewrites a rough idea as a clear, direct request for an AI — without answering it.</p></div>
-      <div class="card"><span class="shortcut"><kbd>⌃⌥⌘^</kbd></span><span class="emoji">🧠</span><h3>Expert prompt</h3><p>Produces a full prompt following best practices: role, context, constraints, expected output format.</p></div>
+    <p class="kicker">Day to day</p>
+    <h2>Three reflexes that change everything</h2>
+    <p class="section-sub">Every action has its own reconfigurable global shortcut, and its prompt can be edited in Settings. All of it honed through daily, real-world use.</p>
+
+    <div class="benefit">
+      <h3 class="benefit-title">✉️ Communicate flawlessly</h3>
+      <p class="benefit-sub">What you send goes out clean: corrected, well phrased, in the right tone — in a second, without tedious proofreading.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘I</kbd></span><span class="emoji">✏️</span><h3>Proofread</h3><p>Spelling, grammar and slightly improved phrasing — language and tone preserved. Perfect after voice dictation.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘T</kbd></span><span class="emoji">👔</span><h3>Professional tone</h3><p>Turns a blunt draft into a clear, courteous message that's ready to send — without changing what it says.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘R</kbd></span><span class="emoji">📋</span><h3>Summarize</h3><p>A few faithful sentences or bullet points, depending on length. Great for digesting a long thread or article.</p></div>
+      </div>
+    </div>
+
+    <div class="benefit">
+      <h3 class="benefit-title">🌍 Translate without thinking about it</h3>
+      <p class="benefit-sub">Write in your language, send in the other. Translation becomes a reflex, not a chore.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘F</kbd></span><span class="emoji">🇫🇷</span><h3>Translate to French</h3><p>Natural, idiomatic translation with formatting preserved.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘E</kbd></span><span class="emoji">🇬🇧</span><h3>Translate to English</h3><p>Draft in your language, send in English — emails, messages, documentation.</p></div>
+      </div>
+    </div>
+
+    <div class="benefit">
+      <h3 class="benefit-title">🤖 Get the most out of AIs</h3>
+      <p class="benefit-sub">A rough idea becomes a structured, effective prompt: your AI conversations start on the right foot — and the answers show it.</p>
+      <div class="grid">
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘P</kbd></span><span class="emoji">💬</span><h3>Turn into a prompt</h3><p>Rewrites a rough idea as a clear, direct request for an AI — without answering it.</p></div>
+        <div class="card"><span class="shortcut"><kbd>⌃⌥⌘^</kbd></span><span class="emoji">🧠</span><h3>Expert prompt</h3><p>Produces a full prompt following best practices: role, context, constraints, expected output format.</p></div>
+      </div>
     </div>
   </div>
 </section>
