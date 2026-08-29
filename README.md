@@ -84,4 +84,4 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "un texte avec de
 
 Claudio est open source sous licence [MIT](LICENSE). Projet indépendant, non affilié à Anthropic — Claude est une marque d'Anthropic, PBC.
 
-Si l'app vous rend service : [offrez-moi un café](https://buymeacoffee.com/VOTRE-PSEUDO) ☕
+Si l'app vous rend service : [offrez-moi un café](https://buymeacoffee.com/gdhios) ☕
