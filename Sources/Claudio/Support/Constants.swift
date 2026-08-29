@@ -24,6 +24,10 @@ enum Constants {
                                                               // (augmenter si une app lit le pasteboard lentement)
     static let restoreClipboardAfterPaste = true
 
+    // Mise à jour : simple lecture de version.json sur le site (aucune donnée envoyée).
+    static let updateFeedURL = URL(string: "https://claudio.okonoma.com/version.json")!
+    static let updateCheckInterval: TimeInterval = 24 * 3600
+
     // Panneau : largeur fixe, hauteur adaptée au contenu (zone de texte bornée).
     static let panelWidth: CGFloat = 460
     static let panelMaxTextHeight: CGFloat = 380

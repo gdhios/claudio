@@ -31,6 +31,10 @@ extension KeyboardShortcuts.Name {
         "summarizeSelection",
         initial: .init(.r, modifiers: [.control, .option, .command])
     )
+    static let simplifyExplanation = Self(
+        "simplifyExplanation",
+        initial: .init(.l, modifiers: [.control, .option, .command])
+    )
 }
 
 extension ClaudioAction {
@@ -44,6 +48,7 @@ extension ClaudioAction {
         case .translateEN: .translateEnglish
         case .professionalTone: .professionalTone
         case .summarize: .summarizeSelection
+        case .simplify: .simplifyExplanation
         }
     }
 }
