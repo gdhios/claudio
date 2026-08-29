@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claudio — Sept actions IA sur votre texte sélectionné, partout sur macOS</title>
+<title>Claudio — Des actions IA sur votre texte sélectionné, partout sur macOS</title>
+<link rel="canonical" href="https://claudio.okonoma.com/">
+<link rel="alternate" hreflang="fr" href="https://claudio.okonoma.com/">
+<link rel="alternate" hreflang="en" href="https://claudio.okonoma.com/en/">
+<link rel="alternate" hreflang="x-default" href="https://claudio.okonoma.com/">
 <meta name="description" content="Claudio est une app macOS de barre de menus : sélectionnez du texte dans n'importe quelle app, déclenchez un raccourci, et l'IA corrige, traduit, résume ou reformule — puis colle le résultat à la place. Gratuit, avec votre clé API Anthropic.">
 <style>
   :root {
@@ -52,7 +56,11 @@
     background: linear-gradient(120deg, var(--indigo), var(--violet));
     color: #fff !important; padding: 8px 16px; border-radius: 10px; font-weight: 600;
   }
-  @media (max-width: 640px) { .nav-links a:not(.nav-cta) { display: none; } }
+  .nav-links a.lang {
+    border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 4px 10px; font-size: 0.8rem; font-weight: 600;
+  }
+  @media (max-width: 640px) { .nav-links a:not(.nav-cta):not(.lang) { display: none; } }
 
   /* ---- Hero ---- */
   header.hero {
@@ -228,6 +236,7 @@
       <a href="#fonctionnalites">Fonctionnalités</a>
       <a href="#pourquoi">Pourquoi Claudio</a>
       <a href="#faq">FAQ</a>
+      <a class="lang" href="/en/" lang="en" hreflang="en" title="English version">EN</a>
       <a class="nav-cta" href="#telecharger">Télécharger</a>
     </div>
   </div>
@@ -266,8 +275,8 @@
 <section id="fonctionnalites">
   <div class="wrap">
     <p class="kicker">Fonctionnalités</p>
-    <h2>Sept actions, un raccourci chacune</h2>
-    <p class="section-sub">Chaque action a son raccourci global (reconfigurable), et son prompt est éditable dans les Réglages.</p>
+    <h2>Une action, un raccourci</h2>
+    <p class="section-sub">Corriger, traduire, résumer, reformuler… Chaque action a son raccourci global reconfigurable et son prompt éditable dans les Réglages.</p>
     <div class="grid">
       <div class="card"><span class="shortcut"><kbd>⌃⌥C</kbd></span><span class="emoji">✏️</span><h3>Corriger</h3><p>Orthographe, grammaire et formulation légèrement améliorée — langue et ton conservés. Parfait après une dictée vocale.</p></div>
       <div class="card"><span class="shortcut"><kbd>⌃⌥F</kbd></span><span class="emoji">🇫🇷</span><h3>Traduire en français</h3><p>Traduction naturelle et idiomatique, mise en forme préservée.</p></div>
