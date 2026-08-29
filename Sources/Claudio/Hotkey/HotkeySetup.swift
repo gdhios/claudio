@@ -1,34 +1,35 @@
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    // Défauts ⌃⌥ + lettre mnémotechnique, reconfigurables dans les Réglages.
+    // Défauts ⌃⌥⌘ + touche mnémotechnique, reconfigurables dans les Réglages.
+    // ⌃⌥⌘ évite les collisions avec les raccourcis ⌃⌥ des apps courantes.
     static let correctSelection = Self(
         "correctSelection",
-        initial: .init(.c, modifiers: [.control, .option])
+        initial: .init(.i, modifiers: [.control, .option, .command])
     )
     static let structurePrompt = Self(
         "structurePrompt",
-        initial: .init(.p, modifiers: [.control, .option])
+        initial: .init(.p, modifiers: [.control, .option, .command])
     )
     static let expertPrompt = Self(
         "expertPrompt",
-        initial: .init(.s, modifiers: [.control, .option])
+        initial: .init(.leftBracket, modifiers: [.control, .option, .command])
     )
     static let translateFrench = Self(
         "translateFrench",
-        initial: .init(.f, modifiers: [.control, .option])
+        initial: .init(.f, modifiers: [.control, .option, .command])
     )
     static let translateEnglish = Self(
         "translateEnglish",
-        initial: .init(.e, modifiers: [.control, .option])
+        initial: .init(.e, modifiers: [.control, .option, .command])
     )
     static let professionalTone = Self(
         "professionalTone",
-        initial: .init(.t, modifiers: [.control, .option])
+        initial: .init(.t, modifiers: [.control, .option, .command])
     )
     static let summarizeSelection = Self(
         "summarizeSelection",
-        initial: .init(.r, modifiers: [.control, .option])
+        initial: .init(.r, modifiers: [.control, .option, .command])
     )
 }
 

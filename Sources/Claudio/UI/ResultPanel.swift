@@ -39,7 +39,8 @@ final class ResultPanel: NSPanel {
                      onPaste: @escaping () -> Void = {},
                      onCopy: @escaping () -> Void = {},
                      onRetry: @escaping () -> Void = {},
-                     onOpenSettings: @escaping () -> Void = {}) -> ResultPanel {
+                     onOpenSettings: @escaping () -> Void = {},
+                     onClose: @escaping () -> Void = {}) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView())
         let view = ResultPanelView(
             session: session,
@@ -47,6 +48,7 @@ final class ResultPanel: NSPanel {
             onCopy: onCopy,
             onRetry: onRetry,
             onOpenSettings: onOpenSettings,
+            onClose: onClose,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         )
         let hosting = NSHostingView(rootView: view)
