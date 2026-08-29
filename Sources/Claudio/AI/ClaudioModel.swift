@@ -9,9 +9,9 @@ enum ClaudioModel: String, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .haiku45: "Haiku 4.5 — rapide et économique"
-        case .sonnet5: "Sonnet 5 — qualité supérieure"
-        case .opus5: "Opus 5 — le plus capable"
+        case .haiku45: "Haiku 4.5 (rapide et économique)"
+        case .sonnet5: "Sonnet 5 (qualité supérieure)"
+        case .opus5: "Opus 5 (le plus capable)"
         }
     }
 
