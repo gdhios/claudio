@@ -37,6 +37,7 @@ struct AnthropicClient: Sendable {
     func streamCompletion(
         of text: String,
         system: String,
+        model: ClaudioModel,
         maxTokens: Int,
         onDelta: @escaping @Sendable (String) async -> Void
     ) async throws -> StreamResult {
@@ -49,14 +50,16 @@ struct AnthropicClient: Sendable {
             request.setValue(workspaceID, forHTTPHeaderField: "anthropic-workspace-id")
         }
 
-        let body: [String: Any] = [
-            "model": Constants.model,
+        var body: [String: Any] = [
+            "model": model.rawValue,
             "max_tokens": maxTokens,
-            "temperature": Constants.temperature,
             "system": system,
             "stream": true,
             "messages": [["role": "user", "content": text]]
         ]
+        if model.supportsTemperature {
+            body["temperature"] = Constants.temperature
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)

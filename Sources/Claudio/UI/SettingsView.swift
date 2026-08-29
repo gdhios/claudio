@@ -3,7 +3,7 @@ import KeyboardShortcuts
 
 /// Réglages façon Réglages Système : barre latérale à pastilles colorées,
 /// sections en cartes (`.formStyle(.grouped)`).
-private enum SettingsSection: String, CaseIterable, Identifiable {
+enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
     case shortcuts
@@ -44,7 +44,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    @State private var selection: SettingsSection? = .general
+    @State private var selection: SettingsSection?
+
+    init(initialSection: SettingsSection = .general) {
+        _selection = State(initialValue: initialSection)
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -96,8 +100,8 @@ private struct GeneralPane: View {
             }
 
             Section("Modèle") {
-                LabeledContent("Modèle Claude", value: Constants.model)
-                Text("Environ 0,2 centime par correction courte. La clé et la consommation se gèrent sur console.anthropic.com.")
+                LabeledContent("Modèle Claude", value: "réglable par action")
+                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Environ 0,2 centime par correction courte avec Haiku. La clé et la consommation se gèrent sur console.anthropic.com.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -193,6 +197,7 @@ private struct ShortcutsPane: View {
 private struct PromptsPane: View {
     @State private var selectedAction: ClaudioAction = .correct
     @State private var promptText: String = ClaudioAction.correct.system
+    @State private var selectedModel: ClaudioModel = ClaudioAction.correct.model
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
 
@@ -206,7 +211,24 @@ private struct PromptsPane: View {
                 }
                 .onChange(of: selectedAction) {
                     promptText = selectedAction.system
+                    selectedModel = selectedAction.model
                 }
+            }
+
+            Section("Modèle") {
+                Picker("Modèle Claude", selection: $selectedModel) {
+                    ForEach(ClaudioModel.allCases, id: \.self) { model in
+                        Text(model.displayName).tag(model)
+                    }
+                }
+                .onChange(of: selectedModel) {
+                    AppSettings.setCustomModel(selectedModel, for: selectedAction)
+                }
+                Text(selectedModel == selectedAction.defaultModel
+                     ? "Modèle par défaut pour cette action."
+                     : "Modèle personnalisé — le défaut est \(selectedAction.defaultModel.displayName).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Prompt système") {

@@ -17,6 +17,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if mode == "settings" {
             settingsController.show()
+        } else if mode == "settings-prompts" {
+            settingsController.show(initialSection: .prompts)
         } else {
             showPanelPreview()
         }
