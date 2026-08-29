@@ -153,7 +153,8 @@ final class CorrectionCoordinator {
             onOpenSettings: { [weak self] in
                 self?.dismiss()
                 self?.openSettings?()
-            }
+            },
+            onClose: { [weak self] in self?.dismiss() }
         )
         panel.onEnter = { [weak self] in self?.pasteResult() }
         panel.onEscape = { [weak self] in self?.dismiss() }

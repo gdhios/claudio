@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Identité visuelle de Claudio : accent indigo→violet (le même dégradé que la landing),
-/// panneau sombre en permanence, badges « pill » et pastilles d'icônes colorées.
+/// Identité visuelle de Claudio : violet profond du robot moustachu (le même
+/// dégradé que l'icône), panneau sombre en permanence, badges « pill » et
+/// pastilles d'icônes colorées.
 enum ClaudioTheme {
-    static let indigo = Color(red: 0.36, green: 0.30, blue: 0.93)   // #5c4ded
-    static let violet = Color(red: 0.63, green: 0.29, blue: 0.90)   // #a14ae6
-    static let accent = Color(red: 0.48, green: 0.33, blue: 0.93)
+    static let violetHaut = Color(red: 0.369, green: 0.208, blue: 0.651)  // #5e35a6
+    static let violetBas = Color(red: 0.243, green: 0.063, blue: 0.435)   // #3e106f
+    static let accent = Color(red: 0.486, green: 0.310, blue: 0.816)      // #7c4fd0
 
-    static let gradient = LinearGradient(colors: [indigo, violet],
-                                         startPoint: .topLeading,
-                                         endPoint: .bottomTrailing)
+    static let gradient = LinearGradient(colors: [violetHaut, violetBas],
+                                         startPoint: .top,
+                                         endPoint: .bottom)
 
     // Panneau : sombre quel que soit le mode système (l'app source garde son thème,
     // le panneau garde le sien — même parti pris que la landing).

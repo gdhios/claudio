@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Variante « petites tailles » de l'icône Claudio (16 et 32 px de l'iconset) :
+     même badge, mais dessin simplifié — grosse moustache + deux yeux — pour rester
+     lisible quand les détails (antenne, contour de tête) fondent dans les pixels. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="fond" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#56309b"/>
+      <stop offset="1" stop-color="#38105f"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#ffffff"/>
+  <rect x="136" y="136" width="752" height="752" rx="167" fill="url(#fond)"/>
+  <circle cx="424" cy="380" r="60" fill="#ffffff"/>
+  <circle cx="600" cy="380" r="60" fill="#ffffff"/>
+  <g transform="translate(150 460) scale(31)">
+    <path fill="#ffffff" d="M12 2.5C10.4.9 7.6 1.1 6 2.9 4.6 4.5 2.6 4.9.8 3.9 1.6 7.5 4.6 9.5 7.8 8.5 9.6 7.9 11 6.5 12 4.9c1 1.6 2.4 3 4.2 3.6 3.2 1 6.2-1 7-4.6-1.8 1-3.8.6-5.2-1C16.4 1.1 13.6.9 12 2.5Z"/>
+  </g>
+</svg>

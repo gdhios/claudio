@@ -43,6 +43,7 @@ struct ResultPanelView: View {
     let onCopy: () -> Void
     let onRetry: () -> Void
     let onOpenSettings: () -> Void
+    let onClose: () -> Void
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var textHeight: CGFloat = 0
@@ -85,6 +86,7 @@ struct ResultPanelView: View {
             }
             Spacer()
             statusLabel
+            PanelCloseButton(action: onClose)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
@@ -225,5 +227,24 @@ struct ResultPanelView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+}
+
+/// Croix de fermeture du panneau : discrète dans le header, cercle au survol.
+private struct PanelCloseButton: View {
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(hovered ? .white : .white.opacity(0.45))
+                .frame(width: 18, height: 18)
+                .background(Color.white.opacity(hovered ? 0.14 : 0), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help("Fermer (Échap)")
     }
 }
