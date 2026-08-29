@@ -5,9 +5,9 @@ import SwiftUI
 final class SettingsWindowController {
     private var window: NSWindow?
 
-    func show() {
+    func show(initialSection: SettingsSection = .general) {
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView())
+            let hosting = NSHostingController(rootView: SettingsView(initialSection: initialSection))
             let win = NSWindow(contentViewController: hosting)
             win.title = "Réglages Claudio"
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]

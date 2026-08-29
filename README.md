@@ -61,7 +61,7 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 
 ## Détails
 
-- **Modèle** : `claude-haiku-4-5` (constante dans `Sources/Claudio/Support/Constants.swift`), streaming SSE. Coût ≈ 0,2 centime par correction courte.
+- **Modèle** : choix par action dans Réglages → Prompts (Haiku 4.5 par défaut, Sonnet 5 ou Opus 5 au choix), streaming SSE. Coût ≈ 0,2 centime par correction courte avec Haiku.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
 - **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` — en ajouter une nouvelle = un cas d'enum + un raccourci.

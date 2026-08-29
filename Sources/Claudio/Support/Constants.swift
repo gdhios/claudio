@@ -3,9 +3,7 @@ import AppKit
 enum Constants {
     static let appName = "Claudio"
 
-    // ⚠️ `temperature` est accepté sur Haiku 4.5 mais rejeté (400) sur les
-    // modèles des générations 4.6+/5 — le retirer du body si on change de modèle.
-    static let model = "claude-haiku-4-5"
+    // Le modèle se choisit par action (ClaudioModel + Réglages → Prompts).
     static let temperature = 0.2
 
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!

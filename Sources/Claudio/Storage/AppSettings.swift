@@ -44,4 +44,26 @@ enum AppSettings {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }
+
+    // MARK: - Modèles par action
+
+    private static func modelKey(for action: ClaudioAction) -> String {
+        "model.\(action.rawValue)"
+    }
+
+    /// Modèle personnalisé de l'action (nil = défaut du code).
+    static func customModel(for action: ClaudioAction) -> ClaudioModel? {
+        UserDefaults.standard.string(forKey: modelKey(for: action))
+            .flatMap(ClaudioModel.init(rawValue:))
+    }
+
+    /// nil ou identique au défaut → retour au défaut (suit les mises à jour de l'app).
+    static func setCustomModel(_ model: ClaudioModel?, for action: ClaudioAction) {
+        let key = modelKey(for: action)
+        if let model, model != action.defaultModel {
+            UserDefaults.standard.set(model.rawValue, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
 }

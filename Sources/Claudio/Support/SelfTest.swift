@@ -16,7 +16,7 @@ enum SelfTest {
             exit(1)
         }
 
-        print("→ Modèle : \(Constants.model)")
+        print("→ Modèle : \(ClaudioAction.correct.model.rawValue)")
         print("→ Texte  : \(sample)")
         print("---")
 
@@ -29,6 +29,7 @@ enum SelfTest {
                 let result = try await client.streamCompletion(
                     of: ClaudioAction.correct.userMessage(forText: sample),
                     system: ClaudioAction.correct.system,
+                    model: ClaudioAction.correct.model,
                     maxTokens: ClaudioAction.correct.maxTokens(forText: sample)
                 ) { piece in
                     print(piece, terminator: "")
