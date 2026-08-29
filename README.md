@@ -79,3 +79,9 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "un texte avec de
 
 - Raccourcis simulés via keycodes physiques (positions C/V) : OK en QWERTY et AZERTY, pas en Dvorak/Bépo.
 - « Lancer à l'ouverture de session » exige l'app packagée dans /Applications (pas `swift run`).
+
+## Licence et soutien
+
+Claudio est open source sous licence [MIT](LICENSE). Projet indépendant, non affilié à Anthropic — Claude est une marque d'Anthropic, PBC.
+
+Si l'app vous rend service : [offrez-moi un café](https://buymeacoffee.com/VOTRE-PSEUDO) ☕
