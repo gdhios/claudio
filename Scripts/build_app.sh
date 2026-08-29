@@ -29,11 +29,37 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Claudio"
 BUNDLE_ID="com.guillaumedhios.claudio"
-VERSION="1.2.2"
+VERSION="1.2.3"
 SIGN_IDENTITY="${SIGN_IDENTITY:-Plume Local Dev}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-claudio-notary}"
 DEST="${DEST:-/Applications}"
 APP="$DEST/$APP_NAME.app"
+
+echo "→ Résolution des dépendances…"
+swift package resolve
+
+# Correctif de dépendance, à réappliquer à chaque build (les checkouts SPM ne sont
+# pas versionnés). L'accès aux ressources généré par SwiftPM cherche le bundle de
+# KeyboardShortcuts à la racine du .app ; codesign refuse d'y sceller quoi que ce
+# soit, donc le bundle vit dans Contents/Resources et l'accès échoue par un
+# fatalError dès l'ouverture de l'onglet Raccourcis. Sur la machine de compilation
+# le repli sur .build masque le crash : il ne se voyait que chez les utilisateurs.
+KS_UTILS=".build/checkouts/KeyboardShortcuts/Sources/KeyboardShortcuts/Utilities.swift"
+KS_FIX='Bundle.main.resourceURL.flatMap { Bundle(url: $0.appendingPathComponent("KeyboardShortcuts_KeyboardShortcuts.bundle")) } ?? .main'
+if [ -f "$KS_UTILS" ]; then
+    if grep -q 'bundle: \.module' "$KS_UTILS"; then
+        echo "→ Correctif KeyboardShortcuts (chemin du bundle de ressources)…"
+        sed -i '' "s|bundle: \\.module|bundle: $KS_FIX|" "$KS_UTILS"
+    fi
+    if ! grep -q "KeyboardShortcuts_KeyboardShortcuts.bundle" "$KS_UTILS"; then
+        echo "❌ Correctif KeyboardShortcuts non appliqué : la dépendance a changé."
+        echo "   Vérifier $KS_UTILS avant de publier, sinon l'onglet Raccourcis plantera."
+        exit 1
+    fi
+else
+    echo "❌ Dépendance KeyboardShortcuts introuvable dans .build/checkouts."
+    exit 1
+fi
 
 echo "→ Compilation (release)…"
 swift build -c release

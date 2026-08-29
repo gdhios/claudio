@@ -268,8 +268,9 @@ private struct PromptsPane: View {
 
 private struct AboutPane: View {
     @State private var checking = false
+    @State private var installing = false
     @State private var updateMessage: String?
-    @State private var updateURL: URL?
+    @State private var pendingUpdate: UpdateChecker.Feed?
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -303,30 +304,31 @@ private struct AboutPane: View {
                             switch await UpdateChecker.shared.checkNow() {
                             case .upToDate:
                                 updateMessage = "Claudio est à jour (version \(version))."
-                                updateURL = nil
+                                pendingUpdate = nil
                             case .updateAvailable(let feed):
                                 updateMessage = "Mise à jour \(feed.version) disponible."
-                                updateURL = feed.url
+                                pendingUpdate = feed
                             case .failed:
                                 updateMessage = "Vérification impossible, réessayez plus tard."
-                                updateURL = nil
+                                pendingUpdate = nil
                             }
                             checking = false
                         }
                     }
-                    .disabled(checking)
-                    if checking {
+                    .disabled(checking || installing)
+                    if checking || installing {
                         ProgressView().controlSize(.small)
                     }
                     Spacer()
-                    if let updateURL {
-                        Link("Télécharger", destination: updateURL)
+                    if let pendingUpdate {
+                        Button("Installer et redémarrer") { install(pendingUpdate) }
+                            .disabled(installing)
                     }
                 }
                 if let updateMessage {
                     Text(updateMessage).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée.")
+                Text("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée. L'installation remplace l'app en place et relance Claudio, sans rien laisser dans les Téléchargements.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -350,5 +352,21 @@ private struct AboutPane: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Télécharge, vérifie et installe : en cas de succès l'app se termine et
+    /// la nouvelle version se relance seule.
+    private func install(_ feed: UpdateChecker.Feed) {
+        installing = true
+        updateMessage = "Téléchargement de la version \(feed.version)…"
+        Task { @MainActor in
+            do {
+                let newApp = try await UpdateInstaller.prepare(from: feed.url)
+                try UpdateInstaller.installAndRelaunch(newApp)
+            } catch {
+                updateMessage = error.localizedDescription
+                installing = false
+            }
+        }
     }
 }
