@@ -275,7 +275,7 @@ private struct AboutPane: View {
                 Link(destination: URL(string: "https://claudio.okonoma.com")!) {
                     Label("Site web", systemImage: "globe")
                 }
-                Link(destination: URL(string: "https://github.com/okonoma-apps/claudio")!) {
+                Link(destination: URL(string: "https://github.com/gdhios/claudio")!) {
                     Label("Code source (MIT)", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 Link(destination: URL(string: "https://buymeacoffee.com/gdhios")!) {
