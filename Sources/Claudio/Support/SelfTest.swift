@@ -41,6 +41,11 @@ enum SelfTest {
                 print(result.truncated
                       ? "⚠️ Réponse tronquée (max_tokens atteint)"
                       : "✅ OK (\(result.text.count) caractères)")
+                // Rend visible ce que le compteur de dépense enregistrera.
+                let cost = request.model.cost(inputTokens: result.inputTokens,
+                                              outputTokens: result.outputTokens)
+                print("→ Jetons : \(result.inputTokens) entrée / \(result.outputTokens) sortie"
+                      + " → \(Money.format(cost))")
             } catch {
                 print("\n❌ \(error.localizedDescription)")
             }

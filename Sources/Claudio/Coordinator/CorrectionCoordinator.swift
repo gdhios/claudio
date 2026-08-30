@@ -109,6 +109,9 @@ final class CorrectionCoordinator {
             session.correctedText = result.text
             session.truncated = result.truncated
             session.phase = .done
+            CostLedger.shared.record(model: request.model,
+                                     inputTokens: result.inputTokens,
+                                     outputTokens: result.outputTokens)
         } catch is CancellationError {
             // Esc pendant le stream : rien à faire
         } catch let error as URLError where error.code == .cancelled {

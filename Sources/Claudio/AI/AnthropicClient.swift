@@ -32,6 +32,10 @@ struct AnthropicClient: Sendable {
     struct StreamResult: Sendable {
         let text: String
         let truncated: Bool
+        /// Jetons facturés, annoncés par l'API elle-même. Zéro quand le flux
+        /// s'interrompt avant de les avoir donnés.
+        let inputTokens: Int
+        let outputTokens: Int
     }
 
     func streamCompletion(
@@ -73,6 +77,8 @@ struct AnthropicClient: Sendable {
 
         var full = ""
         var truncated = false
+        var inputTokens = 0
+        var outputTokens = 0
 
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }  // ignore "event: …" et lignes vides
@@ -88,19 +94,32 @@ struct AnthropicClient: Sendable {
                     full += piece
                     await onDelta(piece)
                 }
+            case "message_start":
+                // Seul endroit où les jetons d'entrée sont annoncés.
+                if let message = event["message"] as? [String: Any],
+                   let usage = message["usage"] as? [String: Any] {
+                    inputTokens = usage["input_tokens"] as? Int ?? inputTokens
+                    outputTokens = usage["output_tokens"] as? Int ?? outputTokens
+                }
             case "message_delta":
                 if let delta = event["delta"] as? [String: Any],
                    let stop = delta["stop_reason"] as? String {
                     truncated = (stop == "max_tokens")
                 }
+                // Le compte de sortie est cumulatif : le dernier fait foi.
+                if let usage = event["usage"] as? [String: Any] {
+                    inputTokens = usage["input_tokens"] as? Int ?? inputTokens
+                    outputTokens = usage["output_tokens"] as? Int ?? outputTokens
+                }
             case "error":
                 let message = ((event["error"] as? [String: Any])?["message"] as? String) ?? "erreur inconnue"
                 throw AnthropicError.stream(message)
             default:
-                continue  // message_start, content_block_start/stop, message_stop, ping
+                continue  // content_block_start/stop, message_stop, ping
             }
         }
-        return StreamResult(text: full, truncated: truncated)
+        return StreamResult(text: full, truncated: truncated,
+                            inputTokens: inputTokens, outputTokens: outputTokens)
     }
 
     private static func apiErrorMessage(from data: Data) -> String {

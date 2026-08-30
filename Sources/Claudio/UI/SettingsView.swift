@@ -77,9 +77,12 @@ struct SettingsView: View {
 
 // MARK: - Général
 
+@MainActor
 private struct GeneralPane: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
+    @State private var costCounterEnabled = AppSettings.costCounterEnabled
+    @ObservedObject private var ledger = CostLedger.shared
 
     var body: some View {
         Form {
@@ -101,12 +104,33 @@ private struct GeneralPane: View {
 
             Section("Modèle") {
                 LabeledContent("Modèle Claude", value: "réglable par action")
-                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Ordre de grandeur par action courte : ≈ 0,2 centime avec Haiku, ≈ 0,5 centime avec Sonnet, ≈ 1 centime avec Opus. La clé et la consommation se gèrent sur console.anthropic.com.")
+                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Dépense") {
+                Toggle("Compter ce que je dépense", isOn: $costCounterEnabled)
+                    .onChange(of: costCounterEnabled) {
+                        AppSettings.costCounterEnabled = costCounterEnabled
+                    }
+                if costCounterEnabled {
+                    LabeledContent("Aujourd'hui") {
+                        Text(ledger.day.actions == 0
+                             ? "aucune action"
+                             : "\(ledger.day.formattedTotal) · \(ledger.day.actions) action\(ledger.day.actions > 1 ? "s" : "")")
+                            .monospacedDigit()
+                    }
+                    Button("Remettre à zéro") { ledger.reset() }
+                        .disabled(ledger.day.actions == 0)
+                }
+                Text("Le total est calculé sur ta machine à partir des jetons facturés par appel, et repart à zéro chaque jour. Le décompte qui fait foi reste celui de console.anthropic.com.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+        .onAppear { ledger.refresh() }
     }
 }
 
@@ -180,10 +204,18 @@ private struct ShortcutsPane: View {
                         KeyboardShortcuts.Recorder("", name: action.shortcutName)
                     }
                 }
+                // Hors catalogue : sa consigne se saisit dans le panneau.
+                HStack(spacing: 10) {
+                    IconBadge(systemName: ClaudioRequest.awaitingInstruction.origin.symbolName,
+                              color: ClaudioRequest.awaitingInstruction.origin.tint, size: 22)
+                    Text(ClaudioRequest.freeMenuTitle)
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .freeAction)
+                }
             } header: {
                 Text("Raccourcis globaux")
             } footer: {
-                Text("Chaque action s'applique au texte sélectionné, dans n'importe quelle app.")
+                Text("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. L'action libre demande la consigne à appliquer au moment du déclenchement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

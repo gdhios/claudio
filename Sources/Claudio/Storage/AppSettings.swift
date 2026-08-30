@@ -23,6 +23,17 @@ enum AppSettings {
         return workspaceID
     }
 
+    // MARK: - Compteur de dépense
+
+    private static let costCounterKey = "costCounterEnabled"
+
+    /// Cumul local de la dépense du jour, activé par défaut et désactivable :
+    /// le calcul se fait sur la machine, rien n'est envoyé nulle part.
+    static var costCounterEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: costCounterKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: costCounterKey) }
+    }
+
     // MARK: - Prompts système personnalisés
 
     private static func systemPromptKey(for action: ClaudioAction) -> String {
