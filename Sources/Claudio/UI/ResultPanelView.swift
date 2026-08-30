@@ -70,6 +70,65 @@ final class CorrectionSession: ObservableObject {
     var trimmedInstruction: String {
         instruction.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    // MARK: - Flux
+
+    /// Fragments reçus depuis la dernière publication. Le flux SSE en livre
+    /// plusieurs dizaines par seconde ; republier `correctedText` à chacun
+    /// relance une mise en page complète du texte, de plus en plus coûteuse à
+    /// mesure qu'il s'allonge. C'est ce qui saturait la boucle principale et
+    /// faisait avancer la fenêtre par à-coups sur les réponses longues. On
+    /// accumule, et on publie à cadence fixe.
+    private var streamBuffer = ""
+    private var flushScheduled = false
+
+    /// Cadence de publication : assez courte pour que le texte reste vivant,
+    /// assez longue pour laisser la mise en page se faire entre deux.
+    static let streamFlushInterval: Duration = .milliseconds(60)
+
+    /// Ouvre une réponse : tampon vidé, texte remis à zéro.
+    func beginStreaming() {
+        streamBuffer = ""
+        flushScheduled = false
+        correctedText = ""
+        truncated = false
+        justCopied = false
+        phase = .streaming
+    }
+
+    /// Reçoit un fragment. Le premier part tout de suite — le panneau doit
+    /// réagir dès le premier mot ; les suivants attendent le prochain vidage.
+    func appendStreamed(_ piece: String) {
+        streamBuffer += piece
+        guard !correctedText.isEmpty else {
+            flushStreamed()
+            return
+        }
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: CorrectionSession.streamFlushInterval)
+            self?.flushStreamed()
+        }
+    }
+
+    /// Publie ce qui attend dans le tampon.
+    func flushStreamed() {
+        flushScheduled = false
+        guard !streamBuffer.isEmpty else { return }
+        correctedText += streamBuffer
+        streamBuffer = ""
+    }
+
+    /// Fin du flux : le texte complet remplace ce qui est passé en route, et
+    /// ce qui restait dans le tampon avec lui.
+    func finishStreaming(with text: String, truncated: Bool) {
+        streamBuffer = ""
+        flushScheduled = false
+        correctedText = text
+        self.truncated = truncated
+        phase = .done
+    }
 }
 
 /// Hauteur idéale du panneau entier — remontée à la fenêtre pour qu'elle
@@ -87,6 +146,10 @@ private struct TextHeightKey: PreferenceKey {
 
 struct ResultPanelView: View {
     @ObservedObject var session: CorrectionSession
+    /// Corps du texte, lu une fois à la construction du panneau : le réglage
+    /// s'applique au panneau suivant, et le panneau courant ne change pas de
+    /// taille sous les yeux de qui le lit.
+    var textSize: PanelTextSize = .normal
     let onPaste: () -> Void
     let onCopy: () -> Void
     let onRetry: () -> Void
@@ -111,7 +174,7 @@ struct ResultPanelView: View {
                 footer
             }
         }
-        .frame(width: Constants.panelWidth)
+        .frame(width: textSize.panelWidth)
         .background {
             GeometryReader { geo in
                 Color.clear.preference(key: PanelHeightKey.self, value: geo.size.height)
@@ -186,7 +249,7 @@ struct ResultPanelView: View {
     @ViewBuilder private var content: some View {
         switch session.phase {
         case .choosingAction:
-            PaletteView(session: session, onLaunch: onLaunchPaletteRow)
+            PaletteView(session: session, textSize: textSize, onLaunch: onLaunchPaletteRow)
         case .askingInstruction:
             instructionPrompt
         case .noSelection:
@@ -206,7 +269,7 @@ struct ResultPanelView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         resultText
-                            .font(.body)
+                            .font(.system(size: textSize.bodyPoints))
                             .foregroundStyle(.white.opacity(0.92))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -219,12 +282,22 @@ struct ResultPanelView: View {
                         }
                     }
                 }
-                .frame(height: min(max(textHeight, 52), Constants.panelMaxTextHeight))
+                .frame(height: min(max(textHeight, 52), textSize.maxTextHeight))
                 .onPreferenceChange(TextHeightKey.self) { height in
-                    Task { @MainActor in textHeight = height }
+                    // La hauteur mesurée saute d'une ligne entière à la fois.
+                    // L'interpoler ici plutôt que de la reporter telle quelle
+                    // fait suivre la fenêtre image par image : elle glisse au
+                    // lieu de sauter, sans que rien n'anime la fenêtre elle-même.
+                    Task { @MainActor in
+                        withAnimation(.easeOut(duration: 0.18)) { textHeight = height }
+                    }
                 }
                 .onChange(of: session.correctedText) {
-                    proxy.scrollTo("bottom", anchor: .bottom)
+                    // Ne suivre le bas que s'il y a de quoi défiler : tant que
+                    // le texte tient dans le panneau, il n'y a rien à rattraper.
+                    if textHeight > textSize.maxTextHeight {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
                 }
             }
         }
@@ -237,7 +310,7 @@ struct ResultPanelView: View {
             TextField("", text: $session.instruction,
                       prompt: Text("Que faire du texte sélectionné ?"))
                 .textFieldStyle(.plain)
-                .font(.body)
+                .font(.system(size: textSize.bodyPoints))
                 .foregroundStyle(.white.opacity(0.92))
                 .focused($instructionFocused)
                 .onSubmit(onSubmitInstruction)
@@ -251,7 +324,7 @@ struct ResultPanelView: View {
                 )
 
             Text(session.originalText)
-                .font(.caption)
+                .font(.system(size: textSize.points(10)))
                 .foregroundStyle(.white.opacity(0.35))
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -280,9 +353,9 @@ struct ResultPanelView: View {
     private func messageView(icon: String, title: String, detail: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.headline)
+            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
             Text(detail)
-                .font(.callout)
+                .font(.system(size: textSize.points(12)))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
