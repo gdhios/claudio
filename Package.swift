@@ -11,6 +11,10 @@ let package = Package(
         .executableTarget(
             name: "Claudio",
             dependencies: ["KeyboardShortcuts"]
+        ),
+        .testTarget(
+            name: "ClaudioTests",
+            dependencies: ["Claudio"]
         )
     ]
 )

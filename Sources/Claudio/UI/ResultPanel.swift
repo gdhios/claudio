@@ -8,6 +8,11 @@ final class ResultPanel: NSPanel {
     var onEscape: (() -> Void)?
     var onCopyShortcut: (() -> Void)?
 
+    /// Échap n'atteint `keyDown` que si personne ne l'a consommé avant : le champ
+    /// de consigne, lui, l'absorbe. Un moniteur local voit la touche avant la
+    /// chaîne des responders, donc « Échap pour fermer » reste vrai en saisie.
+    private var escapeMonitor: Any?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
@@ -39,6 +44,7 @@ final class ResultPanel: NSPanel {
                      onPaste: @escaping () -> Void = {},
                      onCopy: @escaping () -> Void = {},
                      onRetry: @escaping () -> Void = {},
+                     onSubmitInstruction: @escaping () -> Void = {},
                      onOpenSettings: @escaping () -> Void = {},
                      onClose: @escaping () -> Void = {}) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView())
@@ -47,6 +53,7 @@ final class ResultPanel: NSPanel {
             onPaste: onPaste,
             onCopy: onCopy,
             onRetry: onRetry,
+            onSubmitInstruction: onSubmitInstruction,
             onOpenSettings: onOpenSettings,
             onClose: onClose,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
@@ -90,7 +97,22 @@ final class ResultPanel: NSPanel {
         fadeIn()
     }
 
+    override func orderOut(_ sender: Any?) {
+        if let escapeMonitor {
+            NSEvent.removeMonitor(escapeMonitor)
+            self.escapeMonitor = nil
+        }
+        super.orderOut(sender)
+    }
+
     private func fadeIn() {
+        if escapeMonitor == nil {
+            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, event.window === self, event.keyCode == 53 else { return event }
+                self.onEscape?()
+                return nil
+            }
+        }
         alphaValue = 0
         makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
