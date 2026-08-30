@@ -1,0 +1,51 @@
+# CI : les niveaux 1 et 2 du protocole de test (TESTING.md) — tests unitaires
+# puis aperçus UI rendus en PNG — sur main, sur les branches de travail
+# claude/** et sur chaque pull request.
+# Le niveau 3 (API réelle) reste dans Scripts/release.sh : il demande une clé
+# et coûte de vrais jetons ; la CI n'en a pas besoin pour garder main sain.
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests unitaires + aperçus UI
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # KeyboardShortcuts 3.0.1 demande Swift tools 6.2 : le Xcode par défaut
+      # du runner est parfois en retard, on prend le plus récent installé.
+      - name: Sélectionner le Xcode le plus récent
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Protocole de test (niveaux 1 et 2)
+        run: Scripts/test.sh --smoke
+
+      # Les écrans rendus, tels que la CI les a vus : de quoi juger d'un œil
+      # une régression visuelle sans lancer l'app.
+      - name: Publier les aperçus rendus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apercus-ui
+          path: .build/previews/
+          if-no-files-found: ignore

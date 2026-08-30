@@ -54,17 +54,8 @@ struct AnthropicClient: Sendable {
             request.setValue(workspaceID, forHTTPHeaderField: "anthropic-workspace-id")
         }
 
-        var body: [String: Any] = [
-            "model": model.rawValue,
-            "max_tokens": maxTokens,
-            "system": system,
-            "stream": true,
-            "messages": [["role": "user", "content": text]]
-        ]
-        if model.supportsTemperature {
-            body["temperature"] = Constants.temperature
-        }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: Self.makeBody(text: text, system: system, model: model, maxTokens: maxTokens))
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw AnthropicError.badResponse }
@@ -75,24 +66,63 @@ struct AnthropicClient: Sendable {
             throw AnthropicError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
         }
 
-        var full = ""
-        var truncated = false
-        var inputTokens = 0
-        var outputTokens = 0
-
+        var parser = StreamParser()
         for try await line in bytes.lines {
-            guard line.hasPrefix("data: ") else { continue }  // ignore "event: …" et lignes vides
+            if let piece = try parser.consume(line: line) {
+                await onDelta(piece)
+            }
+        }
+        return parser.result
+    }
+
+    /// Corps du POST /v1/messages. Un champ mal nommé ou une température
+    /// envoyée à un modèle qui la refuse est un 400 pour tout le monde :
+    /// c'est ce que les tests verrouillent.
+    static func makeBody(
+        text: String, system: String, model: ClaudioModel, maxTokens: Int
+    ) -> [String: Any] {
+        var body: [String: Any] = [
+            "model": model.rawValue,
+            "max_tokens": maxTokens,
+            "system": system,
+            "stream": true,
+            "messages": [["role": "user", "content": text]]
+        ]
+        if model.supportsTemperature {
+            body["temperature"] = Constants.temperature
+        }
+        return body
+    }
+
+    /// Lit le flux SSE ligne à ligne et en tire tout ce que l'app en attend :
+    /// le texte, la troncature et les jetons facturés. Séparé du transport
+    /// réseau pour être exerçable en test sur des transcriptions du flux.
+    struct StreamParser {
+        private(set) var text = ""
+        private(set) var truncated = false
+        private(set) var inputTokens = 0
+        private(set) var outputTokens = 0
+
+        var result: StreamResult {
+            StreamResult(text: text, truncated: truncated,
+                         inputTokens: inputTokens, outputTokens: outputTokens)
+        }
+
+        /// Consomme une ligne du flux et renvoie le fragment de texte qu'elle
+        /// apporte, s'il y en a un. Lève l'erreur que l'API signale en flux.
+        mutating func consume(line: String) throws -> String? {
+            guard line.hasPrefix("data: ") else { return nil }  // ignore "event: …" et lignes vides
             guard let data = String(line.dropFirst(6)).data(using: .utf8),
                   let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let type = event["type"] as? String else { continue }
+                  let type = event["type"] as? String else { return nil }
 
             switch type {
             case "content_block_delta":
                 if let delta = event["delta"] as? [String: Any],
                    delta["type"] as? String == "text_delta",
                    let piece = delta["text"] as? String {
-                    full += piece
-                    await onDelta(piece)
+                    text += piece
+                    return piece
                 }
             case "message_start":
                 // Seul endroit où les jetons d'entrée sont annoncés.
@@ -115,14 +145,13 @@ struct AnthropicClient: Sendable {
                 let message = ((event["error"] as? [String: Any])?["message"] as? String) ?? "erreur inconnue"
                 throw AnthropicError.stream(message)
             default:
-                continue  // content_block_start/stop, message_stop, ping
+                break  // content_block_start/stop, message_stop, ping
             }
+            return nil
         }
-        return StreamResult(text: full, truncated: truncated,
-                            inputTokens: inputTokens, outputTokens: outputTokens)
     }
 
-    private static func apiErrorMessage(from data: Data) -> String {
+    static func apiErrorMessage(from data: Data) -> String {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = object["error"] as? [String: Any],
               let message = error["message"] as? String else {
