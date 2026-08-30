@@ -6,6 +6,7 @@ Mini-app macOS (barre de menus) qui capture la sélection courante dans n'import
 
 1. Sélectionner du texte dans n'importe quelle app.
 2. Déclencher une action (raccourcis reconfigurables dans les Réglages) :
+   - **⌃⌥⌘K** *Palette d'actions* : ouvre le panneau sur la liste complète plutôt que sur une action. On filtre à la frappe (accents et casse ignorés), on lance avec **⌘1**–**⌘9** ou **↑↓** puis **⏎**. La dernière ligne est toujours l'action libre : si rien ne correspond, ce qui est tapé devient la consigne. Le seul raccourci à retenir.
    - **⌃⌥⌘I** *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
    - **⌃⌥⌘P** *Structurer en prompt* : reformule une idée brute en demande claire et directe, compacte, sans y répondre.
    - **⌃⌥⌘^** *Structurer en prompt expert* : produit un prompt complet selon les bonnes pratiques Anthropic (rôle, contexte, tâche, contraintes, format de sortie, balises pour les données, espaces réservés `[préciser : …]` si une info manque).
@@ -61,18 +62,30 @@ NOTARIZE=1 Scripts/build_app.sh
 
 Note : Developer ID étant une identité différente de « Plume Local Dev », macOS redemande une fois Accessibilité/Trousseau sur ta machine quand tu alternes entre build local et build notarisé.
 
+### Publier une version
+
+Une version n'est pas « faite » quand elle compile : elle l'est quand elle est notarisée, poussée, publiée en release GitHub, déployée sur le site, annoncée par `version.json` et vérifiée en ligne. Toute cette chaîne tient dans un script, dans cet ordre, avec arrêt à la première étape qui échoue :
+
+```bash
+Scripts/release.sh 1.4.0 "palette d'actions"
+```
+
+Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications (branche `main`, arbre propre, tag libre, `gh` authentifié, VPS joignable) → numéro de version dans `build_app.sh` et sur les deux landings → `swift test` → build notarisé → commit + tag + push → release GitHub (notes reprises de `dist/release_notes_X.Y.Z.md` s'il existe) → `rsync` du site, envoi du zip en `Claudio.zip`, réécriture de `version.json` → vérification de ce qui est réellement servi : le flux annonce la bonne version, le zip téléchargé a le même SHA-256 que le zip notarisé, les quatre pages répondent et affichent le bon numéro, la release GitHub porte son asset.
+
 ## Détails
 
 - **Modèle** : choix par action dans Réglages → Prompts (Haiku 4.5 par défaut, Sonnet 5 ou Opus 5 au choix), streaming SSE. Tarifs Anthropic par million de jetons, entrée / sortie : Haiku 4.5 1 $ / 5 $, Sonnet 5 2 $ / 10 $, Opus 5 5 $ / 25 $ — soit ≈ 0,12 $ pour cent actions courtes avec Haiku.
 - **Dépense** : `AnthropicClient` relève les jetons que l'API facture (`message_start` pour l'entrée, `message_delta` pour la sortie) ; `CostLedger` cumule le total de la journée dans UserDefaults et le remet à zéro au changement de date. Affiché dans Réglages → Général, désactivable (`AppSettings.costCounterEnabled`). Rien n'est envoyé nulle part : le calcul est local et le décompte qui fait foi reste celui de console.anthropic.com.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
-- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` ; en ajouter une nouvelle = un cas d'enum + un raccourci.
+- **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` ; en ajouter une nouvelle = un cas d'enum + un raccourci. Ce qui est réellement envoyé à l'API est un `ClaudioRequest` (`AI/ClaudioRequest.swift`), construit depuis une entrée du catalogue ou depuis une consigne libre — c'est ce découplage qui rend l'action libre et la palette possibles.
+- **Palette** : `AI/PaletteCatalog.swift` (filtrage, lignes) et `UI/PaletteView.swift` (rendu). Le panneau est le même objet que pour un résultat : la phase `.choosingAction` affiche la liste, la ligne retenue remplace la requête de la session et le stream démarre. Le filtre retient une action si chaque mot tapé commence un mot de son titre ou de son sous-titre.
 - **Prompts éditables** : l'onglet Prompts des Réglages affiche le prompt système de chaque action et permet de le modifier (stocké dans UserDefaults ; « Réinitialiser » revient au prompt du code, qui suit alors les mises à jour de l'app).
 - **Prompt** : toutes les instructions vivent dans le message `system`. Pour les actions de structuration, le texte sélectionné est balisé `<texte_source>` dans le message `user`. Sans cela, une sélection du type « résume mes mails » se lit comme un ordre et le modèle y répond au lieu de la transformer. La langue du texte est préservée.
 - **Icône** : `icon/AppIcon.icns`, embarquée par `build_app.sh`. Les sources de l'icône ne sont pas versionnées (`Scripts/make_icon.sh` sert à la régénérer en local).
 - **Mises à jour** : vérification automatique une fois par jour (simple lecture de `version.json` sur claudio.okonoma.com, aucune donnée envoyée) + bouton « Vérifier maintenant » dans Réglages → À propos. Une mise à jour disponible apparaît en tête du menu de la barre.
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
+- **Aperçus UI sans réseau** : `.build/release/Claudio --preview <mode> [--shot fichier.png]`, avec mode ∈ `panel`, `panel-streaming`, `panel-long`, `panel-error`, `panel-noselection`, `panel-free`, `panel-free-filled`, `palette`, `palette-filtre`, `palette-libre`, `settings`, `settings-prompts`, `settings-shortcuts`, `settings-about`. Aucun raccourci global ni item de barre de menus n'est installé, aucune clé n'est requise.
 - **Test CLI sans UI** :
 
 ```bash

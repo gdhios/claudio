@@ -68,6 +68,12 @@ extension ClaudioRequest.Origin {
     }
 }
 
+/// La palette n'est pas une action : elle les contient toutes.
+extension PaletteCatalog {
+    static let symbolName = "square.grid.2x2.fill"
+    static let tint = ClaudioTheme.accent
+}
+
 /// Pastille d'icône colorée façon Réglages Système.
 struct IconBadge: View {
     let systemName: String

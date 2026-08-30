@@ -7,11 +7,17 @@ final class ResultPanel: NSPanel {
     var onEnter: (() -> Void)?
     var onEscape: (() -> Void)?
     var onCopyShortcut: (() -> Void)?
+    /// Flèches haut/bas : `-1` monter, `+1` descendre. Renvoie `true` si la
+    /// touche a servi — sinon elle poursuit sa route (défiler un résultat long).
+    var onArrow: ((Int) -> Bool)?
+    /// ⌘1…⌘9 : lance la ligne de ce rang. Même contrat de retour.
+    var onDigit: ((Int) -> Bool)?
 
-    /// Échap n'atteint `keyDown` que si personne ne l'a consommé avant : le champ
-    /// de consigne, lui, l'absorbe. Un moniteur local voit la touche avant la
-    /// chaîne des responders, donc « Échap pour fermer » reste vrai en saisie.
-    private var escapeMonitor: Any?
+    /// Ces touches n'atteignent `keyDown` que si personne ne les a consommées
+    /// avant : les champs de saisie, eux, les absorbent. Un moniteur local les
+    /// voit avant la chaîne des responders, donc « Échap pour fermer » et la
+    /// navigation de la palette restent vrais pendant la frappe.
+    private var keyMonitor: Any?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -45,6 +51,7 @@ final class ResultPanel: NSPanel {
                      onCopy: @escaping () -> Void = {},
                      onRetry: @escaping () -> Void = {},
                      onSubmitInstruction: @escaping () -> Void = {},
+                     onLaunchPaletteRow: @escaping (Int) -> Void = { _ in },
                      onOpenSettings: @escaping () -> Void = {},
                      onClose: @escaping () -> Void = {}) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView())
@@ -54,6 +61,7 @@ final class ResultPanel: NSPanel {
             onCopy: onCopy,
             onRetry: onRetry,
             onSubmitInstruction: onSubmitInstruction,
+            onLaunchPaletteRow: onLaunchPaletteRow,
             onOpenSettings: onOpenSettings,
             onClose: onClose,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
@@ -98,19 +106,44 @@ final class ResultPanel: NSPanel {
     }
 
     override func orderOut(_ sender: Any?) {
-        if let escapeMonitor {
-            NSEvent.removeMonitor(escapeMonitor)
-            self.escapeMonitor = nil
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
         }
         super.orderOut(sender)
     }
 
+    /// Rang demandé par ⌘1…⌘9, ou `nil`. Le caractère couvre le QWERTY ; la
+    /// position physique couvre l'AZERTY, où la rangée du haut ne donne pas de
+    /// chiffres sans ⇧ mais où les touches sont au même endroit.
+    private func digitRank(of event: NSEvent) -> Int? {
+        guard event.modifierFlags.contains(.command) else { return nil }
+        if let character = event.charactersIgnoringModifiers,
+           let rank = Int(character), (1...9).contains(rank) {
+            return rank
+        }
+        // kVK_ANSI_1…9, dans l'ordre des chiffres (6 et 7 ne se suivent pas).
+        let positions: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
+        return positions.firstIndex(of: event.keyCode).map { $0 + 1 }
+    }
+
     private func fadeIn() {
-        if escapeMonitor == nil {
-            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, event.window === self, event.keyCode == 53 else { return event }
-                self.onEscape?()
-                return nil
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, event.window === self else { return event }
+                switch event.keyCode {
+                case 53:  // Esc
+                    self.onEscape?()
+                    return nil
+                case 126 where self.onArrow?(-1) == true,  // Haut
+                     125 where self.onArrow?(1) == true:   // Bas
+                    return nil
+                default:
+                    if let rank = self.digitRank(of: event), self.onDigit?(rank) == true {
+                        return nil
+                    }
+                    return event
+                }
             }
         }
         alphaValue = 0

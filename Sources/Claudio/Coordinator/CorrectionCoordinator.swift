@@ -25,7 +25,13 @@ final class CorrectionCoordinator {
         trigger(.awaitingInstruction)
     }
 
-    func trigger(_ request: ClaudioRequest) {
+    /// Palette : la sélection est capturée d'abord, l'action se choisit ensuite
+    /// dans le panneau. La requête de départ n'est qu'un garnissage.
+    func triggerPalette() {
+        trigger(.awaitingChoice, opensPalette: true)
+    }
+
+    func trigger(_ request: ClaudioRequest, opensPalette: Bool = false) {
         dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
 
         guard AccessibilityPermission.isGranted else {
@@ -39,7 +45,7 @@ final class CorrectionCoordinator {
         previousApp = (frontmost?.bundleIdentifier == Bundle.main.bundleIdentifier) ? nil : frontmost
         clipboardSnapshot = PasteboardSnapshot.capture()
 
-        let session = CorrectionSession(request: request)
+        let session = CorrectionSession(request: request, opensPalette: opensPalette)
         self.session = session
 
         streamTask = Task { [weak self] in
@@ -59,6 +65,13 @@ final class CorrectionCoordinator {
             return
         }
         session.originalText = text
+
+        // Palette : rien à envoyer tant qu'une ligne n'est pas retenue.
+        // La suite repart de `launchPaletteRow(at:)`.
+        guard !session.opensPalette else {
+            session.phase = .choosingAction
+            return
+        }
 
         // Action libre : rien à envoyer tant que la consigne n'est pas saisie.
         // La suite repart de `submitInstruction()`.
@@ -81,6 +94,49 @@ final class CorrectionCoordinator {
         streamTask = Task { [weak self] in
             await self?.stream(session: session)
         }
+    }
+
+    // MARK: - Palette
+
+    /// Ligne retenue dans la palette : sa requête devient celle de la session.
+    /// L'action libre sans consigne fait escale par le champ de saisie plutôt
+    /// que de partir avec une instruction vide.
+    private func choose(_ request: ClaudioRequest) {
+        guard let session, session.phase == .choosingAction else { return }
+        session.adopt(request)
+
+        guard !request.needsInstruction else {
+            session.phase = .askingInstruction
+            return
+        }
+        streamTask?.cancel()
+        streamTask = Task { [weak self] in
+            await self?.stream(session: session)
+        }
+    }
+
+    func launchPaletteRow(at index: Int) {
+        guard let session, session.phase == .choosingAction else { return }
+        let rows = session.paletteRows
+        guard rows.indices.contains(index) else { return }
+        session.paletteSelection = index
+        choose(rows[index].request)
+    }
+
+    /// Flèches : ne consomme la touche que si la palette est ouverte, sinon
+    /// elle continue sa route et fait défiler un résultat long.
+    private func movePaletteSelection(by delta: Int) -> Bool {
+        guard let session, session.phase == .choosingAction else { return false }
+        session.movePaletteSelection(by: delta)
+        return true
+    }
+
+    /// ⌘1…⌘9 : lance la ligne de ce rang si elle existe.
+    private func launchPaletteRank(_ rank: Int) -> Bool {
+        guard let session, session.phase == .choosingAction,
+              session.paletteRows.indices.contains(rank - 1) else { return false }
+        launchPaletteRow(at: rank - 1)
+        return true
     }
 
     private func stream(session: CorrectionSession) async {
@@ -124,11 +180,15 @@ final class CorrectionCoordinator {
 
     // MARK: - Actions du panneau
 
-    /// Entrée : valide la consigne pendant la saisie, colle le résultat ensuite.
+    /// Entrée : lance la ligne retenue dans la palette, valide la consigne
+    /// pendant la saisie, colle le résultat ensuite.
     func confirm() {
-        if session?.phase == .askingInstruction {
+        switch session?.phase {
+        case .choosingAction:
+            launchPaletteRow(at: session?.paletteSelection ?? 0)
+        case .askingInstruction:
             submitInstruction()
-        } else {
+        default:
             pasteResult()
         }
     }
@@ -196,6 +256,7 @@ final class CorrectionCoordinator {
             onCopy: { [weak self] in self?.copyResult() },
             onRetry: { [weak self] in self?.retry() },
             onSubmitInstruction: { [weak self] in self?.submitInstruction() },
+            onLaunchPaletteRow: { [weak self] index in self?.launchPaletteRow(at: index) },
             onOpenSettings: { [weak self] in
                 self?.dismiss()
                 self?.openSettings?()
@@ -205,6 +266,8 @@ final class CorrectionCoordinator {
         panel.onEnter = { [weak self] in self?.confirm() }
         panel.onEscape = { [weak self] in self?.dismiss() }
         panel.onCopyShortcut = { [weak self] in self?.copyResult() }
+        panel.onArrow = { [weak self] delta in self?.movePaletteSelection(by: delta) ?? false }
+        panel.onDigit = { [weak self] rank in self?.launchPaletteRank(rank) ?? false }
         self.panel = panel
         panel.present(near: NSEvent.mouseLocation)
     }

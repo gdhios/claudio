@@ -50,6 +50,35 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
+    /// Libellé dans la palette : plus court que celui du menu, qui passerait à
+    /// la ligne dans une liste (« Lapacompris : expliquer simplement »).
+    var paletteTitle: String {
+        switch self {
+        case .correct: "Corriger"
+        case .makePrompt: "Structurer en prompt"
+        case .expertPrompt: "Prompt expert"
+        case .translateFR: "Traduire en français"
+        case .translateEN: "Traduire en anglais"
+        case .professionalTone: "Ton professionnel"
+        case .summarize: "Résumer"
+        case .simplify: "Expliquer simplement"
+        }
+    }
+
+    /// Seconde ligne dans la palette : ce que l'action fait, en un souffle.
+    var paletteDetail: String {
+        switch self {
+        case .correct: "Orthographe, grammaire, ponctuation"
+        case .makePrompt: "Transforme une idée en prompt clair"
+        case .expertPrompt: "Contraintes, format et critères de sortie"
+        case .translateFR: "Depuis n'importe quelle langue"
+        case .translateEN: "Depuis n'importe quelle langue"
+        case .professionalTone: "Reformule pour un contexte de travail"
+        case .summarize: "Points clés, format court"
+        case .simplify: "Lapacompris : sans jargon"
+        }
+    }
+
     /// Prompt système effectif : personnalisé (Réglages) sinon défaut.
     var system: String { AppSettings.customSystemPrompt(for: self) ?? defaultSystem }
 

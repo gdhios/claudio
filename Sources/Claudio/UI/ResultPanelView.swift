@@ -4,6 +4,8 @@ import SwiftUI
 final class CorrectionSession: ObservableObject {
     enum Phase: Equatable {
         case capturing
+        /// Palette : la sélection est prise, l'action se choisit dans le panneau.
+        case choosingAction
         /// Action libre : la sélection est prise, la consigne se saisit dans le panneau.
         case askingInstruction
         case streaming
@@ -14,7 +16,14 @@ final class CorrectionSession: ObservableObject {
     }
 
     @Published private(set) var request: ClaudioRequest
-    init(request: ClaudioRequest) { self.request = request }
+    /// La palette s'ouvre entre la capture et l'appel : la requête n'est alors
+    /// qu'un garnissage, remplacé par la ligne choisie.
+    let opensPalette: Bool
+
+    init(request: ClaudioRequest, opensPalette: Bool = false) {
+        self.request = request
+        self.opensPalette = opensPalette
+    }
 
     /// Confort pour les appels qui partent d'une entrée du catalogue.
     convenience init(action: ClaudioAction) { self.init(request: action.request) }
@@ -28,8 +37,32 @@ final class CorrectionSession: ObservableObject {
     @Published var justCopied = false
     /// Consigne en cours de saisie (action libre).
     @Published var instruction = ""
+    /// Saisie de la palette : filtre le catalogue, et sert de consigne si c'est
+    /// la ligne d'action libre qu'on lance.
+    @Published var paletteQuery = "" {
+        didSet { paletteSelection = 0 }  // le filtre a changé : la liste aussi
+    }
+    @Published var paletteSelection = 0
     var originalText = ""
     var maxTokensMultiplier = 1
+
+    /// Lignes de la palette pour la saisie courante.
+    var paletteRows: [PaletteRow] { PaletteCatalog.rows(matching: paletteQuery) }
+
+    /// Ligne mise en avant, bornée : le filtre peut raccourcir la liste sous
+    /// l'index courant entre deux frappes.
+    var selectedPaletteRow: PaletteRow? {
+        let rows = paletteRows
+        guard !rows.isEmpty else { return nil }
+        return rows[min(max(paletteSelection, 0), rows.count - 1)]
+    }
+
+    /// Déplace la sélection sans sortir de la liste : arrivé en bas, on y reste.
+    func movePaletteSelection(by delta: Int) {
+        let count = paletteRows.count
+        guard count > 0 else { return }
+        paletteSelection = min(max(paletteSelection + delta, 0), count - 1)
+    }
 
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
 
@@ -58,6 +91,7 @@ struct ResultPanelView: View {
     let onCopy: () -> Void
     let onRetry: () -> Void
     let onSubmitInstruction: () -> Void
+    let onLaunchPaletteRow: (Int) -> Void
     let onOpenSettings: () -> Void
     let onClose: () -> Void
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
@@ -70,8 +104,12 @@ struct ResultPanelView: View {
             header
             ClaudioTheme.panelSeparator.frame(height: 1)
             content
-            ClaudioTheme.panelSeparator.frame(height: 1)
-            footer
+            // La palette porte son propre pied (champ de saisie et indices) :
+            // le pied commun ne s'affiche que pour les autres phases.
+            if session.phase != .choosingAction {
+                ClaudioTheme.panelSeparator.frame(height: 1)
+                footer
+            }
         }
         .frame(width: Constants.panelWidth)
         .background {
@@ -95,14 +133,21 @@ struct ResultPanelView: View {
         HStack(spacing: 8) {
             ClaudioBadge()
             Text("Claudio").font(.headline)
-            StatusPill {
-                Image(systemName: session.request.origin.symbolName)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(session.request.origin.tint)
-                Text(session.request.panelTitle)
+            // Pendant la palette, aucune action n'est choisie : la pastille
+            // mentirait. La dépense du jour prend sa place.
+            if session.phase == .choosingAction {
+                Spacer()
+                CostGauge()
+            } else {
+                StatusPill {
+                    Image(systemName: session.request.origin.symbolName)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(session.request.origin.tint)
+                    Text(session.request.panelTitle)
+                }
+                Spacer()
+                statusLabel
             }
-            Spacer()
-            statusLabel
             PanelCloseButton(action: onClose)
         }
         .padding(.horizontal, 14)
@@ -133,13 +178,15 @@ struct ResultPanelView: View {
                     Text("Prêt")
                 }
             }
-        case .askingInstruction, .noSelection, .missingKey, .error:
+        case .choosingAction, .askingInstruction, .noSelection, .missingKey, .error:
             EmptyView()
         }
     }
 
     @ViewBuilder private var content: some View {
         switch session.phase {
+        case .choosingAction:
+            PaletteView(session: session, onLaunch: onLaunchPaletteRow)
         case .askingInstruction:
             instructionPrompt
         case .noSelection:

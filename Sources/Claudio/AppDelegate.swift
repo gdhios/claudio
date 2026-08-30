@@ -56,6 +56,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = NSImage(systemSymbolName: "mustache.fill", accessibilityDescription: "Claudio")
 
         let menu = NSMenu()
+
+        // En tête : la porte d'entrée unique, qui contient toutes les autres.
+        let palette = NSMenuItem(title: PaletteCatalog.menuTitle,
+                                 action: #selector(paletteFromMenu), keyEquivalent: "")
+        palette.target = self
+        menu.addItem(palette)
+        menu.addItem(.separator())
+
         for action in ClaudioAction.allCases {
             let item = NSMenuItem(title: action.menuTitle, action: #selector(actionFromMenu(_:)), keyEquivalent: "")
             item.target = self
@@ -142,6 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func freeActionFromMenu() {
         afterMenuCloses { $0.triggerFreeAction() }
+    }
+
+    @objc private func paletteFromMenu() {
+        afterMenuCloses { $0.triggerPalette() }
     }
 
     /// Laisse le menu se refermer et l'app précédente reprendre le focus avant
