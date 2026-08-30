@@ -57,6 +57,24 @@ final class CorrectionSession: ObservableObject {
         return rows[min(max(paletteSelection, 0), rows.count - 1)]
     }
 
+    /// Position du pointeur à l'ouverture de la palette. Tant qu'il n'a pas
+    /// bougé, son survol ne choisit rien : le panneau s'ouvre près du curseur,
+    /// et une ligne qu'il recouvrirait s'attribuerait la sélection sans que la
+    /// main y soit pour rien.
+    private var hoverOrigin: CGPoint?
+
+    /// À l'apparition de la palette : le survol est en attente d'un mouvement.
+    func armHover(at location: CGPoint) { hoverOrigin = location }
+
+    /// `true` si ce survol vient d'une main qui a bougé. Le premier vrai
+    /// mouvement rend la souris à son métier, définitivement.
+    func acceptsHover(at location: CGPoint) -> Bool {
+        guard let origin = hoverOrigin else { return true }
+        guard hypot(location.x - origin.x, location.y - origin.y) > 2 else { return false }
+        hoverOrigin = nil
+        return true
+    }
+
     /// Déplace la sélection sans sortir de la liste : arrivé en bas, on y reste.
     func movePaletteSelection(by delta: Int) {
         let count = paletteRows.count

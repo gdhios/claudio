@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// La palette d'actions : tout le catalogue sous les yeux, filtrable à la
@@ -22,6 +23,9 @@ struct PaletteView: View {
             hints
         }
         .onAppear {
+            // Le pointeur est là où le raccourci a été frappé : son survol ne
+            // vaut choix qu'une fois qu'il aura bougé.
+            session.armHover(at: NSEvent.mouseLocation)
             // Même précaution que pour le champ de consigne : le focus posé
             // dans le cycle d'apparition est perdu, un tour plus tard il tient.
             Task { @MainActor in queryFocused = true }
@@ -52,7 +56,10 @@ struct PaletteView: View {
                                isSelected: index == session.paletteSelection,
                                textSize: textSize)
                     .contentShape(Rectangle())
-                    .onHover { if $0 { session.paletteSelection = index } }
+                    .onHover {
+                        guard $0, session.acceptsHover(at: NSEvent.mouseLocation) else { return }
+                        session.paletteSelection = index
+                    }
                     .onTapGesture { onLaunch(index) }
             }
         }
