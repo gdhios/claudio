@@ -14,7 +14,18 @@ final class CorrectionCoordinator {
 
     // MARK: - Déclenchement
 
+    /// Entrée du catalogue : raccourci global ou item de menu.
     func trigger(action: ClaudioAction) {
+        trigger(action.request)
+    }
+
+    /// Action libre : même cycle, avec une escale de saisie de la consigne
+    /// entre la capture de la sélection et l'appel à l'API.
+    func triggerFreeAction() {
+        trigger(.awaitingInstruction)
+    }
+
+    func trigger(_ request: ClaudioRequest) {
         dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
 
         guard AccessibilityPermission.isGranted else {
@@ -28,7 +39,7 @@ final class CorrectionCoordinator {
         previousApp = (frontmost?.bundleIdentifier == Bundle.main.bundleIdentifier) ? nil : frontmost
         clipboardSnapshot = PasteboardSnapshot.capture()
 
-        let session = CorrectionSession(action: action)
+        let session = CorrectionSession(request: request)
         self.session = session
 
         streamTask = Task { [weak self] in
@@ -48,7 +59,28 @@ final class CorrectionCoordinator {
             return
         }
         session.originalText = text
+
+        // Action libre : rien à envoyer tant que la consigne n'est pas saisie.
+        // La suite repart de `submitInstruction()`.
+        guard !session.request.needsInstruction else {
+            session.phase = .askingInstruction
+            return
+        }
         await stream(session: session)
+    }
+
+    /// Consigne validée dans le panneau : la requête libre se construit ici,
+    /// puis emprunte le chemin commun.
+    func submitInstruction() {
+        guard let session, session.phase == .askingInstruction else { return }
+        let instruction = session.trimmedInstruction
+        guard !instruction.isEmpty else { return }
+
+        session.adopt(.free(instruction: instruction))
+        streamTask?.cancel()
+        streamTask = Task { [weak self] in
+            await self?.stream(session: session)
+        }
     }
 
     private func stream(session: CorrectionSession) async {
@@ -62,14 +94,14 @@ final class CorrectionCoordinator {
         session.justCopied = false
 
         let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
-        let action = session.action
+        let request = session.request
         do {
             let result = try await client.streamCompletion(
-                of: action.userMessage(forText: session.originalText),
-                system: action.system,
-                model: action.model,
-                maxTokens: action.maxTokens(forText: session.originalText,
-                                            multiplier: session.maxTokensMultiplier)
+                of: request.userMessage(forText: session.originalText),
+                system: request.system,
+                model: request.model,
+                maxTokens: request.maxTokens(forText: session.originalText,
+                                             multiplier: session.maxTokensMultiplier)
             ) { @MainActor piece in
                 session.correctedText += piece
             }
@@ -88,6 +120,15 @@ final class CorrectionCoordinator {
     }
 
     // MARK: - Actions du panneau
+
+    /// Entrée : valide la consigne pendant la saisie, colle le résultat ensuite.
+    func confirm() {
+        if session?.phase == .askingInstruction {
+            submitInstruction()
+        } else {
+            pasteResult()
+        }
+    }
 
     func retry() {
         guard let session else { return }
@@ -151,13 +192,14 @@ final class CorrectionCoordinator {
             onPaste: { [weak self] in self?.pasteResult() },
             onCopy: { [weak self] in self?.copyResult() },
             onRetry: { [weak self] in self?.retry() },
+            onSubmitInstruction: { [weak self] in self?.submitInstruction() },
             onOpenSettings: { [weak self] in
                 self?.dismiss()
                 self?.openSettings?()
             },
             onClose: { [weak self] in self?.dismiss() }
         )
-        panel.onEnter = { [weak self] in self?.pasteResult() }
+        panel.onEnter = { [weak self] in self?.confirm() }
         panel.onEscape = { [weak self] in self?.dismiss() }
         panel.onCopyShortcut = { [weak self] in self?.copyResult() }
         self.panel = panel

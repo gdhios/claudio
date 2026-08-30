@@ -1,22 +1,25 @@
 import Foundation
 
-/// `Claudio --selftest [texte]` : teste le client streaming en CLI, sans UI.
+/// `Claudio --selftest [texte] [instruction]` : teste le client streaming en
+/// CLI, sans UI. Avec une instruction, c'est le chemin de l'action libre qui est
+/// exercé au lieu de la correction du catalogue.
 enum SelfTest {
     static func runBlocking() {
         let arguments = CommandLine.arguments
-        let sample: String
-        if let last = arguments.last, last != "--selftest" {
-            sample = last
-        } else {
-            sample = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
-        }
+        let extras = arguments.firstIndex(of: "--selftest").map { Array(arguments[($0 + 1)...]) } ?? []
+        let sample = extras.first
+            ?? "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+        let request = extras.count > 1
+            ? ClaudioRequest.free(instruction: extras[1])
+            : ClaudioAction.correct.request
 
         guard let apiKey = KeychainStore.currentAPIKey() else {
             print("❌ Aucune clé API : exporte \(Constants.apiKeyEnvVar) ou enregistre une clé dans les Réglages.")
             exit(1)
         }
 
-        print("→ Modèle : \(ClaudioAction.correct.model.rawValue)")
+        print("→ Action : \(request.panelTitle)")
+        print("→ Modèle : \(request.model.rawValue)")
         print("→ Texte  : \(sample)")
         print("---")
 
@@ -27,10 +30,10 @@ enum SelfTest {
         Task.detached {
             do {
                 let result = try await client.streamCompletion(
-                    of: ClaudioAction.correct.userMessage(forText: sample),
-                    system: ClaudioAction.correct.system,
-                    model: ClaudioAction.correct.model,
-                    maxTokens: ClaudioAction.correct.maxTokens(forText: sample)
+                    of: request.userMessage(forText: sample),
+                    system: request.system,
+                    model: request.model,
+                    maxTokens: request.maxTokens(forText: sample)
                 ) { piece in
                     print(piece, terminator: "")
                 }

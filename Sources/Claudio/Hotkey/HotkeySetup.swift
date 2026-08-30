@@ -35,6 +35,13 @@ extension KeyboardShortcuts.Name {
         "simplifyExplanation",
         initial: .init(.l, modifiers: [.control, .option, .command])
     )
+    /// Action libre : D comme « demande ». Carbon enregistre les raccourcis par
+    /// position physique, et D occupe la même sur AZERTY que sur QWERTY (au
+    /// contraire de A, Z et M) : la touche pressée est bien celle affichée.
+    static let freeAction = Self(
+        "freeAction",
+        initial: .init(.d, modifiers: [.control, .option, .command])
+    )
 }
 
 extension ClaudioAction {
@@ -60,6 +67,9 @@ enum HotkeySetup {
             KeyboardShortcuts.onKeyUp(for: action.shortcutName) { [weak coordinator] in
                 coordinator?.trigger(action: action)
             }
+        }
+        KeyboardShortcuts.onKeyUp(for: .freeAction) { [weak coordinator] in
+            coordinator?.triggerFreeAction()
         }
     }
 }

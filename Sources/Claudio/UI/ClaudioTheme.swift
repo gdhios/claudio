@@ -50,6 +50,24 @@ extension ClaudioAction {
     }
 }
 
+/// Même paire pour une requête, quelle que soit son origine : le catalogue
+/// délègue à l'action, l'action libre a son propre couple.
+extension ClaudioRequest.Origin {
+    var symbolName: String {
+        switch self {
+        case .catalog(let action): action.symbolName
+        case .free: "wand.and.stars"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .catalog(let action): action.tint
+        case .free: .orange
+        }
+    }
+}
+
 /// Pastille d'icône colorée façon Réglages Système.
 struct IconBadge: View {
     let systemName: String

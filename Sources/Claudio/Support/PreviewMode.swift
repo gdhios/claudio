@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Mode aperçu UI pour le développement : `Claudio --preview <mode>`
 /// avec mode ∈ panel, panel-streaming, panel-long, panel-error,
-/// panel-noselection, settings. Affiche l'élément à une position fixe et
+/// panel-noselection, panel-free, panel-free-filled, settings.
+/// Affiche l'élément à une position fixe et
 /// imprime la région à capturer (top-left, pour `screencapture -R`).
 /// Aucun raccourci global ni item de barre de menus n'est installé.
 @MainActor
@@ -23,6 +24,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .shortcuts)
         } else if mode == "settings-about" {
             settingsController.show(initialSection: .about)
+        } else if mode.hasPrefix("palette") {
+            showPalettePreview()
         } else {
             showPanelPreview()
         }
@@ -91,6 +94,15 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         case "panel-noselection":
             session = CorrectionSession(action: .correct)
             session.phase = .noSelection
+        case "panel-free":
+            session = CorrectionSession(request: .awaitingInstruction)
+            session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+            session.phase = .askingInstruction
+        case "panel-free-filled":
+            session = CorrectionSession(request: .awaitingInstruction)
+            session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+            session.instruction = "Traduis en espagnol"
+            session.phase = .askingInstruction
         default:  // "panel"
             session = CorrectionSession(action: .translateEN)
             session.phase = .done
@@ -100,6 +112,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         self.panel = panel
         let screen = NSScreen.screens.first?.frame ?? .zero
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 760))
+    }
+
+    /// Maquettes de la palette (voir `PalettePreview.swift`).
+    private func showPalettePreview() {
+        let panel = PaletteMockPanel.make(mode: mode)
+        self.panel = panel
+        let screen = NSScreen.screens.first?.frame ?? .zero
+        panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 860))
     }
 
     /// Coordonnées pour `screencapture -R x,y,w,h` : origine top-left de l'écran principal.

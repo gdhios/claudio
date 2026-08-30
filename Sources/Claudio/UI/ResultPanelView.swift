@@ -4,6 +4,8 @@ import SwiftUI
 final class CorrectionSession: ObservableObject {
     enum Phase: Equatable {
         case capturing
+        /// Action libre : la sélection est prise, la consigne se saisit dans le panneau.
+        case askingInstruction
         case streaming
         case done
         case noSelection
@@ -11,17 +13,30 @@ final class CorrectionSession: ObservableObject {
         case error(String)
     }
 
-    let action: ClaudioAction
-    init(action: ClaudioAction) { self.action = action }
+    @Published private(set) var request: ClaudioRequest
+    init(request: ClaudioRequest) { self.request = request }
+
+    /// Confort pour les appels qui partent d'une entrée du catalogue.
+    convenience init(action: ClaudioAction) { self.init(request: action.request) }
+
+    /// L'action libre ne connaît sa requête qu'une fois la consigne validée.
+    func adopt(_ request: ClaudioRequest) { self.request = request }
 
     @Published var phase: Phase = .capturing
     @Published var correctedText = ""
     @Published var truncated = false
     @Published var justCopied = false
+    /// Consigne en cours de saisie (action libre).
+    @Published var instruction = ""
     var originalText = ""
     var maxTokensMultiplier = 1
 
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
+
+    /// Consigne exploitable : le bouton « Lancer » et ⏎ restent inertes sans elle.
+    var trimmedInstruction: String {
+        instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 /// Hauteur idéale du panneau entier — remontée à la fenêtre pour qu'elle
@@ -42,11 +57,13 @@ struct ResultPanelView: View {
     let onPaste: () -> Void
     let onCopy: () -> Void
     let onRetry: () -> Void
+    let onSubmitInstruction: () -> Void
     let onOpenSettings: () -> Void
     let onClose: () -> Void
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var textHeight: CGFloat = 0
+    @FocusState private var instructionFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -79,10 +96,10 @@ struct ResultPanelView: View {
             ClaudioBadge()
             Text("Claudio").font(.headline)
             StatusPill {
-                Image(systemName: session.action.symbolName)
+                Image(systemName: session.request.origin.symbolName)
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(session.action.tint)
-                Text(session.action.panelTitle)
+                    .foregroundStyle(session.request.origin.tint)
+                Text(session.request.panelTitle)
             }
             Spacer()
             statusLabel
@@ -102,7 +119,7 @@ struct ResultPanelView: View {
         case .streaming:
             StatusPill {
                 ProgressView().controlSize(.mini)
-                Text(session.action.progressLabel)
+                Text(session.request.progressLabel)
             }
         case .done:
             if session.truncated {
@@ -116,13 +133,15 @@ struct ResultPanelView: View {
                     Text("Prêt")
                 }
             }
-        case .noSelection, .missingKey, .error:
+        case .askingInstruction, .noSelection, .missingKey, .error:
             EmptyView()
         }
     }
 
     @ViewBuilder private var content: some View {
         switch session.phase {
+        case .askingInstruction:
+            instructionPrompt
         case .noSelection:
             messageView(icon: "cursorarrow.rays",
                         title: "Aucune sélection détectée",
@@ -164,6 +183,40 @@ struct ResultPanelView: View {
         }
     }
 
+    /// Saisie de la consigne (action libre), avec un extrait de la sélection
+    /// sous le champ : on transforme un texte qu'on ne voit plus à l'écran.
+    private var instructionPrompt: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            TextField("", text: $session.instruction,
+                      prompt: Text("Que faire du texte sélectionné ?"))
+                .textFieldStyle(.plain)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.92))
+                .focused($instructionFocused)
+                .onSubmit(onSubmitInstruction)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                )
+
+            Text(session.originalText)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.35))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(14)
+        .onAppear {
+            // Le focus posé dans le même cycle que l'apparition est perdu :
+            // un tour de boucle plus tard, le champ le garde.
+            Task { @MainActor in instructionFocused = true }
+        }
+    }
+
     /// Texte en streaming avec caret clignotant ; texte simple une fois terminé.
     @ViewBuilder private var resultText: some View {
         if session.phase == .capturing || session.phase == .streaming {
@@ -196,6 +249,12 @@ struct ResultPanelView: View {
             Text("Échap pour fermer").font(.caption2).foregroundStyle(.tertiary)
             Spacer()
             switch session.phase {
+            case .askingInstruction:
+                Button(action: onSubmitInstruction) {
+                    Text("Lancer ") + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
+                }
+                .buttonStyle(ClaudioProminentButtonStyle())
+                .disabled(session.trimmedInstruction.isEmpty)
             case .missingKey:
                 Button("Réglages…", action: onOpenSettings)
                     .buttonStyle(PanelPillButtonStyle())

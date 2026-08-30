@@ -7,3 +7,4 @@ dist/
 # Sources de l'icône (non publiées)
 icon/*.svg
 *.af
+*.af~lock~

@@ -62,6 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.representedObject = action.rawValue
             menu.addItem(item)
         }
+
+        let free = NSMenuItem(title: ClaudioRequest.freeMenuTitle,
+                              action: #selector(freeActionFromMenu), keyEquivalent: "")
+        free.target = self
+        menu.addItem(free)
         menu.addItem(.separator())
 
         let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
@@ -132,14 +137,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func actionFromMenu(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String,
               let action = ClaudioAction(rawValue: raw) else { return }
-        triggerFromMenu(action)
+        afterMenuCloses { $0.trigger(action: action) }
     }
 
-    private func triggerFromMenu(_ action: ClaudioAction) {
-        // Laisse le menu se refermer et l'app précédente reprendre le focus.
-        Task { @MainActor in
+    @objc private func freeActionFromMenu() {
+        afterMenuCloses { $0.triggerFreeAction() }
+    }
+
+    /// Laisse le menu se refermer et l'app précédente reprendre le focus avant
+    /// de déclencher : la capture de sélection vise l'app source, pas Claudio.
+    private func afterMenuCloses(_ trigger: @escaping @MainActor (CorrectionCoordinator) -> Void) {
+        Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 250_000_000)
-            coordinator.trigger(action: action)
+            guard let self else { return }
+            trigger(self.coordinator)
         }
     }
 
