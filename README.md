@@ -14,6 +14,7 @@ Mini-app macOS (barre de menus) qui capture la sélection courante dans n'import
    - **⌃⌥⌘T** *Ton professionnel* : réécrit la sélection en message courtois et professionnel prêt à envoyer, sans en changer le fond.
    - **⌃⌥⌘R** *Résumer* : condense le texte en quelques phrases ou puces fidèles (résultat plutôt à copier qu'à coller).
    - **⌃⌥⌘L** *Lapacompris* : réexplique un texte dense ou jargonneux beaucoup plus simplement, comme à un ami, en gardant les faits exacts (chemins, commandes, nombres, décisions).
+   - **⌃⌥⌘D** *Action libre* : le panneau demande d'abord la consigne (« traduis en espagnol », « mets en puces »…), puis l'applique à la sélection. Tout ce que le catalogue ne couvre pas.
 3. Le panneau apparaît près du pointeur et le résultat s'écrit en streaming.
 4. **Entrée** (ou bouton « Coller ») → colle le résultat à la place de la sélection, puis restaure le presse-papiers d'origine. **Échap** → annule sans rien toucher. **⌘C / « Copier »** → copie seulement.
 
@@ -62,7 +63,8 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 
 ## Détails
 
-- **Modèle** : choix par action dans Réglages → Prompts (Haiku 4.5 par défaut, Sonnet 5 ou Opus 5 au choix), streaming SSE. Coût ≈ 0,2 centime par correction courte avec Haiku.
+- **Modèle** : choix par action dans Réglages → Prompts (Haiku 4.5 par défaut, Sonnet 5 ou Opus 5 au choix), streaming SSE. Tarifs Anthropic par million de jetons, entrée / sortie : Haiku 4.5 1 $ / 5 $, Sonnet 5 2 $ / 10 $, Opus 5 5 $ / 25 $ — soit ≈ 0,12 $ pour cent actions courtes avec Haiku.
+- **Dépense** : `AnthropicClient` relève les jetons que l'API facture (`message_start` pour l'entrée, `message_delta` pour la sortie) ; `CostLedger` cumule le total de la journée dans UserDefaults et le remet à zéro au changement de date. Affiché dans Réglages → Général, désactivable (`AppSettings.costCounterEnabled`). Rien n'est envoyé nulle part : le calcul est local et le décompte qui fait foi reste celui de console.anthropic.com.
 - **Capture** : API Accessibilité (`AXSelectedText`) d'abord, repli sur un ⌘C simulé (Chrome/Electron) avec restauration du presse-papiers.
 - **Collage** : réactive l'app d'origine, colle via ⌘V simulé, puis restaure le presse-papiers multi-types (images/RTF compris) après 500 ms (`Constants.clipboardRestoreDelayNs`, désactivable via `restoreClipboardAfterPaste`).
 - **Actions** : chaque action (prompt système, budget de tokens, libellés) est définie dans `Sources/Claudio/AI/ClaudioAction.swift` ; en ajouter une nouvelle = un cas d'enum + un raccourci.
@@ -76,6 +78,14 @@ Note : Developer ID étant une identité différente de « Plume Local Dev », m
 ```bash
 ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "un texte avec des faute"
 ```
+
+  Avec un second argument, c'est le chemin de l'action libre qui est exercé, consigne comprise :
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "Traduis en espagnol"
+```
+
+  Les deux impriment les jetons facturés et le coût correspondant.
 
 ## Limites connues
 
