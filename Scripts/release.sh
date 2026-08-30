@@ -58,9 +58,9 @@ sed -i '' "s/⬇ Télécharger Claudio [0-9.]*/⬇ Télécharger Claudio $MINOR/
 sed -i '' "s/⬇ Download Claudio [0-9.]*/⬇ Download Claudio $MINOR/" site/en/index.html
 grep -q "^VERSION=\"$VERSION\"$" Scripts/build_app.sh || { echo "❌ Version non appliquée au build."; exit 1; }
 
-# ── 3. Tests, puis build notarisé ──────────────────────────────────────────────
-echo "→ Tests…"
-swift test >/dev/null
+# ── 3. Protocole de test complet, puis build notarisé ──────────────────────────
+# Les trois niveaux de TESTING.md : unitaires, aperçus UI, API réelle.
+Scripts/test.sh --release
 
 echo "→ Build notarisé (le script remplace /Applications/Claudio.app : on quitte l'app)…"
 osascript -e 'quit app "Claudio"' 2>/dev/null || true

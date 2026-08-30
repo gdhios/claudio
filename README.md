@@ -1,5 +1,7 @@
 # Claudio
 
+[![CI](https://github.com/gdhios/claudio/actions/workflows/ci.yml/badge.svg)](https://github.com/gdhios/claudio/actions/workflows/ci.yml)
+
 Mini-app macOS (barre de menus) qui capture la sélection courante dans n'importe quelle app, la transforme via Claude, affiche le résultat en streaming dans un panneau flottant, puis le colle à la place de la sélection.
 
 ## Usage
@@ -70,7 +72,7 @@ Une version n'est pas « faite » quand elle compile : elle l'est quand elle est
 Scripts/release.sh 1.4.0 "palette d'actions"
 ```
 
-Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications (branche `main`, arbre propre, tag libre, `gh` authentifié, VPS joignable) → numéro de version dans `build_app.sh` et sur les deux landings → `swift test` → build notarisé → commit + tag + push → release GitHub (notes reprises de `dist/release_notes_X.Y.Z.md` s'il existe) → `rsync` du site, envoi du zip en `Claudio.zip`, réécriture de `version.json` → vérification de ce qui est réellement servi : le flux annonce la bonne version, le zip téléchargé a le même SHA-256 que le zip notarisé, les quatre pages répondent et affichent le bon numéro, la release GitHub porte son asset.
+Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications (branche `main`, arbre propre, tag libre, `gh` authentifié, VPS joignable) → numéro de version dans `build_app.sh` et sur les deux landings → protocole de test complet (`Scripts/test.sh --release`, voir [TESTING.md](TESTING.md)) → build notarisé → commit + tag + push → release GitHub (notes reprises de `dist/release_notes_X.Y.Z.md` s'il existe) → `rsync` du site, envoi du zip en `Claudio.zip`, réécriture de `version.json` → vérification de ce qui est réellement servi : le flux annonce la bonne version, le zip téléchargé a le même SHA-256 que le zip notarisé, les quatre pages répondent et affichent le bon numéro, la release GitHub porte son asset.
 
 ## Détails
 
@@ -101,6 +103,18 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "
 ```
 
   Les deux impriment les jetons facturés et le coût correspondant.
+
+## Tests
+
+Le protocole complet est décrit dans [TESTING.md](TESTING.md) : trois niveaux, du moins cher au plus complet, chacun à la fréquence qui le justifie.
+
+```bash
+swift test                  # niveau 1 : unitaires — à chaque modification (secondes)
+Scripts/test.sh --smoke     # + niveau 2 : l'app rend ses écrans critiques en PNG (CI sur chaque push)
+Scripts/test.sh --release   # + niveau 3 : appels API réels — exécuté par release.sh à la publication
+```
+
+La CI (GitHub Actions, runner macOS) déroule les niveaux 1+2 sur chaque push et PR, et publie les aperçus rendus en artefacts. Ce que l'automatisation ne peut pas atteindre (capture Accessibilité, collage, restauration du presse-papiers) tient dans une checklist manuelle de 2 minutes, dans TESTING.md.
 
 ## Limites connues
 

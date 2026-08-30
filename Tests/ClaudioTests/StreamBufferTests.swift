@@ -80,6 +80,21 @@ final class StreamBufferTests: XCTestCase {
         XCTAssertEqual(session.correctedText, "Bonjour tout le monde")
     }
 
+    /// ⏎ pendant le flux ne doit pas coller un résultat à moitié écrit.
+    func testOnNeCollePasAvantLaFinDuFlux() {
+        let session = session()
+        session.beginStreaming()
+        session.appendStreamed("Bonjour")
+        XCTAssertFalse(session.canPaste)
+
+        session.finishStreaming(with: "Bonjour", truncated: false)
+        XCTAssertTrue(session.canPaste)
+
+        // Un résultat vide n'a rien à coller, même « terminé ».
+        session.finishStreaming(with: "", truncated: false)
+        XCTAssertFalse(session.canPaste)
+    }
+
     /// Un flux qui repart (« Réessayer + ») ne doit pas hériter du tampon du
     /// précédent.
     func testUnNouveauFluxNeRecolleRienDuPrecedent() {

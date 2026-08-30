@@ -3,6 +3,8 @@ import Foundation
 /// `Claudio --selftest [texte] [instruction]` : teste le client streaming en
 /// CLI, sans UI. Avec une instruction, c'est le chemin de l'action libre qui est
 /// exercé au lieu de la correction du catalogue.
+/// Code de sortie non nul si l'appel échoue : c'est ce qui permet à
+/// `Scripts/test.sh --release` de s'en servir comme verrou de publication.
 enum SelfTest {
     static func runBlocking() {
         let arguments = CommandLine.arguments
@@ -47,7 +49,11 @@ enum SelfTest {
                 print("→ Jetons : \(result.inputTokens) entrée / \(result.outputTokens) sortie"
                       + " → \(Money.format(cost))")
             } catch {
+                // Une CLI qui échoue doit le dire par son code de sortie,
+                // pas seulement à l'écran.
                 print("\n❌ \(error.localizedDescription)")
+                fflush(stdout)
+                exit(1)
             }
             semaphore.signal()
         }

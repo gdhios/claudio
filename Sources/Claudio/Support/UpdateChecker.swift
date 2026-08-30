@@ -29,6 +29,14 @@ final class UpdateChecker {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
+    /// La version du flux dépasse-t-elle celle installée ? Comparaison
+    /// numérique champ à champ : « 1.10.0 » dépasse « 1.9.9 », là où l'ordre
+    /// alphabétique inverserait. Égale ou plus ancienne (flux revenu en
+    /// arrière) → rien n'est proposé.
+    nonisolated static func isNewer(_ candidate: String, than current: String) -> Bool {
+        candidate.compare(current, options: .numeric) == .orderedDescending
+    }
+
     /// Vérification au lancement, puis quotidienne (tolérance large : le moment
     /// exact n'a aucune importance, autant laisser macOS regrouper les réveils).
     func startPeriodicChecks() {
@@ -50,7 +58,7 @@ final class UpdateChecker {
                 return .failed
             }
             let feed = try JSONDecoder().decode(Feed.self, from: data)
-            if feed.version.compare(currentVersion, options: .numeric) == .orderedDescending {
+            if Self.isNewer(feed.version, than: currentVersion) {
                 availableUpdate = feed
                 onUpdateFound?(feed)
                 return .updateAvailable(feed)
