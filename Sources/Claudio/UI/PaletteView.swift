@@ -6,6 +6,8 @@ import SwiftUI
 /// le même objet qui se transforme une fois l'action choisie.
 struct PaletteView: View {
     @ObservedObject var session: CorrectionSession
+    /// Corps du texte, réglé dans les Réglages (Général → Panneau).
+    var textSize: PanelTextSize = .normal
     /// Lance la ligne d'index donné.
     let onLaunch: (Int) -> Void
 
@@ -29,10 +31,10 @@ struct PaletteView: View {
     private var question: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Que faire de la sélection ?")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: textSize.points(12), weight: .medium))
                 .foregroundStyle(.white.opacity(0.88))
             Text(session.originalText)
-                .font(.caption)
+                .font(.system(size: textSize.points(10)))
                 .foregroundStyle(.white.opacity(0.32))
                 .lineLimit(1)
         }
@@ -47,7 +49,8 @@ struct PaletteView: View {
             ForEach(Array(session.paletteRows.enumerated()), id: \.element.id) { index, row in
                 PaletteRowView(row: row,
                                number: index + 1,
-                               isSelected: index == session.paletteSelection)
+                               isSelected: index == session.paletteSelection,
+                               textSize: textSize)
                     .contentShape(Rectangle())
                     .onHover { if $0 { session.paletteSelection = index } }
                     .onTapGesture { onLaunch(index) }
@@ -64,7 +67,7 @@ struct PaletteView: View {
                       prompt: Text("Filtrer, ou écrire une consigne…")
                         .foregroundStyle(.white.opacity(0.3)))
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.system(size: textSize.bodyPoints))
                 .foregroundStyle(.white.opacity(0.95))
                 .focused($queryFocused)
                 .onSubmit { onLaunch(session.paletteSelection) }
@@ -106,6 +109,9 @@ private struct PaletteRowView: View {
     let row: PaletteRow
     let number: Int
     let isSelected: Bool
+    /// Le libellé de l'action suit le réglage de taille ; le rang, l'icône et
+    /// le raccourci restent fixes — ce sont des repères, pas de la lecture.
+    var textSize: PanelTextSize = .normal
 
     var body: some View {
         HStack(spacing: 10) {
@@ -129,11 +135,11 @@ private struct PaletteRowView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
-                    .font(.system(size: 12.2, weight: .medium))
+                    .font(.system(size: textSize.points(12.2), weight: .medium))
                     .foregroundStyle(.white.opacity(isSelected ? 1 : 0.78))
                     .lineLimit(1)
                 Text(row.detail)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: textSize.points(10.5)))
                     .foregroundStyle(.white.opacity(isSelected ? 0.5 : 0.38))
                     .lineLimit(1)
             }

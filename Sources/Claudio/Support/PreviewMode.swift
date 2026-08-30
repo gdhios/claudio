@@ -5,6 +5,7 @@ import SwiftUI
 /// avec mode ∈ panel, panel-streaming, panel-long, panel-error,
 /// panel-noselection, panel-free, panel-free-filled, palette,
 /// palette-filtre, palette-libre, settings.
+/// `--size small|normal|large|extraLarge` force la taille du texte du panneau.
 /// Affiche l'élément à une position fixe et
 /// imprime la région à capturer (top-left, pour `screencapture -R`).
 /// Aucun raccourci global ni item de barre de menus n'est installé.
@@ -15,6 +16,16 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     private let settingsController = SettingsWindowController()
 
     init(mode: String) { self.mode = mode }
+
+    /// Taille du texte de l'aperçu : `--size large`, sinon le réglage courant.
+    private var textSize: PanelTextSize {
+        guard let index = CommandLine.arguments.firstIndex(of: "--size"),
+              CommandLine.arguments.count > index + 1,
+              let size = PanelTextSize(rawValue: CommandLine.arguments[index + 1]) else {
+            return AppSettings.panelTextSize
+        }
+        return size
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if mode == "settings" {
@@ -41,10 +52,13 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rend la fenêtre d'aperçu dans un PNG (aucune permission d'enregistrement
-    /// d'écran requise pour capturer les fenêtres de son propre process).
-    /// Capture via le compositeur (matériaux/vibrancy rendus), repli sur un
-    /// rendu direct de la vue sinon.
+    /// Rend la fenêtre d'aperçu dans un PNG.
+    ///
+    /// Rendu direct de la vue d'abord : c'est le seul chemin qui ne dépende
+    /// d'aucune permission. La capture par le compositeur (qui rendrait les
+    /// matériaux et l'ombre) demande l'autorisation d'enregistrement d'écran
+    /// et, sans elle, renvoie une image blanche sans le dire — un aperçu faux
+    /// est pire que pas d'aperçu.
     private func writeShot(to path: String) {
         guard let window: NSWindow = panel ?? NSApp.windows.first(where: { $0.isVisible }) else {
             print("PREVIEW_SHOT=échec")
@@ -52,14 +66,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             exit(1)
         }
         let rep: NSBitmapImageRep?
-        if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow,
-                                                 CGWindowID(window.windowNumber),
-                                                 [.boundsIgnoreFraming, .bestResolution]) {
-            rep = NSBitmapImageRep(cgImage: cgImage)
-        } else if let view = window.contentView,
-                  let cached = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+        if let view = window.contentView,
+           let cached = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: cached)
             rep = cached
+        } else if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow,
+                                                       CGWindowID(window.windowNumber),
+                                                       [.boundsIgnoreFraming, .bestResolution]) {
+            rep = NSBitmapImageRep(cgImage: cgImage)
         } else {
             rep = nil
         }
@@ -109,7 +123,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.phase = .done
             session.correctedText = "Can you send me the final version before tomorrow's meeting?"
         }
-        let panel = ResultPanel.make(session: session)
+        let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         let screen = NSScreen.screens.first?.frame ?? .zero
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 760))
@@ -129,7 +143,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         }
         session.phase = .choosingAction
 
-        let panel = ResultPanel.make(session: session)
+        let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         let screen = NSScreen.screens.first?.frame ?? .zero
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 860))

@@ -82,6 +82,7 @@ private struct GeneralPane: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
     @State private var costCounterEnabled = AppSettings.costCounterEnabled
+    @State private var panelTextSize = AppSettings.panelTextSize
     @ObservedObject private var ledger = CostLedger.shared
 
     var body: some View {
@@ -100,6 +101,21 @@ private struct GeneralPane: View {
                 if let loginItemError {
                     Text(loginItemError).font(.caption).foregroundStyle(.orange)
                 }
+            }
+
+            Section("Panneau") {
+                Picker("Taille du texte", selection: $panelTextSize) {
+                    ForEach(PanelTextSize.allCases) { size in
+                        Text(size.title).tag(size)
+                    }
+                }
+                .onChange(of: panelTextSize) { AppSettings.panelTextSize = panelTextSize }
+                Text("Le résultat s'affiche à cette taille.")
+                    .font(.system(size: panelTextSize.bodyPoints))
+                    .foregroundStyle(.secondary)
+                Text("S'applique au texte du panneau flottant : le résultat, la consigne et les actions de la palette. Le panneau s'élargit avec le texte, et le changement vaut pour le panneau suivant.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Modèle") {

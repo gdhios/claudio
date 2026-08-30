@@ -144,10 +144,7 @@ final class CorrectionCoordinator {
             session.phase = .missingKey
             return
         }
-        session.phase = .streaming
-        session.correctedText = ""
-        session.truncated = false
-        session.justCopied = false
+        session.beginStreaming()
 
         let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
         let request = session.request
@@ -159,12 +156,10 @@ final class CorrectionCoordinator {
                 maxTokens: request.maxTokens(forText: session.originalText,
                                              multiplier: session.maxTokensMultiplier)
             ) { @MainActor piece in
-                session.correctedText += piece
+                session.appendStreamed(piece)
             }
             guard !Task.isCancelled else { return }
-            session.correctedText = result.text
-            session.truncated = result.truncated
-            session.phase = .done
+            session.finishStreaming(with: result.text, truncated: result.truncated)
             CostLedger.shared.record(model: request.model,
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)

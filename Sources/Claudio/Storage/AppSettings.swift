@@ -34,6 +34,20 @@ enum AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: costCounterKey) }
     }
 
+    // MARK: - Taille du texte du panneau
+
+    private static let panelTextSizeKey = "panelTextSize"
+
+    /// Taille du texte du panneau flottant et de la palette. Valeur absente ou
+    /// inconnue (réglage écrit par une version future) → le corps normal.
+    static var panelTextSize: PanelTextSize {
+        get {
+            UserDefaults.standard.string(forKey: panelTextSizeKey)
+                .flatMap(PanelTextSize.init(rawValue:)) ?? .normal
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: panelTextSizeKey) }
+    }
+
     // MARK: - Prompts système personnalisés
 
     private static func systemPromptKey(for action: ClaudioAction) -> String {

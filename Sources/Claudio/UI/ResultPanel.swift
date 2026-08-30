@@ -22,10 +22,10 @@ final class ResultPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    init(contentView: NSView) {
+    init(contentView: NSView, width: CGFloat = Constants.panelWidth) {
         super.init(
             contentRect: NSRect(origin: .zero,
-                                size: NSSize(width: Constants.panelWidth, height: 160)),
+                                size: NSSize(width: width, height: 160)),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -47,6 +47,7 @@ final class ResultPanel: NSPanel {
     /// de fenêtre qui suit le contenu.
     @MainActor
     static func make(session: CorrectionSession,
+                     textSize: PanelTextSize = AppSettings.panelTextSize,
                      onPaste: @escaping () -> Void = {},
                      onCopy: @escaping () -> Void = {},
                      onRetry: @escaping () -> Void = {},
@@ -54,9 +55,10 @@ final class ResultPanel: NSPanel {
                      onLaunchPaletteRow: @escaping (Int) -> Void = { _ in },
                      onOpenSettings: @escaping () -> Void = {},
                      onClose: @escaping () -> Void = {}) -> ResultPanel {
-        let panel = ResultPanel(contentView: NSView())
+        let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
         let view = ResultPanelView(
             session: session,
+            textSize: textSize,
             onPaste: onPaste,
             onCopy: onCopy,
             onRetry: onRetry,
@@ -77,12 +79,16 @@ final class ResultPanel: NSPanel {
     /// Ajuste la hauteur de la fenêtre au contenu en gardant le bord HAUT en
     /// place (le panneau grandit vers le bas, sans sortir de l'écran).
     func updateContentHeight(_ height: CGFloat) {
-        let newHeight = max(height, 60)
+        // Borne haute : au plus grand corps de texte, la palette entière peut
+        // dépasser un petit écran. Mieux vaut un panneau qui s'arrête au bord
+        // qu'un panneau qui le franchit.
+        let visible = (screen ?? NSScreen.main)?.visibleFrame
+        let newHeight = min(max(height, 60), (visible?.height ?? .greatestFiniteMagnitude) - 16)
         guard abs(frame.height - newHeight) > 0.5 else { return }
         var newFrame = frame
         newFrame.origin.y += newFrame.height - newHeight
         newFrame.size.height = newHeight
-        if let visible = screen?.visibleFrame {
+        if let visible {
             newFrame.origin.y = min(max(newFrame.origin.y, visible.minY + 8),
                                     visible.maxY - newHeight - 8)
         }
