@@ -220,7 +220,6 @@ private struct ShortcutsPane: View {
                     Spacer()
                     KeyboardShortcuts.Recorder("", name: .actionPalette)
                 }
-                Divider()
                 ForEach(ClaudioAction.allCases, id: \.self) { action in
                     HStack(spacing: 10) {
                         IconBadge(systemName: action.symbolName, color: action.tint, size: 22)
