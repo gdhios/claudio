@@ -131,11 +131,12 @@ final class CorrectionCoordinator {
         return true
     }
 
-    /// ⌘1…⌘9 : lance la ligne de ce rang si elle existe.
-    private func launchPaletteRank(_ rank: Int) -> Bool {
-        guard let session, session.phase == .choosingAction,
-              session.paletteRows.indices.contains(rank - 1) else { return false }
-        launchPaletteRow(at: rank - 1)
+    /// Chiffres : lance la ligne de ce rang quand la frappe la désigne bien.
+    private func launchPaletteRank(_ rank: Int, withCommand: Bool) -> Bool {
+        guard let session,
+              let index = session.paletteIndex(forRank: rank, withCommand: withCommand)
+        else { return false }
+        launchPaletteRow(at: index)
         return true
     }
 
@@ -262,7 +263,9 @@ final class CorrectionCoordinator {
         panel.onEscape = { [weak self] in self?.dismiss() }
         panel.onCopyShortcut = { [weak self] in self?.copyResult() }
         panel.onArrow = { [weak self] delta in self?.movePaletteSelection(by: delta) ?? false }
-        panel.onDigit = { [weak self] rank in self?.launchPaletteRank(rank) ?? false }
+        panel.onDigit = { [weak self] rank, withCommand in
+            self?.launchPaletteRank(rank, withCommand: withCommand) ?? false
+        }
         self.panel = panel
         panel.present(near: NSEvent.mouseLocation)
     }
