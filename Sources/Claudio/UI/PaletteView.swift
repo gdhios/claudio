@@ -90,7 +90,10 @@ struct PaletteView: View {
     private var hints: some View {
         HStack(spacing: 12) {
             Text("↑↓ naviguer")
-            Text("⌘1–9 lancer")
+            // Le chiffre nu lance tant que rien n'est écrit ; après, il
+            // s'écrit, et c'est ⌘ qui lance. L'indice suit plutôt qu'il ne
+            // promette à moitié.
+            Text(session.paletteQuery.isEmpty ? "1–9 lancer" : "⌘1–9 lancer")
             Text("échap fermer")
             Spacer()
         }

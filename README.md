@@ -6,7 +6,7 @@ Mini-app macOS (barre de menus) qui capture la sélection courante dans n'import
 
 1. Sélectionner du texte dans n'importe quelle app.
 2. Déclencher une action (raccourcis reconfigurables dans les Réglages) :
-   - **⌃⌥⌘K** *Palette d'actions* : ouvre le panneau sur la liste complète plutôt que sur une action. On filtre à la frappe (accents et casse ignorés), on lance avec **⌘1**–**⌘9** ou **↑↓** puis **⏎**. La dernière ligne est toujours l'action libre : si rien ne correspond, ce qui est tapé devient la consigne. Le seul raccourci à retenir.
+   - **⌃⌥⌘K** *Palette d'actions* : ouvre le panneau sur la liste complète plutôt que sur une action. On lance une ligne avec son chiffre, **1** à **9**, ou avec **↑↓** puis **⏎**. On filtre à la frappe (accents et casse ignorés) : dès qu'une saisie commence, les chiffres s'y écrivent — c'est ce qui permet une consigne comme « résume en 3 phrases » — et **⌘1**–**⌘9** prend le relais pour lancer. La dernière ligne est toujours l'action libre : si rien ne correspond, ce qui est tapé devient la consigne. Le seul raccourci à retenir.
    - **⌃⌥⌘I** *Corriger la sélection* : orthographe, grammaire, formulation légèrement améliorée, langue et ton préservés.
    - **⌃⌥⌘P** *Structurer en prompt* : reformule une idée brute en demande claire et directe, compacte, sans y répondre.
    - **⌃⌥⌘^** *Structurer en prompt expert* : produit un prompt complet selon les bonnes pratiques Anthropic (rôle, contexte, tâche, contraintes, format de sortie, balises pour les données, espaces réservés `[préciser : …]` si une info manque).

@@ -10,8 +10,10 @@ final class ResultPanel: NSPanel {
     /// Flèches haut/bas : `-1` monter, `+1` descendre. Renvoie `true` si la
     /// touche a servi — sinon elle poursuit sa route (défiler un résultat long).
     var onArrow: ((Int) -> Bool)?
-    /// ⌘1…⌘9 : lance la ligne de ce rang. Même contrat de retour.
-    var onDigit: ((Int) -> Bool)?
+    /// Chiffre 1…9 : lance la ligne de ce rang. `withCommand` dit si ⌘ était
+    /// tenu — ce que la touche autorise se décide dans la session, pas ici.
+    /// Même contrat de retour.
+    var onDigit: ((Int, Bool) -> Bool)?
 
     /// Ces touches n'atteignent `keyDown` que si personne ne les a consommées
     /// avant : les champs de saisie, eux, les absorbent. Un moniteur local les
@@ -119,18 +121,27 @@ final class ResultPanel: NSPanel {
         super.orderOut(sender)
     }
 
-    /// Rang demandé par ⌘1…⌘9, ou `nil`. Le caractère couvre le QWERTY ; la
-    /// position physique couvre l'AZERTY, où la rangée du haut ne donne pas de
-    /// chiffres sans ⇧ mais où les touches sont au même endroit.
-    private func digitRank(of event: NSEvent) -> Int? {
-        guard event.modifierFlags.contains(.command) else { return nil }
-        if let character = event.charactersIgnoringModifiers,
-           let rank = Int(character), (1...9).contains(rank) {
-            return rank
+    /// Rang demandé par la frappe, et si ⌘ l'accompagnait — ou `nil` si ce
+    /// n'est pas un rang qu'on demande.
+    ///
+    /// Un vrai chiffre compte toujours, ⇧ compris : sur AZERTY il n'y en a pas
+    /// sans. La position physique, elle, ne compte qu'avec ⌘ : sans lui la
+    /// rangée du haut d'un AZERTY donne « & é " ' », et une consigne qui
+    /// commence par « écris » ne doit pas lancer la deuxième ligne.
+    static func digitKey(keyCode: UInt16,
+                         characters: String?,
+                         modifiers: NSEvent.ModifierFlags) -> (rank: Int, withCommand: Bool)? {
+        let flags = modifiers.intersection(.deviceIndependentFlagsMask)
+        // ⌥ et ⌃ composent des caractères : ce n'est pas un rang qu'on demande.
+        guard !flags.contains(.option), !flags.contains(.control) else { return nil }
+        let withCommand = flags.contains(.command)
+        if let characters, let rank = Int(characters), (1...9).contains(rank) {
+            return (rank, withCommand)
         }
+        guard withCommand else { return nil }
         // kVK_ANSI_1…9, dans l'ordre des chiffres (6 et 7 ne se suivent pas).
         let positions: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
-        return positions.firstIndex(of: event.keyCode).map { $0 + 1 }
+        return positions.firstIndex(of: keyCode).map { ($0 + 1, true) }
     }
 
     private func fadeIn() {
@@ -145,7 +156,12 @@ final class ResultPanel: NSPanel {
                      125 where self.onArrow?(1) == true:   // Bas
                     return nil
                 default:
-                    if let rank = self.digitRank(of: event), self.onDigit?(rank) == true {
+                    // Refusé — hors palette, ou consigne déjà commencée — le
+                    // chiffre poursuit sa route et s'écrit dans le champ.
+                    if let digit = ResultPanel.digitKey(keyCode: event.keyCode,
+                                                        characters: event.charactersIgnoringModifiers,
+                                                        modifiers: event.modifierFlags),
+                       self.onDigit?(digit.rank, digit.withCommand) == true {
                         return nil
                     }
                     return event

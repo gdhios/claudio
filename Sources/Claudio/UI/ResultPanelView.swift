@@ -64,6 +64,19 @@ final class CorrectionSession: ObservableObject {
         paletteSelection = min(max(paletteSelection + delta, 0), count - 1)
     }
 
+    /// Index de la ligne que lance un chiffre, ou `nil` si la touche doit
+    /// suivre sa route. Le rang affiché devant chaque ligne se tape donc tel
+    /// quel — c'est ce qu'il promet. Sans ⌘ il ne lance toutefois que tant que
+    /// rien n'est écrit : passé la première frappe le champ dicte une consigne,
+    /// et « 3 » doit s'y écrire. Une espace en tête suffit alors pour commencer
+    /// une consigne par un chiffre.
+    func paletteIndex(forRank rank: Int, withCommand: Bool) -> Int? {
+        guard phase == .choosingAction else { return nil }
+        guard withCommand || paletteQuery.isEmpty else { return nil }
+        let index = rank - 1
+        return paletteRows.indices.contains(index) ? index : nil
+    }
+
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
 
     /// Consigne exploitable : le bouton « Lancer » et ⏎ restent inertes sans elle.
