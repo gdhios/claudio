@@ -15,20 +15,57 @@ enum ClaudioModel: String, CaseIterable, Sendable {
         }
     }
 
+    /// Nom nu, pour les phrases où le qualificatif encombre.
+    var shortName: String {
+        switch self {
+        case .haiku45: "Haiku 4.5"
+        case .sonnet5: "Sonnet 5"
+        case .opus5: "Opus 5"
+        }
+    }
+
     /// `temperature` est accepté par Haiku 4.5 mais rejeté (400) par les
     /// modèles 4.6+ et 5 : on ne l'envoie que lorsqu'il est supporté.
     var supportsTemperature: Bool {
         self == .haiku45
     }
 
-    /// Ordre de grandeur pour une action courte (~200 tokens entrée/sortie),
-    /// d'après les tarifs publics par MTok — à rafraîchir si Anthropic les change.
-    var costHint: String {
+    // MARK: - Tarifs
+
+    /// Tarifs publics Anthropic, en dollars par million de jetons, relevés sur
+    /// platform.claude.com/docs — à rafraîchir s'ils changent.
+    var inputPricePerMTok: Double {
         switch self {
-        case .haiku45: "≈ 0,2 centime par action courte"
-        case .sonnet5: "≈ 0,5 centime par action courte (~3× Haiku)"
-        case .opus5: "≈ 1 centime par action courte (~5× Haiku)"
+        case .haiku45: 1
+        case .sonnet5: 2
+        case .opus5: 5
         }
+    }
+
+    var outputPricePerMTok: Double {
+        switch self {
+        case .haiku45: 5
+        case .sonnet5: 10
+        case .opus5: 25
+        }
+    }
+
+    /// Coût d'un appel en dollars, d'après les jetons réellement facturés.
+    func cost(inputTokens: Int, outputTokens: Int) -> Double {
+        (Double(inputTokens) * inputPricePerMTok
+            + Double(outputTokens) * outputPricePerMTok) / 1_000_000
+    }
+
+    /// Repère pour les Réglages. Une action courte coûte des millièmes de
+    /// dollar : on en compte cent pour rester lisible.
+    var costHint: String {
+        let hundred = cost(inputTokens: 200, outputTokens: 200) * 100
+        return "≈ \(Money.format(hundred)) pour 100 actions courtes"
+    }
+
+    /// Tarif brut, tel qu'Anthropic l'affiche.
+    var priceLine: String {
+        "\(shortName) \(Money.formatRounded(inputPricePerMTok)) / \(Money.formatRounded(outputPricePerMTok))"
     }
 }
 
