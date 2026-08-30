@@ -196,6 +196,15 @@ private struct ShortcutsPane: View {
     var body: some View {
         Form {
             Section {
+                // En tête : la palette, qui donne accès à tout le reste.
+                HStack(spacing: 10) {
+                    IconBadge(systemName: PaletteCatalog.symbolName,
+                              color: PaletteCatalog.tint, size: 22)
+                    Text(PaletteCatalog.menuTitle)
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .actionPalette)
+                }
+                Divider()
                 ForEach(ClaudioAction.allCases, id: \.self) { action in
                     HStack(spacing: 10) {
                         IconBadge(systemName: action.symbolName, color: action.tint, size: 22)
@@ -215,7 +224,7 @@ private struct ShortcutsPane: View {
             } header: {
                 Text("Raccourcis globaux")
             } footer: {
-                Text("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. L'action libre demande la consigne à appliquer au moment du déclenchement.")
+                Text("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

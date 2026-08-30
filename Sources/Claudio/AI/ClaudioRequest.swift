@@ -83,6 +83,11 @@ extension ClaudioRequest {
     /// la remplace par `free(instruction:)`.
     static let awaitingInstruction = ClaudioRequest.free(instruction: "")
 
+    /// Palette ouverte : aucune action n'est encore choisie. Sert de garnissage
+    /// le temps du choix — le panneau masque la pastille d'action dans cette
+    /// phase — et la ligne retenue la remplace par la vraie requête.
+    static let awaitingChoice = ClaudioRequest.awaitingInstruction
+
     /// Action libre : l'instruction de l'utilisateur devient la tâche, insérée
     /// dans le gabarit des prompts du catalogue (sortie nue, texte balisé, langue
     /// et mise en forme préservées) pour que le résultat reste collable tel quel.

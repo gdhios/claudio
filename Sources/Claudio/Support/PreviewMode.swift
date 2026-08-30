@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Mode aperçu UI pour le développement : `Claudio --preview <mode>`
 /// avec mode ∈ panel, panel-streaming, panel-long, panel-error,
-/// panel-noselection, panel-free, panel-free-filled, settings.
+/// panel-noselection, panel-free, panel-free-filled, palette,
+/// palette-filtre, palette-libre, settings.
 /// Affiche l'élément à une position fixe et
 /// imprime la région à capturer (top-left, pour `screencapture -R`).
 /// Aucun raccourci global ni item de barre de menus n'est installé.
@@ -114,9 +115,21 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 760))
     }
 
-    /// Maquettes de la palette (voir `PalettePreview.swift`).
+    /// Palette : le vrai panneau, arrêté sur la phase de choix.
     private func showPalettePreview() {
-        let panel = PaletteMockPanel.make(mode: mode)
+        let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+        switch mode {
+        case "palette-filtre":
+            session.paletteQuery = "trad"
+        case "palette-libre":
+            session.paletteQuery = "Traduis en espagnol"
+        default:  // "palette"
+            break
+        }
+        session.phase = .choosingAction
+
+        let panel = ResultPanel.make(session: session)
         self.panel = panel
         let screen = NSScreen.screens.first?.frame ?? .zero
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 860))

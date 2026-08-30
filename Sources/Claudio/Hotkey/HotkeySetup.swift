@@ -42,6 +42,12 @@ extension KeyboardShortcuts.Name {
         "freeAction",
         initial: .init(.d, modifiers: [.control, .option, .command])
     )
+    /// Palette d'actions : K comme « kommande », et surtout une touche à la
+    /// même position physique sur AZERTY et sur QWERTY, comme D plus haut.
+    static let actionPalette = Self(
+        "actionPalette",
+        initial: .init(.k, modifiers: [.control, .option, .command])
+    )
 }
 
 extension ClaudioAction {
@@ -58,6 +64,22 @@ extension ClaudioAction {
         case .simplify: .simplifyExplanation
         }
     }
+
+    /// Raccourci tel qu'il est configuré, pour l'afficher dans la palette.
+    /// Vide si l'utilisateur l'a effacé : la ligne se lance alors au ⏎ ou au
+    /// chiffre, comme les autres.
+    @MainActor
+    var shortcutDescription: String {
+        KeyboardShortcuts.getShortcut(for: shortcutName)?.description ?? ""
+    }
+}
+
+extension ClaudioRequest {
+    /// Idem pour l'action libre, qui n'est pas une entrée du catalogue.
+    @MainActor
+    static var freeShortcutDescription: String {
+        KeyboardShortcuts.getShortcut(for: .freeAction)?.description ?? ""
+    }
 }
 
 @MainActor
@@ -70,6 +92,9 @@ enum HotkeySetup {
         }
         KeyboardShortcuts.onKeyUp(for: .freeAction) { [weak coordinator] in
             coordinator?.triggerFreeAction()
+        }
+        KeyboardShortcuts.onKeyUp(for: .actionPalette) { [weak coordinator] in
+            coordinator?.triggerPalette()
         }
     }
 }
