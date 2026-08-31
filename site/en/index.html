@@ -172,6 +172,12 @@
   .section-sub { text-align: center; color: var(--muted); max-width: 600px; margin: 0 auto 46px; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  /* Quatre cartes : 2 x 2 equilibre, plutot que 3 + 1 orpheline */
+  @media (min-width: 760px) {
+    .grid:has(> .card:nth-child(4)):not(:has(> .card:nth-child(5))) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
   .card {
     background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
     padding: 24px;
