@@ -44,7 +44,7 @@ jobs:
       # une régression visuelle sans lancer l'app.
       - name: Publier les aperçus rendus
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: apercus-ui
           path: .build/previews/
