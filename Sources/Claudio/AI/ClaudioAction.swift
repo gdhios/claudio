@@ -15,38 +15,38 @@ enum ClaudioAction: String, CaseIterable, Sendable {
 
     var panelTitle: String {
         switch self {
-        case .correct: "Correction"
+        case .correct: loc("Correction", en: "Fix")
         case .makePrompt: "Prompt"
-        case .expertPrompt: "Prompt expert"
-        case .translateFR: "Français"
-        case .translateEN: "Anglais"
-        case .professionalTone: "Ton pro"
-        case .summarize: "Résumé"
+        case .expertPrompt: loc("Prompt expert", en: "Expert prompt")
+        case .translateFR: loc("Français", en: "French")
+        case .translateEN: loc("Anglais", en: "English")
+        case .professionalTone: loc("Ton pro", en: "Pro tone")
+        case .summarize: loc("Résumé", en: "Summary")
         case .simplify: "Lapacompris"
         }
     }
 
     var progressLabel: String {
         switch self {
-        case .correct: "Correction…"
-        case .makePrompt, .expertPrompt: "Structuration…"
-        case .translateFR, .translateEN: "Traduction…"
-        case .professionalTone: "Reformulation…"
-        case .summarize: "Résumé…"
-        case .simplify: "Simplification…"
+        case .correct: loc("Correction…", en: "Fixing…")
+        case .makePrompt, .expertPrompt: loc("Structuration…", en: "Structuring…")
+        case .translateFR, .translateEN: loc("Traduction…", en: "Translating…")
+        case .professionalTone: loc("Reformulation…", en: "Rewriting…")
+        case .summarize: loc("Résumé…", en: "Summarizing…")
+        case .simplify: loc("Simplification…", en: "Simplifying…")
         }
     }
 
     var menuTitle: String {
         switch self {
-        case .correct: "Corriger la sélection"
-        case .makePrompt: "Structurer en prompt"
-        case .expertPrompt: "Structurer en prompt expert"
-        case .translateFR: "Traduire en français"
-        case .translateEN: "Traduire en anglais"
-        case .professionalTone: "Ton professionnel"
-        case .summarize: "Résumer"
-        case .simplify: "Lapacompris : expliquer simplement"
+        case .correct: loc("Corriger la sélection", en: "Fix the selection")
+        case .makePrompt: loc("Structurer en prompt", en: "Turn into a prompt")
+        case .expertPrompt: loc("Structurer en prompt expert", en: "Turn into an expert prompt")
+        case .translateFR: loc("Traduire en français", en: "Translate to French")
+        case .translateEN: loc("Traduire en anglais", en: "Translate to English")
+        case .professionalTone: loc("Ton professionnel", en: "Professional tone")
+        case .summarize: loc("Résumer", en: "Summarize")
+        case .simplify: loc("Lapacompris : expliquer simplement", en: "Lapacompris: explain simply")
         }
     }
 

@@ -253,7 +253,7 @@ struct ResultPanelView: View {
         case .capturing:
             StatusPill {
                 ProgressView().controlSize(.mini)
-                Text("Capture…")
+                Text(loc("Capture…", en: "Reading…"))
             }
         case .streaming:
             StatusPill {
@@ -264,12 +264,12 @@ struct ResultPanelView: View {
             if session.truncated {
                 StatusPill(background: .orange.opacity(0.18), foreground: .orange) {
                     Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9))
-                    Text("Réponse tronquée")
+                    Text(loc("Réponse tronquée", en: "Answer cut short"))
                 }
             } else {
                 StatusPill(background: .green.opacity(0.16), foreground: .green) {
                     Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                    Text("Prêt")
+                    Text(loc("Prêt", en: "Ready"))
                 }
             }
         case .choosingAction, .askingInstruction, .noSelection, .missingKey, .error:
@@ -285,15 +285,17 @@ struct ResultPanelView: View {
             instructionPrompt
         case .noSelection:
             messageView(icon: "cursorarrow.rays",
-                        title: "Aucune sélection détectée",
-                        detail: "Sélectionne du texte puis relance le raccourci.")
+                        title: loc("Aucune sélection détectée", en: "No selection found"),
+                        detail: loc("Sélectionne du texte puis relance le raccourci.",
+                                    en: "Select some text, then trigger the shortcut again."))
         case .missingKey:
             messageView(icon: "key",
-                        title: "Clé API manquante",
-                        detail: "Ajoute ta clé Anthropic dans les Réglages pour activer la correction.")
+                        title: loc("Clé API manquante", en: "No API key"),
+                        detail: loc("Ajoute ta clé Anthropic dans les Réglages pour activer la correction.",
+                                    en: "Add your Anthropic key in Settings to start using Claudio."))
         case .error(let message):
             messageView(icon: "exclamationmark.triangle",
-                        title: "Erreur",
+                        title: loc("Erreur", en: "Error"),
                         detail: message)
         default:
             ScrollViewReader { proxy in
@@ -339,7 +341,8 @@ struct ResultPanelView: View {
     private var instructionPrompt: some View {
         VStack(alignment: .leading, spacing: 9) {
             TextField("", text: $session.instruction,
-                      prompt: Text("Que faire du texte sélectionné ?"))
+                      prompt: Text(loc("Que faire du texte sélectionné ?",
+                                       en: "What should Claudio do with the selected text?")))
                 .textFieldStyle(.plain)
                 .font(.system(size: textSize.bodyPoints))
                 .foregroundStyle(.white.opacity(0.92))
@@ -397,37 +400,38 @@ struct ResultPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Text("Échap pour fermer").font(.caption2).foregroundStyle(.tertiary)
+            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
             Spacer()
             switch session.phase {
             case .askingInstruction:
                 Button(action: onSubmitInstruction) {
-                    Text("Lancer ") + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
+                    Text(loc("Lancer ", en: "Run ")) + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
                 }
                 .buttonStyle(ClaudioProminentButtonStyle())
                 .disabled(session.trimmedInstruction.isEmpty)
             case .missingKey:
-                Button("Réglages…", action: onOpenSettings)
+                Button(loc("Réglages…", en: "Settings…"), action: onOpenSettings)
                     .buttonStyle(PanelPillButtonStyle())
             case .error:
-                Button("Réessayer", action: onRetry)
+                Button(loc("Réessayer", en: "Try again"), action: onRetry)
                     .buttonStyle(PanelPillButtonStyle())
             case .done:
                 if session.truncated {
-                    Button("Réessayer +", action: onRetry)
+                    Button(loc("Réessayer +", en: "Try again +"), action: onRetry)
                         .buttonStyle(PanelPillButtonStyle())
-                        .help("Relance avec un budget de tokens doublé")
+                        .help(loc("Relance avec un budget de tokens doublé",
+                                  en: "Runs again with twice the token budget"))
                 }
                 Button(action: onCopy) {
                     if session.justCopied {
-                        Text("Copié ✓")
+                        Text(loc("Copié ✓", en: "Copied ✓"))
                     } else {
-                        Text("Copier ") + Text("⌘C").foregroundStyle(.secondary)
+                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
                     }
                 }
                 .buttonStyle(PanelPillButtonStyle())
                 Button(action: onPaste) {
-                    Text("Coller ") + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
+                    Text(loc("Coller ", en: "Paste ")) + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
                 }
                 .buttonStyle(ClaudioProminentButtonStyle())
                 .disabled(!session.canPaste)
@@ -455,6 +459,6 @@ private struct PanelCloseButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .help("Fermer (Échap)")
+        .help(loc("Fermer (Échap)", en: "Close (esc)"))
     }
 }

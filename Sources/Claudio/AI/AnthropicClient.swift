@@ -8,16 +8,19 @@ enum AnthropicError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badResponse:
-            return "Réponse inattendue du serveur."
+            return loc("Réponse inattendue du serveur.", en: "Unexpected response from the server.")
         case .http(let status, let message):
             switch status {
-            case 401: return "Clé API invalide ou révoquée (401). Vérifie-la dans les Réglages."
-            case 429: return "Limite de débit atteinte (429). Réessaie dans quelques secondes."
-            case 529: return "API momentanément surchargée (529). Réessaie."
-            default: return "Erreur API (\(status)) : \(message)"
+            case 401: return loc("Clé API invalide ou révoquée (401). Vérifie-la dans les Réglages.",
+                                 en: "Invalid or revoked API key (401). Check it in Settings.")
+            case 429: return loc("Limite de débit atteinte (429). Réessaie dans quelques secondes.",
+                                 en: "Rate limit reached (429). Try again in a few seconds.")
+            case 529: return loc("API momentanément surchargée (529). Réessaie.",
+                                 en: "The API is briefly overloaded (529). Try again.")
+            default: return loc("Erreur API (\(status)) : \(message)", en: "API error (\(status)): \(message)")
             }
         case .stream(let message):
-            return "Erreur de flux : \(message)"
+            return loc("Erreur de flux : \(message)", en: "Stream error: \(message)")
         }
     }
 }
@@ -155,7 +158,7 @@ struct AnthropicClient: Sendable {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = object["error"] as? [String: Any],
               let message = error["message"] as? String else {
-            return String(data: data.prefix(300), encoding: .utf8) ?? "réponse illisible"
+            return String(data: data.prefix(300), encoding: .utf8) ?? loc("réponse illisible", en: "unreadable response")
         }
         return message
     }

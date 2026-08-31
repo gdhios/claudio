@@ -17,16 +17,23 @@ enum AccessibilityPermission {
 
     static func showExplanation() {
         let alert = NSAlert()
-        alert.messageText = "Autorisation Accessibilité requise"
-        alert.informativeText = """
+        alert.messageText = loc("Autorisation Accessibilité requise",
+                                en: "Accessibility permission needed")
+        alert.informativeText = loc("""
         Claudio a besoin de l'autorisation « Accessibilité » pour lire la sélection \
         et coller le texte corrigé.
 
         Réglages Système → Confidentialité et sécurité → Accessibilité → activer Claudio, \
         puis relance le raccourci.
-        """
-        alert.addButton(withTitle: "Ouvrir les Réglages Système")
-        alert.addButton(withTitle: "Plus tard")
+        """, en: """
+        Claudio needs the “Accessibility” permission to read your selection \
+        and paste the result back.
+
+        System Settings → Privacy & Security → Accessibility → turn Claudio on, \
+        then trigger the shortcut again.
+        """)
+        alert.addButton(withTitle: loc("Ouvrir les Réglages Système", en: "Open System Settings"))
+        alert.addButton(withTitle: loc("Plus tard", en: "Later"))
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn {
             let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!

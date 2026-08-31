@@ -29,7 +29,7 @@ struct PaletteRow: Identifiable {
 /// Ce que la palette propose, et comment la saisie le filtre.
 enum PaletteCatalog {
     /// Libellé dans le menu de la barre et dans les Réglages.
-    static let menuTitle = "Palette d'actions…"
+    static var menuTitle: String { loc("Palette d'actions…", en: "Action palette…") }
 
     /// Étiquette de la ligne d'action libre quand une consigne est écrite : ce
     /// qui est tapé part tel quel comme instruction.

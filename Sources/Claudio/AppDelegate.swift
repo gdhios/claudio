@@ -32,19 +32,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: "Quitter Claudio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
         let editItem = NSMenuItem()
-        let editMenu = NSMenu(title: "Édition")
-        editMenu.addItem(NSMenuItem(title: "Annuler", action: Selector(("undo:")), keyEquivalent: "z"))
-        editMenu.addItem(NSMenuItem(title: "Rétablir", action: Selector(("redo:")), keyEquivalent: "Z"))
+        let editMenu = NSMenu(title: loc("Édition", en: "Edit"))
+        editMenu.addItem(NSMenuItem(title: loc("Annuler", en: "Undo"), action: Selector(("undo:")), keyEquivalent: "z"))
+        editMenu.addItem(NSMenuItem(title: loc("Rétablir", en: "Redo"), action: Selector(("redo:")), keyEquivalent: "Z"))
         editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(title: "Couper", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
-        editMenu.addItem(NSMenuItem(title: "Copier", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
-        editMenu.addItem(NSMenuItem(title: "Coller", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(NSMenuItem(title: "Tout sélectionner", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenu.addItem(NSMenuItem(title: loc("Couper", en: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: loc("Copier", en: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: loc("Coller", en: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: loc("Tout sélectionner", en: "Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
 
@@ -77,27 +77,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(free)
         menu.addItem(.separator())
 
-        let settings = NSMenuItem(title: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
+        let settings = NSMenuItem(title: loc("Réglages…", en: "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quitter Claudio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         item.menu = menu
         statusItem = item
         statusMenu = menu
     }
 
+    private func updateMenuTitle(_ feed: UpdateChecker.Feed) -> String {
+        loc("Mise à jour \(feed.version) disponible…", en: "Update \(feed.version) available…")
+    }
+
     /// Item « Mise à jour X disponible… » en tête du menu status.
     private func showUpdateMenuItem(_ feed: UpdateChecker.Feed) {
         guard let menu = statusMenu else { return }
         if let existing = menu.item(withTag: updateMenuItemTag) {
-            existing.title = "Mise à jour \(feed.version) disponible…"
+            existing.title = updateMenuTitle(feed)
             existing.representedObject = feed.url
             return
         }
-        let item = NSMenuItem(title: "Mise à jour \(feed.version) disponible…",
+        let item = NSMenuItem(title: updateMenuTitle(feed),
                               action: #selector(installUpdate(_:)), keyEquivalent: "")
         item.target = self
         item.tag = updateMenuItemTag
@@ -112,15 +116,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let feed = UpdateChecker.shared.availableUpdate else { return }
 
         let confirm = NSAlert()
-        confirm.messageText = "Installer Claudio \(feed.version) ?"
-        confirm.informativeText = "Claudio télécharge la nouvelle version, remplace l'app installée, puis redémarre."
-        confirm.addButton(withTitle: "Installer et redémarrer")
-        confirm.addButton(withTitle: "Annuler")
+        confirm.messageText = loc("Installer Claudio \(feed.version) ?", en: "Install Claudio \(feed.version)?")
+        confirm.informativeText = loc("Claudio télécharge la nouvelle version, remplace l'app installée, puis redémarre.",
+                                      en: "Claudio downloads the new version, replaces the installed app, then restarts.")
+        confirm.addButton(withTitle: loc("Installer et redémarrer", en: "Install and restart"))
+        confirm.addButton(withTitle: loc("Annuler", en: "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
         let title = sender.title
-        sender.title = "Téléchargement de la mise à jour…"
+        sender.title = loc("Téléchargement de la mise à jour…", en: "Downloading the update…")
         sender.isEnabled = false
         Task { @MainActor in
             do {
@@ -130,10 +135,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 sender.title = title
                 sender.isEnabled = true
                 let failed = NSAlert()
-                failed.messageText = "Mise à jour impossible"
+                failed.messageText = loc("Mise à jour impossible", en: "Update failed")
                 failed.informativeText = error.localizedDescription
                 failed.addButton(withTitle: "OK")
-                failed.addButton(withTitle: "Télécharger dans le navigateur")
+                failed.addButton(withTitle: loc("Télécharger dans le navigateur", en: "Download in the browser"))
                 NSApp.activate(ignoringOtherApps: true)
                 if failed.runModal() == .alertSecondButtonReturn {
                     NSWorkspace.shared.open(feed.url)

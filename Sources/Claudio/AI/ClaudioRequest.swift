@@ -76,7 +76,7 @@ struct ClaudioRequest: Sendable {
 extension ClaudioRequest {
     /// Libellé de l'action libre dans le menu et les Réglages. Les points de
     /// suspension annoncent la saisie, comme « Réglages… ».
-    static let freeMenuTitle = "Action libre…"
+    static var freeMenuTitle: String { loc("Action libre…", en: "Custom action…") }
 
     /// Action libre encore sans consigne : habille le panneau (titre, icône,
     /// teinte) pendant la saisie. Jamais envoyée telle quelle — la validation
@@ -114,8 +114,8 @@ extension ClaudioRequest {
         """
         return ClaudioRequest(
             origin: .free(instruction: task),
-            panelTitle: "Action libre",
-            progressLabel: "Transformation…",
+            panelTitle: loc("Action libre", en: "Custom action"),
+            progressLabel: loc("Transformation…", en: "Working…"),
             system: system,
             model: model,
             budget: .expand,
