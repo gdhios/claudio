@@ -104,58 +104,165 @@
   .specs span { margin: 0 8px; }
 
   /* ---- Fake demo panel ---- */
+  /* ---- Demo animee : la scene rejoue selection -> raccourci -> panneau -> collage ---- */
   .demo { padding: 10px 0 70px; }
   .demo-stage {
     position: relative; max-width: 760px; margin: 0 auto;
     background: linear-gradient(160deg, #1a1530, #131022 60%);
     border: 1px solid var(--card-border); border-radius: 22px;
-    padding: 46px 28px 40px;
+    padding: clamp(16px, 3.4vw, 30px) clamp(14px, 3vw, 26px) clamp(18px, 3vw, 24px);
   }
-  .demo-selection {
-    max-width: 480px; margin: 0 auto 26px; padding: 14px 18px;
-    background: rgba(255, 255, 255, 0.04); border-radius: 12px;
-    font-size: 0.95rem; color: var(--muted); font-style: italic;
+  .demo-scene { position: relative; }
+
+  /* Fenetre d'app simulee : le decor dans lequel Claudio intervient */
+  .appwin {
+    background: #17141f; border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; overflow: hidden; text-align: left;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
   }
-  .demo-selection mark {
-    background: rgba(92, 77, 237, 0.35); color: var(--text); border-radius: 4px; padding: 1px 3px; font-style: normal;
+  .appwin-bar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 13px; background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-  .panel {
-    max-width: 440px; margin: 0 auto;
-    background: #131317; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 18px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  .appwin-bar i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .appwin-bar .r { background: #ff5f57; }
+  .appwin-bar .y { background: #febc2e; }
+  .appwin-bar .g { background: #28c840; }
+  .appwin-title {
+    margin-left: 6px; font-size: 0.78rem; color: rgba(255, 255, 255, 0.42);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* La reserve du bas accueille le panneau : la selection reste visible au-dessus. */
+  .appwin-body { padding: 15px 17px 210px; }
+  .appwin-meta { font-size: 0.78rem; color: rgba(255, 255, 255, 0.3); margin-bottom: 10px; }
+  .appwin-text {
+    font-size: clamp(0.9rem, 2.4vw, 0.98rem); line-height: 1.62;
+    color: rgba(255, 255, 255, 0.88); white-space: pre-wrap; overflow-wrap: anywhere;
+    min-height: 5.2em;
+  }
+
+  /* La portion selectionnee : le surlignage balaie le texte de gauche a droite */
+  .sel {
+    border-radius: 4px; padding: 1px 2px;
+    background-image: linear-gradient(rgba(92, 77, 237, 0.5), rgba(92, 77, 237, 0.5));
+    background-repeat: no-repeat; background-size: 0% 100%;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone;
+    transition: background-size 560ms cubic-bezier(0.4, 0, 0.2, 1), color 200ms ease;
+  }
+  .is-selecting .sel, .is-keys .sel, .is-panel .sel, .is-typing .sel, .is-enter .sel { background-size: 100% 100%; color: #fff; }
+  .is-done .sel {
+    background-image: linear-gradient(rgba(52, 199, 89, 0.24), rgba(52, 199, 89, 0.24));
+    background-size: 100% 100%; color: #fff;
+  }
+
+  /* Le pointeur qui va chercher le texte */
+  .demo-cursor {
+    position: absolute; top: 0; left: 0; width: 19px; height: 19px;
+    margin: -2px 0 0 -3px; pointer-events: none; opacity: 0;
+    transition: transform 620ms cubic-bezier(0.4, 0, 0.2, 1), opacity 260ms ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)); z-index: 3;
+  }
+  .demo-cursor svg { width: 100%; height: 100%; display: block; }
+
+  /* Le panneau Claudio, flottant par-dessus la fenetre */
+  .cpanel {
+    position: absolute; left: 50%; bottom: 0; z-index: 2;
+    width: min(430px, 100%);
+    background: #131317; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62);
     text-align: left; overflow: hidden;
+    opacity: 0; pointer-events: none;
+    transform: translateX(-50%) translateY(10px) scale(0.97);
+    transition: opacity 200ms ease, transform 240ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
   }
-  .panel-head {
+  .is-panel .cpanel, .is-typing .cpanel, .is-enter .cpanel {
+    opacity: 1; transform: translateX(-50%) translateY(0) scale(1);
+  }
+  .cpanel-head {
     display: flex; align-items: center; gap: 8px;
-    padding: 11px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     font-size: 0.85rem; color: var(--muted);
   }
-  .panel-head .stache {
+  .cpanel-head .stache {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 22px; height: 22px; border-radius: 6px;
     background: linear-gradient(135deg, var(--indigo), var(--violet));
   }
-  .panel-head .stache svg { width: 14px; height: 7px; fill: #fff; }
-  .panel-head strong { color: var(--text); font-weight: 650; font-size: 0.95rem; }
+  .cpanel-head .stache svg { width: 14px; height: 7px; fill: #fff; }
+  .cpanel-head strong { color: var(--text); font-weight: 650; font-size: 0.92rem; }
   .ppill {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08); font-size: 0.78rem; color: var(--muted); white-space: nowrap;
+    background: rgba(255, 255, 255, 0.08); font-size: 0.76rem; color: var(--muted); white-space: nowrap;
   }
-  .ppill-ok { background: rgba(52, 199, 89, 0.16); color: #4cd964; margin-left: auto; font-weight: 600; }
-  .panel-body { padding: 14px; font-size: 0.98rem; min-height: 52px; color: rgba(255, 255, 255, 0.92); }
-  .panel-foot {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-top: 1px solid rgba(255, 255, 255, 0.06);
+  .ppill-ok {
+    background: rgba(255, 255, 255, 0.06); color: var(--muted);
+    margin-left: auto; font-weight: 600; transition: background 240ms ease, color 240ms ease;
   }
-  .panel-foot .esc { font-size: 0.78rem; color: rgba(255, 255, 255, 0.35); margin-right: auto; }
-  .panel-foot .pbtn {
-    font-size: 0.85rem; padding: 6px 14px; border-radius: 8px; font-weight: 600;
+  .is-enter .ppill-ok, .is-ready .ppill-ok { background: rgba(52, 199, 89, 0.16); color: #4cd964; }
+  .cpanel-body {
+    padding: 13px; font-size: clamp(0.88rem, 2.3vw, 0.96rem); line-height: 1.55;
+    min-height: 3.6em; color: rgba(255, 255, 255, 0.92); overflow-wrap: anywhere;
   }
+  .caret {
+    display: inline-block; width: 2px; height: 1.05em; vertical-align: -0.16em;
+    background: #9d8bff; margin-left: 1px; animation: blink 1s steps(2, start) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cpanel-foot {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 13px; border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .cpanel-foot .esc { font-size: 0.76rem; color: rgba(255, 255, 255, 0.35); margin-right: auto; }
+  .pbtn { font-size: 0.83rem; padding: 6px 13px; border-radius: 8px; font-weight: 600; }
   .pbtn-ghost { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.85); }
-  .pbtn-main { background: linear-gradient(120deg, var(--indigo), var(--violet)); color: #fff; }
-  .demo-caption { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 24px; }
+  .pbtn-main {
+    background: linear-gradient(120deg, var(--indigo), var(--violet)); color: #fff;
+    transition: transform 140ms ease, box-shadow 240ms ease;
+  }
+  .is-enter .pbtn-main { transform: scale(0.94); box-shadow: 0 0 0 3px rgba(157, 139, 255, 0.35); }
+
+  /* Barre du bas : action en cours, raccourci, points de navigation */
+  .demo-keys {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    flex-wrap: wrap; margin-top: 20px; min-height: 30px;
+  }
+  .demo-action { font-size: 0.9rem; font-weight: 650; color: var(--text); }
+  .demo-keys .keys { display: inline-flex; gap: 4px; }
+  .demo-keys kbd { transition: transform 130ms ease, background 200ms ease, border-color 200ms ease; }
+  .is-keys .demo-keys kbd, .is-panel .demo-keys kbd, .is-typing .demo-keys kbd, .is-enter .demo-keys kbd {
+    background: linear-gradient(120deg, var(--indigo), var(--violet));
+    border-color: #7d5fd0; color: #fff; transform: translateY(2px);
+  }
+  .demo-caption { text-align: center; color: var(--muted); font-size: 0.88rem; margin-top: 14px; }
+  .demo-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; }
+  .demo-dot {
+    width: 26px; height: 4px; border-radius: 999px; border: 0; padding: 0; cursor: pointer;
+    background: rgba(255, 255, 255, 0.16); transition: background 220ms ease;
+  }
+  .demo-dot[aria-current="true"] { background: linear-gradient(120deg, var(--indigo), var(--violet)); }
+  .demo-dot:focus-visible { outline: 2px solid #9d8bff; outline-offset: 3px; }
+  .demo-toggle {
+    background: none; border: 0; cursor: pointer; padding: 4px 8px; margin-left: 4px;
+    color: var(--muted); font: inherit; font-size: 0.8rem; border-radius: 6px;
+  }
+  .demo-toggle:hover { color: var(--text); }
+  .demo-toggle:focus-visible { outline: 2px solid #9d8bff; outline-offset: 2px; }
+
+  @media (max-width: 560px) {
+    .appwin-body { padding: 13px 14px 232px; }
+    .appwin-text { min-height: 6.4em; }
+    .cpanel { width: 100%; }
+    .demo-cursor { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sel, .demo-cursor, .cpanel, .demo-keys kbd, .pbtn-main { transition: none; }
+    .caret { animation: none; }
+  }
+
   kbd {
+
     font-family: inherit; font-size: 0.85em; font-weight: 600;
     background: var(--kbd-bg); border: 1px solid var(--kbd-border); border-bottom-width: 2px;
     border-radius: 6px; padding: 2px 7px; white-space: nowrap;
@@ -280,23 +387,40 @@
 </header>
 
 <div class="demo wrap">
-  <div class="demo-stage">
-    <div class="demo-selection">“<mark>Peux-tu m'envoyer la version finale avant la réunion de demain&nbsp;?</mark>”</div>
-    <div class="panel">
-      <div class="panel-head">
-        <span class="stache"><svg viewBox="0 0 24 10" aria-hidden="true"><path d="M12 2.5C10.4.9 7.6 1.1 6 2.9 4.6 4.5 2.6 4.9.8 3.9 1.6 7.5 4.6 9.5 7.8 8.5 9.6 7.9 11 6.5 12 4.9c1 1.6 2.4 3 4.2 3.6 3.2 1 6.2-1 7-4.6-1.8 1-3.8.6-5.2-1C16.4 1.1 13.6.9 12 2.5Z"/></svg></span>
-        <strong>Claudio</strong>
-        <span class="ppill">🌎 English</span>
-        <span class="ppill ppill-ok">✓ Ready</span>
+  <div class="demo-stage" id="demo">
+    <div class="demo-scene">
+      <div class="appwin">
+        <div class="appwin-bar">
+          <i class="r"></i><i class="y"></i><i class="g"></i>
+          <span class="appwin-title" data-win-title></span>
+        </div>
+        <div class="appwin-body">
+          <p class="appwin-meta" data-win-meta></p>
+          <p class="appwin-text" data-win-text></p>
+        </div>
       </div>
-      <div class="panel-body">Can you send me the final version before tomorrow's meeting?</div>
-      <div class="panel-foot">
-        <span class="esc">Esc to dismiss</span>
-        <span class="pbtn pbtn-ghost">Copy ⌘C</span>
-        <span class="pbtn pbtn-main">Paste ⏎</span>
+      <div class="demo-cursor" data-cursor><svg viewBox="0 0 12 19" aria-hidden="true"><path d="M1.2 1.1 10.6 10l-4.1.2 2.4 5.3-1.9.9-2.5-5.3-3.3 2.7z" fill="#fff" stroke="#0b0912" stroke-width="1.1" stroke-linejoin="round"/></svg></div>
+      <div class="cpanel" aria-hidden="true">
+        <div class="cpanel-head">
+          <span class="stache"><svg viewBox="0 0 24 10" aria-hidden="true"><path d="M12 2.5C10.4.9 7.6 1.1 6 2.9 4.6 4.5 2.6 4.9.8 3.9 1.6 7.5 4.6 9.5 7.8 8.5 9.6 7.9 11 6.5 12 4.9c1 1.6 2.4 3 4.2 3.6 3.2 1 6.2-1 7-4.6-1.8 1-3.8.6-5.2-1C16.4 1.1 13.6.9 12 2.5Z"/></svg></span>
+          <strong>Claudio</strong>
+          <span class="ppill" data-pill></span>
+          <span class="ppill ppill-ok" data-status></span>
+        </div>
+        <div class="cpanel-body" data-out></div>
+        <div class="cpanel-foot">
+          <span class="esc">Esc to dismiss</span>
+          <span class="pbtn pbtn-ghost">Copy ⌘C</span>
+          <span class="pbtn pbtn-main">Paste ⏎</span>
+        </div>
       </div>
     </div>
-    <p class="demo-caption"><kbd>⌃⌥⌘E</kbd> on a selection → the panel pops up next to your pointer, the result streams in live, and <kbd>⏎</kbd> pastes it in place.</p>
+    <div class="demo-keys">
+      <span class="demo-action" data-action></span>
+      <span class="keys" data-keys></span>
+    </div>
+    <p class="demo-caption">One shortcut on a selection: the panel opens next to your pointer, the answer streams in live, and <kbd>⏎</kbd> pastes it in place.</p>
+    <div class="demo-nav" data-nav></div>
   </div>
 </div>
 
@@ -444,5 +568,156 @@
   </div>
 </footer>
 
+<script>
+(function () {
+  var stage = document.getElementById('demo');
+  if (!stage) return;
+  var C = {"data": [{"app": "Mail — New message", "meta": "To: thomas@brevet-conseil.com", "pre": "Hi,\n\n", "sel": "need you to send the quote back before monday or the whole build slips", "post": "\n\nThanks.", "out": "could you send the quote back to me by Monday? After that, we won’t be able to keep the build on schedule.", "action": "Professional tone", "keys": ["⌃", "⌥", "⌘", "T"], "pill": "👔 Professional tone"}, {"app": "Slack — #design", "meta": "to Sarah · 2:02 PM", "pre": "", "sel": "Could you send me the final version before tomorrow’s meeting?", "post": "", "out": "Peux-tu m’envoyer la version finale avant la réunion de demain ?", "action": "Translate to French", "keys": ["⌃", "⌥", "⌘", "F"], "pill": "🌍 Français"}, {"app": "Safari — Terms of service", "meta": "section 7.2", "pre": "", "sel": "The provider shall not be held liable for indirect damages arising from any temporary unavailability of the service.", "post": "", "out": "If the service goes down for a while, they won’t pay for whatever that cost you elsewhere.", "action": "Lapacompris", "keys": ["⌃", "⌥", "⌘", "L"], "pill": "🐰 Lapacompris"}], "thinking": "…", "ready": "✓ Ready", "pause": "Pause", "play": "Play", "dot": "Show example"}, DATA = C.data;
+
+  var scene   = stage.querySelector('.demo-scene');
+  var winT    = stage.querySelector('[data-win-title]');
+  var winM    = stage.querySelector('[data-win-meta]');
+  var winTx   = stage.querySelector('[data-win-text]');
+  var cursor  = stage.querySelector('[data-cursor]');
+  var pill    = stage.querySelector('[data-pill]');
+  var status  = stage.querySelector('[data-status]');
+  var out     = stage.querySelector('[data-out]');
+  var actionL = stage.querySelector('[data-action]');
+  var keysEl  = stage.querySelector('[data-keys]');
+  var nav     = stage.querySelector('[data-nav]');
+
+  var caret = document.createElement('span');
+  caret.className = 'caret';
+
+  var timers = [], idx = 0, selEl = null, userPaused = false, visible = true;
+  var reduced = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+
+  function clear() { for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]); timers = []; }
+  function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function phase() {
+    var c = 'demo-stage';
+    for (var i = 0; i < arguments.length; i++) c += ' is-' + arguments[i];
+    stage.className = c;
+  }
+
+  // Points de depart et d'arrivee du surlignage, pour y poser le pointeur.
+  function selPoints() {
+    if (!selEl || !selEl.getClientRects) return null;
+    var r = selEl.getClientRects(), s = scene.getBoundingClientRect();
+    if (!r.length) return null;
+    var a = r[0], b = r[r.length - 1];
+    return { x1: a.left - s.left, y1: a.top - s.top + a.height * 0.55,
+             x2: b.right - s.left, y2: b.top - s.top + b.height * 0.55 };
+  }
+  function moveCursor(x, y, show) {
+    cursor.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    cursor.style.opacity = show ? '1' : '0';
+  }
+
+  function render(d) {
+    winT.textContent = d.app;
+    winM.textContent = d.meta;
+    winTx.textContent = '';
+    if (d.pre) winTx.appendChild(document.createTextNode(d.pre));
+    selEl = document.createElement('span');
+    selEl.className = 'sel';
+    selEl.textContent = d.sel;
+    winTx.appendChild(selEl);
+    if (d.post) winTx.appendChild(document.createTextNode(d.post));
+
+    pill.textContent = d.pill;
+    status.textContent = C.thinking;
+    out.textContent = '';
+    actionL.textContent = d.action;
+    keysEl.textContent = '';
+    for (var i = 0; i < d.keys.length; i++) {
+      var k = document.createElement('kbd');
+      k.textContent = d.keys[i];
+      keysEl.appendChild(k);
+    }
+    for (var j = 0; j < nav.children.length; j++) {
+      nav.children[j].setAttribute('aria-current', j === idx ? 'true' : 'false');
+    }
+  }
+
+  // Le nombre de caracteres se deduit du temps ecoule, pas du nombre de ticks :
+  // fluide a l'ecran, et toujours juste si le navigateur espace les minuteurs.
+  function type(text, done) {
+    var dur = Math.min(2200, Math.max(700, text.length * 16)), t0 = Date.now();
+    (function tick() {
+      var k = Math.min(1, (Date.now() - t0) / dur);
+      out.textContent = text.slice(0, Math.round(k * text.length));
+      out.appendChild(caret);
+      if (k < 1) at(24, tick); else done();
+    })();
+  }
+
+  function run(i) {
+    clear();
+    idx = ((i % DATA.length) + DATA.length) % DATA.length;
+    var d = DATA[idx];
+    render(d);
+    phase();
+    moveCursor(0, 0, false);
+
+    if (reduced.matches) {           // pas d'animation : une image fixe, selection + panneau ouvert.
+      out.textContent = d.out;
+      status.textContent = C.ready;
+      phase('selecting', 'panel', 'ready');
+      return;
+    }
+
+    at(320,  function () { var p = selPoints(); if (p) moveCursor(p.x1 - 6, p.y1, true); });
+    at(980,  function () { phase('selecting'); var p = selPoints(); if (p) moveCursor(p.x2 + 2, p.y2, true); });
+    at(1680, function () { phase('selecting', 'keys'); });
+    at(2120, function () { phase('selecting', 'keys', 'panel'); });
+    at(2380, function () {
+      phase('selecting', 'keys', 'panel', 'typing');
+      type(d.out, function () {
+        if (caret.parentNode) caret.parentNode.removeChild(caret);
+        status.textContent = C.ready;
+        phase('selecting', 'keys', 'panel', 'typing', 'ready');
+        at(780,  function () { phase('selecting', 'keys', 'panel', 'typing', 'ready', 'enter'); });
+        at(1280, function () { phase('done'); selEl.textContent = d.out; moveCursor(0, 0, false); });
+        at(3200, function () { if (!userPaused && visible) run(idx + 1); });
+      });
+    });
+  }
+
+  // Points de navigation : un par exemple, cliquables.
+  for (var n = 0; n < DATA.length; n++) {
+    (function (k) {
+      var b = document.createElement('button');
+      b.className = 'demo-dot';
+      b.type = 'button';
+      b.setAttribute('aria-label', C.dot + ' ' + (k + 1));
+      b.addEventListener('click', function () { userPaused = false; toggle.textContent = C.pause; run(k); });
+      nav.appendChild(b);
+    })(n);
+  }
+
+  var toggle = document.createElement('button');
+  toggle.className = 'demo-toggle';
+  toggle.type = 'button';
+  toggle.textContent = C.pause;
+  toggle.addEventListener('click', function () {
+    userPaused = !userPaused;
+    toggle.textContent = userPaused ? C.play : C.pause;
+    if (userPaused) clear(); else run(idx);
+  });
+  nav.appendChild(toggle);
+
+  // On ne fait pas tourner la scene hors de l'ecran.
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (entries) {
+      visible = entries[0].isIntersecting;
+      if (!visible) clear();
+      else if (!userPaused) run(idx);
+    }, { threshold: 0.25 }).observe(stage);
+  }
+
+  run(0);
+})();
+</script>
 </body>
 </html>
