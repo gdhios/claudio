@@ -355,6 +355,13 @@
     background: var(--accent-soft); border-radius: 11px; font-size: 1.25rem; margin-bottom: 14px;
   }
 
+  /* Une vraie capture de la palette, posee sous la carte qui la decrit. */
+  .shot { margin: 26px 0 0; }
+  .shot img {
+    width: 100%; max-width: 420px; height: auto; display: block; margin: 0 auto;
+  }
+  .shot figcaption { color: var(--muted); font-size: 0.88rem; text-align: center; margin-top: 14px; }
+
   .benefit { margin-top: 52px; }
   .benefit:first-of-type { margin-top: 0; }
   .benefit-title { font-size: 1.35rem; font-weight: 720; margin-bottom: 8px; }
@@ -494,6 +501,11 @@
       <div class="grid">
         <div class="card"><span class="shortcut"><kbd>⌃⌥⌘K</kbd></span><span class="emoji">🎛️</span><h3>Palette d’actions</h3><p>Votre sélection est déjà prise. <kbd>1</kbd> à <kbd>9</kbd> lance la ligne du même numéro, ou tapez quelques lettres pour filtrer. Rien ne correspond&nbsp;? Ce que vous avez tapé devient la consigne.</p></div>
       </div>
+      <figure class="shot">
+        <img src="img/palette.png" width="920" height="1039" loading="lazy" decoding="async"
+             alt="La palette d’actions de Claudio : les neuf actions numérotées avec leur raccourci, et un champ pour filtrer ou écrire sa propre consigne.">
+        <figcaption>La palette, telle qu’elle s’ouvre par-dessus votre fenêtre.</figcaption>
+      </figure>
     </div>
 
     <div class="benefit">
