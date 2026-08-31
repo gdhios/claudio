@@ -172,9 +172,12 @@
   .section-sub { text-align: center; color: var(--muted); max-width: 600px; margin: 0 auto 46px; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
-  /* Quatre cartes : 2 x 2 equilibre, plutot que 3 + 1 orpheline */
+  /* Quatre tuiles : 2 x 2 equilibre, plutot que 3 + 1 orpheline.
+     Vaut pour toutes les grilles de la page, pas seulement .grid. */
   @media (min-width: 760px) {
-    .grid:has(> .card:nth-child(4)):not(:has(> .card:nth-child(5))) {
+    .grid:has(> :nth-child(4)):not(:has(> :nth-child(5))),
+    .steps:has(> :nth-child(4)):not(:has(> :nth-child(5))),
+    .why-grid:has(> :nth-child(4)):not(:has(> :nth-child(5))) {
       grid-template-columns: repeat(2, 1fr);
     }
   }
