@@ -34,7 +34,7 @@ struct PaletteView: View {
 
     private var question: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("Que faire de la sélection ?")
+            Text(loc("Que faire de la sélection ?", en: "What should Claudio do with it?"))
                 .font(.system(size: textSize.points(12), weight: .medium))
                 .foregroundStyle(.white.opacity(0.88))
             Text(session.originalText)
@@ -71,7 +71,7 @@ struct PaletteView: View {
     private var field: some View {
         HStack(spacing: 10) {
             TextField("", text: $session.paletteQuery,
-                      prompt: Text("Filtrer, ou écrire une consigne…")
+                      prompt: Text(loc("Filtrer, ou écrire une consigne…", en: "Filter, or write an instruction…"))
                         .foregroundStyle(.white.opacity(0.3)))
                 .textFieldStyle(.plain)
                 .font(.system(size: textSize.bodyPoints))
@@ -96,12 +96,13 @@ struct PaletteView: View {
 
     private var hints: some View {
         HStack(spacing: 12) {
-            Text("↑↓ naviguer")
+            Text(loc("↑↓ naviguer", en: "↑↓ move"))
             // Le chiffre nu lance tant que rien n'est écrit ; après, il
             // s'écrit, et c'est ⌘ qui lance. L'indice suit plutôt qu'il ne
             // promette à moitié.
-            Text(session.paletteQuery.isEmpty ? "1–9 lancer" : "⌘1–9 lancer")
-            Text("échap fermer")
+            Text(session.paletteQuery.isEmpty ? loc("1–9 lancer", en: "1–9 run")
+                                              : loc("⌘1–9 lancer", en: "⌘1–9 run"))
+            Text(loc("échap fermer", en: "esc close"))
             Spacer()
         }
         .font(.caption2)
@@ -188,7 +189,7 @@ struct CostGauge: View {
     var body: some View {
         if AppSettings.costCounterEnabled {
             HStack(spacing: 5) {
-                Text("auj.")
+                Text(loc("auj.", en: "today"))
                     .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.42))
                 Text(ledger.day.formattedTotal)

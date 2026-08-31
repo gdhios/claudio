@@ -83,6 +83,7 @@ private struct GeneralPane: View {
     @State private var loginItemError: String?
     @State private var costCounterEnabled = AppSettings.costCounterEnabled
     @State private var panelTextSize = AppSettings.panelTextSize
+    @State private var language = AppSettings.language
     @ObservedObject private var ledger = CostLedger.shared
 
     var body: some View {
@@ -101,6 +102,18 @@ private struct GeneralPane: View {
                 if let loginItemError {
                     Text(loginItemError).font(.caption).foregroundStyle(.orange)
                 }
+            }
+
+            Section("Langue") {
+                Picker("Langue de l'interface", selection: $language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
+                .onChange(of: language) { AppSettings.language = language }
+                Text("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Panneau") {

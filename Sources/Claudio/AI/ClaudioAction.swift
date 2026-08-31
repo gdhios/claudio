@@ -54,28 +54,28 @@ enum ClaudioAction: String, CaseIterable, Sendable {
     /// la ligne dans une liste (« Lapacompris : expliquer simplement »).
     var paletteTitle: String {
         switch self {
-        case .correct: "Corriger"
-        case .makePrompt: "Structurer en prompt"
-        case .expertPrompt: "Prompt expert"
-        case .translateFR: "Traduire en français"
-        case .translateEN: "Traduire en anglais"
-        case .professionalTone: "Ton professionnel"
-        case .summarize: "Résumer"
-        case .simplify: "Expliquer simplement"
+        case .correct: loc("Corriger", en: "Fix")
+        case .makePrompt: loc("Structurer en prompt", en: "Turn into a prompt")
+        case .expertPrompt: loc("Prompt expert", en: "Expert prompt")
+        case .translateFR: loc("Traduire en français", en: "Translate to French")
+        case .translateEN: loc("Traduire en anglais", en: "Translate to English")
+        case .professionalTone: loc("Ton professionnel", en: "Professional tone")
+        case .summarize: loc("Résumer", en: "Summarize")
+        case .simplify: loc("Expliquer simplement", en: "Explain simply")
         }
     }
 
     /// Seconde ligne dans la palette : ce que l'action fait, en un souffle.
     var paletteDetail: String {
         switch self {
-        case .correct: "Orthographe, grammaire, ponctuation"
-        case .makePrompt: "Transforme une idée en prompt clair"
-        case .expertPrompt: "Contraintes, format et critères de sortie"
-        case .translateFR: "Depuis n'importe quelle langue"
-        case .translateEN: "Depuis n'importe quelle langue"
-        case .professionalTone: "Reformule pour un contexte de travail"
-        case .summarize: "Points clés, format court"
-        case .simplify: "Lapacompris : sans jargon"
+        case .correct: loc("Orthographe, grammaire, ponctuation", en: "Spelling, grammar, punctuation")
+        case .makePrompt: loc("Transforme une idée en prompt clair", en: "Turns a rough idea into a clear prompt")
+        case .expertPrompt: loc("Contraintes, format et critères de sortie", en: "Constraints, format and success criteria")
+        case .translateFR: loc("Depuis n'importe quelle langue", en: "From any language")
+        case .translateEN: loc("Depuis n'importe quelle langue", en: "From any language")
+        case .professionalTone: loc("Reformule pour un contexte de travail", en: "Rewrites it for a work context")
+        case .summarize: loc("Points clés, format court", en: "Key points, kept short")
+        case .simplify: loc("Lapacompris : sans jargon", en: "Lapacompris: no jargon")
         }
     }
 

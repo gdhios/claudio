@@ -34,6 +34,20 @@ enum AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: costCounterKey) }
     }
 
+    // MARK: - Langue de l'interface
+
+    private static let languageKey = "language"
+
+    /// Langue de l'interface. Valeur absente ou inconnue (réglage écrit par
+    /// une version future) → celle du système.
+    static var language: AppLanguage {
+        get {
+            UserDefaults.standard.string(forKey: languageKey)
+                .flatMap(AppLanguage.init(rawValue:)) ?? .system
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: languageKey) }
+    }
+
     // MARK: - Taille du texte du panneau
 
     private static let panelTextSizeKey = "panelTextSize"

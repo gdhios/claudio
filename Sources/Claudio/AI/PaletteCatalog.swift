@@ -33,7 +33,7 @@ enum PaletteCatalog {
 
     /// Étiquette de la ligne d'action libre quand une consigne est écrite : ce
     /// qui est tapé part tel quel comme instruction.
-    static let freeBadge = "consigne"
+    static var freeBadge: String { loc("consigne", en: "custom") }
 
     /// Actions du catalogue retenues par la saisie. Chaque mot de la requête
     /// doit commencer un mot du titre ou du sous-titre : « trad ang » trouve la
@@ -66,9 +66,9 @@ enum PaletteCatalog {
         }
         let free = PaletteRow(
             origin: .free(instruction: instruction),
-            title: instruction.isEmpty ? "Action libre" : instruction,
-            detail: instruction.isEmpty ? "Écrire sa propre consigne"
-                                        : "Envoyé tel quel comme instruction",
+            title: instruction.isEmpty ? loc("Action libre", en: "Custom action") : instruction,
+            detail: instruction.isEmpty ? loc("Écrire sa propre consigne", en: "Write your own instruction")
+                                        : loc("Envoyé tel quel comme instruction", en: "Sent as-is as the instruction"),
             trailing: instruction.isEmpty ? ClaudioRequest.freeShortcutDescription : freeBadge
         )
         return catalog + [free]
