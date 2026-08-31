@@ -135,7 +135,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   /* Hauteur de page fixe : le panneau se pose au centre sans faire sauter la scene. */
-  .appwin-body { padding: 18px 20px; min-height: 270px; }
+  .appwin-body { padding: 18px 20px; min-height: 270px; position: relative; isolation: isolate; }
   .appwin-meta { font-size: 0.78rem; color: rgba(0, 0, 0, 0.38); margin-bottom: 10px; }
   .appwin-text {
     font-size: clamp(0.9rem, 2.4vw, 0.98rem); line-height: 1.62;
@@ -145,16 +145,23 @@
   /* La portion selectionnee : le surlignage balaie le texte de gauche a droite */
   .sel {
     border-radius: 4px; padding: 1px 2px;
-    background-image: linear-gradient(#5c4ded, #5c4ded);
-    background-repeat: no-repeat; background-size: 0% 100%;
     -webkit-box-decoration-break: clone; box-decoration-break: clone;
-    transition: background-size 560ms cubic-bezier(0.4, 0, 0.2, 1), color 200ms ease;
   }
-  .is-selecting .sel, .is-keys .sel, .is-panel .sel, .is-typing .sel, .is-enter .sel { background-size: 100% 100%; color: #fff; }
-  .is-done .sel {
-    background-image: linear-gradient(rgba(52, 199, 89, 0.34), rgba(52, 199, 89, 0.34));
-    background-size: 100% 100%; color: #123c21;
+  /* Le surlignage se dessine ligne apres ligne, comme une vraie selection a la souris.
+     Il passe sous le texte : celui-ci reste lisible du debut a la fin. */
+  .sel-band {
+    position: absolute; z-index: -1; width: 0; pointer-events: none; border-radius: 3px;
+    background: rgba(92, 77, 237, 0.34);
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 180ms ease;
   }
+  .is-done .sel { background-color: rgba(52, 199, 89, 0.34); color: #123c21; }
+  /* Le remplacement : le texte de Claudio arrive en vert, assez fort pour qu'on le voie. */
+  @keyframes swapin {
+    0%   { opacity: 0.1; background-color: rgba(52, 199, 89, 0.9);  box-shadow: 0 0 0 6px rgba(52, 199, 89, 0.3); }
+    40%  { opacity: 1;   background-color: rgba(52, 199, 89, 0.72); box-shadow: 0 0 0 6px rgba(52, 199, 89, 0.26); }
+    100% { opacity: 1;   background-color: rgba(52, 199, 89, 0.34); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+  }
+  .is-done .sel { animation: swapin 860ms cubic-bezier(0.3, 0.9, 0.3, 1) both; }
 
   /* Le voile : des que Claudio s'ouvre, la fenetre passe derriere lui. */
   .appwin-veil {
@@ -303,10 +310,10 @@
     .demo-cursor { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .sel, .demo-cursor, .cpanel, .appwin-veil, .demo-keys kbd, .demo-shortcut, .pbtn-main { transition: none; }
+    .sel, .sel-band, .demo-cursor, .cpanel, .appwin-veil, .demo-keys kbd, .demo-shortcut, .pbtn-main { transition: none; }
     .caret { animation: none; }
     .is-keys .demo-keys kbd, .is-keys .demo-shortcut { animation: none; }
-    .is-enter .pbtn-main, .is-enter .demo-cursor::after { animation: none; }
+    .is-enter .pbtn-main, .is-enter .demo-cursor::after, .is-done .sel { animation: none; }
   }
 
   kbd {
@@ -642,7 +649,7 @@
   var caret = document.createElement('span');
   caret.className = 'caret';
 
-  var timers = [], idx = 0, selEl = null, userPaused = false, visible = true;
+  var timers = [], idx = 0, selEl = null, userPaused = false, visible = true, bands = [];
   var reduced = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
   function clear() { for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]); timers = []; }
@@ -662,6 +669,42 @@
     return { x1: a.left - s.left, y1: a.top - s.top + a.height * 0.55,
              x2: b.right - s.left, y2: b.top - s.top + b.height * 0.55 };
   }
+  // Une bande par ligne du surlignage, tracees l'une apres l'autre au prorata de leur
+  // longueur : la selection avance comme sous la souris, meme sur deux lignes.
+  function clearBands() {
+    for (var i = 0; i < bands.length; i++) {
+      if (bands[i].parentNode) bands[i].parentNode.removeChild(bands[i]);
+    }
+    bands = [];
+  }
+  function fadeBands() { for (var i = 0; i < bands.length; i++) bands[i].style.opacity = '0'; }
+  function makeBands(instant) {
+    clearBands();
+    if (!selEl || !selEl.getClientRects) return;
+    var host = winTx.parentNode, r = selEl.getClientRects(), h = host.getBoundingClientRect();
+    var total = 0, i;
+    for (i = 0; i < r.length; i++) total += r[i].width;
+    if (!total) return;
+    var acc = 0, DUR = 620;
+    for (i = 0; i < r.length; i++) {
+      var b = document.createElement('span');
+      b.className = 'sel-band';
+      b.style.left = (r[i].left - h.left - 2) + 'px';
+      b.style.top = (r[i].top - h.top - 1) + 'px';
+      b.style.height = (r[i].height + 2) + 'px';
+      if (instant) b.style.transition = 'none';
+      else {
+        b.style.transitionDuration = Math.round(DUR * r[i].width / total) + 'ms, 180ms';
+        b.style.transitionDelay = Math.round(DUR * acc / total) + 'ms, 0ms';
+      }
+      host.appendChild(b);
+      bands.push(b);
+      acc += r[i].width;
+    }
+    host.offsetWidth;                 // on force le calcul avant de lancer les largeurs
+    for (i = 0; i < bands.length; i++) bands[i].style.width = (r[i].width + 4) + 'px';
+  }
+
   function moveCursor(x, y, show) {
     cursor.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
     cursor.style.opacity = show ? '1' : '0';
@@ -715,6 +758,7 @@
 
   function run(i) {
     clear();
+    clearBands();
     idx = ((i % DATA.length) + DATA.length) % DATA.length;
     var d = DATA[idx];
     render(d);
@@ -725,11 +769,12 @@
       out.textContent = d.out;
       status.textContent = C.ready;
       phase('selecting', 'panel', 'ready');
+      makeBands(true);
       return;
     }
 
     at(320,  function () { var p = selPoints(); if (p) moveCursor(p.x1 - 6, p.y1, true); });
-    at(980,  function () { phase('selecting'); var p = selPoints(); if (p) moveCursor(p.x2 + 2, p.y2, true); });
+    at(980,  function () { phase('selecting'); makeBands(); var p = selPoints(); if (p) moveCursor(p.x2 + 2, p.y2, true); });
     at(1700, function () { phase('selecting', 'keys'); });
     // Le raccourci a le temps de se composer touche par touche avant l'ouverture.
     at(2500, function () { phase('selecting', 'keys', 'panel'); cursor.style.opacity = '0'; });
@@ -742,8 +787,12 @@
         // Le pointeur revient se poser sur « Coller » avant d'appuyer : le clic doit se voir.
         at(500,  function () { var p = pastePoint(); if (p) moveCursor(p.x, p.y, true); });
         at(1300, function () { phase('selecting', 'keys', 'panel', 'typing', 'ready', 'enter'); });
-        at(2200, function () { phase('done'); selEl.textContent = d.out; moveCursor(0, 0, false); });
-        at(4200, function () { if (!userPaused && visible) run(idx + 1); });
+        // Le panneau se referme d'abord : l'oeil revient sur le document, et voit le
+        // texte selectionne ceder la place a celui de Claudio.
+        at(2150, function () { phase('selecting'); moveCursor(0, 0, false); });
+        at(2380, function () { fadeBands(); });
+        at(2450, function () { phase('done'); selEl.textContent = d.out; });
+        at(4700, function () { if (!userPaused && visible) run(idx + 1); });
       });
     });
   }
