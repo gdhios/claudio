@@ -22,17 +22,23 @@ enum UpdateInstaller {
         var errorDescription: String? {
             switch self {
             case .download:
-                "Téléchargement impossible. Vérifiez la connexion, puis réessayez."
+                loc("Téléchargement impossible. Vérifiez la connexion, puis réessayez.",
+                    en: "Download failed. Check your connection, then try again.")
             case .archive:
-                "L'archive téléchargée est illisible."
+                loc("L'archive téléchargée est illisible.",
+                    en: "The downloaded archive cannot be read.")
             case .untrusted:
-                "Cette mise à jour n'est pas signée par le développeur de Claudio : installation annulée."
+                loc("Cette mise à jour n'est pas signée par le développeur de Claudio : installation annulée.",
+                    en: "This update is not signed by Claudio's developer: install cancelled.")
             case .translocated:
-                "Claudio tourne depuis une copie temporaire. Glissez d'abord l'app dans le dossier Applications, relancez-la, puis réessayez."
+                loc("Claudio tourne depuis une copie temporaire. Glissez d'abord l'app dans le dossier Applications, relancez-la, puis réessayez.",
+                    en: "Claudio is running from a temporary copy. Move the app to your Applications folder, launch it from there, then try again.")
             case .notWritable(let path):
-                "Droits insuffisants pour remplacer l'app dans \(path)."
+                loc("Droits insuffisants pour remplacer l'app dans \(path).",
+                    en: "Not enough permissions to replace the app in \(path).")
             case .replace:
-                "Le remplacement a échoué. La version actuelle est intacte."
+                loc("Le remplacement a échoué. La version actuelle est intacte.",
+                    en: "The replacement failed. The current version is untouched.")
             }
         }
     }

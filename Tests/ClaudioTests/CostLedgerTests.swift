@@ -31,15 +31,39 @@ final class CostLedgerTests: XCTestCase {
                        0.0012, accuracy: 1e-9)
         XCTAssertEqual(ClaudioModel.opus5.cost(inputTokens: 200, outputTokens: 200),
                        0.006, accuracy: 1e-9)
-        XCTAssertEqual(ClaudioModel.haiku45.costHint, "≈ 0,12 $ pour 100 actions courtes")
-        XCTAssertEqual(ClaudioModel.opus5.costHint, "≈ 0,60 $ pour 100 actions courtes")
+        withLanguage(.french) {
+            XCTAssertEqual(ClaudioModel.haiku45.costHint, "≈ 0,12 $ pour 100 actions courtes")
+            XCTAssertEqual(ClaudioModel.opus5.costHint, "≈ 0,60 $ pour 100 actions courtes")
+        }
     }
 
     func testFormatMonetaire() {
-        XCTAssertEqual(Money.format(0), "0,00 $")
-        XCTAssertEqual(Money.format(0.0012), "< 0,01 $")
-        XCTAssertEqual(Money.format(0.42), "0,42 $")
-        XCTAssertEqual(Money.format(12.5), "12,50 $")
+        withLanguage(.french) {
+            XCTAssertEqual(Money.format(0), "0,00 $")
+            XCTAssertEqual(Money.format(0.0012), "< 0,01 $")
+            XCTAssertEqual(Money.format(0.42), "0,42 $")
+            XCTAssertEqual(Money.format(12.5), "12,50 $")
+            XCTAssertEqual(Money.formatRounded(5), "5 $")
+        }
+    }
+
+    /// En anglais le dollar passe devant et le séparateur est le point.
+    func testFormatMonetaireAnglais() {
+        withLanguage(.english) {
+            XCTAssertEqual(Money.format(0), "$0.00")
+            XCTAssertEqual(Money.format(0.0012), "< $0.01")
+            XCTAssertEqual(Money.format(12.5), "$12.50")
+            XCTAssertEqual(Money.formatRounded(5), "$5")
+        }
+    }
+
+    /// Le temps d'une assertion, la langue est celle qu'on veut éprouver, et
+    /// le réglage de la machine est rendu tel qu'il était.
+    private func withLanguage(_ language: AppLanguage, _ body: () -> Void) {
+        let previous = AppSettings.language
+        AppSettings.language = language
+        body()
+        AppSettings.language = previous
     }
 
     // MARK: - Cumul du jour
@@ -53,7 +77,7 @@ final class CostLedgerTests: XCTestCase {
         jour = jour.adding(0.32, at: midi.addingTimeInterval(3600))
         XCTAssertEqual(jour.total, 0.42, accuracy: 1e-9)
         XCTAssertEqual(jour.actions, 2)
-        XCTAssertEqual(jour.formattedTotal, "0,42 $")
+        withLanguage(.french) { XCTAssertEqual(jour.formattedTotal, "0,42 $") }
     }
 
     func testLeCumulRepartDeZeroLeLendemain() {

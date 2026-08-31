@@ -14,11 +14,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: "Général"
-        case .apiKey: "Clé API"
-        case .shortcuts: "Raccourcis"
-        case .prompts: "Prompts"
-        case .about: "À propos"
+        case .general: loc("Général", en: "General")
+        case .apiKey: loc("Clé API", en: "API key")
+        case .shortcuts: loc("Raccourcis", en: "Shortcuts")
+        case .prompts: loc("Prompts", en: "Prompts")
+        case .about: loc("À propos", en: "About")
         }
     }
 
@@ -64,11 +64,11 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
             switch selection ?? .general {
-            case .general: GeneralPane().navigationTitle("Général")
-            case .apiKey: APIKeyPane().navigationTitle("Clé API")
-            case .shortcuts: ShortcutsPane().navigationTitle("Raccourcis")
-            case .prompts: PromptsPane().navigationTitle("Prompts")
-            case .about: AboutPane().navigationTitle("À propos")
+            case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
+            case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
+            case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
+            case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
+            case .about: AboutPane().navigationTitle(SettingsSection.about.title)
             }
         }
         .frame(minWidth: 700, minHeight: 500)
@@ -88,14 +88,15 @@ private struct GeneralPane: View {
 
     var body: some View {
         Form {
-            Section("Système") {
-                Toggle("Ouvrir à l'ouverture de session", isOn: $launchAtLogin)
+            Section(loc("Système", en: "System")) {
+                Toggle(loc("Ouvrir à l'ouverture de session", en: "Open at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) {
                         do {
                             try LoginItem.setEnabled(launchAtLogin)
                             loginItemError = nil
                         } catch {
-                            loginItemError = "Nécessite l'app installée dans /Applications (\(error.localizedDescription))"
+                            loginItemError = loc("Nécessite l'app installée dans /Applications (\(error.localizedDescription))",
+                                                 en: "Requires the app to live in /Applications (\(error.localizedDescription))")
                             launchAtLogin = LoginItem.isEnabled
                         }
                     }
@@ -104,56 +105,61 @@ private struct GeneralPane: View {
                 }
             }
 
-            Section("Langue") {
-                Picker("Langue de l'interface", selection: $language) {
+            Section(loc("Langue", en: "Language")) {
+                Picker(loc("Langue de l'interface", en: "Interface language"), selection: $language) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.title).tag(language)
                     }
                 }
                 .onChange(of: language) { AppSettings.language = language }
-                Text("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné.")
+                Text(loc("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné.",
+                         en: "Applies to Claudio's own labels. What Claude sends back always follows the language of the selected text."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Panneau") {
-                Picker("Taille du texte", selection: $panelTextSize) {
+            Section(loc("Panneau", en: "Panel")) {
+                Picker(loc("Taille du texte", en: "Text size"), selection: $panelTextSize) {
                     ForEach(PanelTextSize.allCases) { size in
                         Text(size.title).tag(size)
                     }
                 }
                 .onChange(of: panelTextSize) { AppSettings.panelTextSize = panelTextSize }
-                Text("Le résultat s'affiche à cette taille.")
+                Text(loc("Le résultat s'affiche à cette taille.", en: "The result appears at this size."))
                     .font(.system(size: panelTextSize.bodyPoints))
                     .foregroundStyle(.secondary)
-                Text("S'applique au texte du panneau flottant : le résultat, la consigne et les actions de la palette. Le panneau s'élargit avec le texte, et le changement vaut pour le panneau suivant.")
+                Text(loc("S'applique au texte du panneau flottant : le résultat, la consigne et les actions de la palette. Le panneau s'élargit avec le texte, et le changement vaut pour le panneau suivant.",
+                         en: "Applies to the floating panel: the result, the instruction field and the palette actions. The panel widens with the text, and the change takes effect on the next panel."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Modèle") {
-                LabeledContent("Modèle Claude", value: "réglable par action")
-                Text("Le modèle se choisit pour chaque action dans l'onglet Prompts. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")).")
+            Section(loc("Modèle", en: "Model")) {
+                LabeledContent(loc("Modèle Claude", en: "Claude model"),
+                               value: loc("réglable par action", en: "set per action"))
+                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")).",
+                         en: "The model is chosen per action in the Prompts tab. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", "))."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Dépense") {
-                Toggle("Compter ce que je dépense", isOn: $costCounterEnabled)
+            Section(loc("Dépense", en: "Spending")) {
+                Toggle(loc("Compter ce que je dépense", en: "Count what I spend"), isOn: $costCounterEnabled)
                     .onChange(of: costCounterEnabled) {
                         AppSettings.costCounterEnabled = costCounterEnabled
                     }
                 if costCounterEnabled {
-                    LabeledContent("Aujourd'hui") {
+                    LabeledContent(loc("Aujourd'hui", en: "Today")) {
                         Text(ledger.day.actions == 0
-                             ? "aucune action"
+                             ? loc("aucune action", en: "no action yet")
                              : "\(ledger.day.formattedTotal) · \(ledger.day.actions) action\(ledger.day.actions > 1 ? "s" : "")")
                             .monospacedDigit()
                     }
-                    Button("Remettre à zéro") { ledger.reset() }
+                    Button(loc("Remettre à zéro", en: "Reset")) { ledger.reset() }
                         .disabled(ledger.day.actions == 0)
                 }
-                Text("Le total est calculé sur ta machine à partir des jetons facturés par appel, et repart à zéro chaque jour. Le décompte qui fait foi reste celui de console.anthropic.com.")
+                Text(loc("Le total est calculé sur ta machine à partir des jetons facturés par appel, et repart à zéro chaque jour. Le décompte qui fait foi reste celui de console.anthropic.com.",
+                         en: "The total is computed on your Mac from the tokens billed per call, and starts over every day. The count that matters is still the one on console.anthropic.com."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -172,26 +178,26 @@ private struct APIKeyPane: View {
 
     var body: some View {
         Form {
-            Section("Clé API Anthropic") {
+            Section(loc("Clé API Anthropic", en: "Anthropic API key")) {
                 SecureField("sk-ant-…", text: $apiKeyField)
                 HStack {
                     if hasStoredKey {
-                        Label("Clé enregistrée dans le Trousseau", systemImage: "checkmark.circle")
+                        Label(loc("Clé enregistrée dans le Trousseau", en: "Key saved in the Keychain"), systemImage: "checkmark.circle")
                             .foregroundStyle(.green)
                             .font(.caption)
                     } else {
-                        Label("Aucune clé enregistrée", systemImage: "exclamationmark.circle")
+                        Label(loc("Aucune clé enregistrée", en: "No key saved"), systemImage: "exclamationmark.circle")
                             .foregroundStyle(.orange)
                             .font(.caption)
                     }
                     Spacer()
                     if hasStoredKey {
-                        Button("Supprimer") {
+                        Button(loc("Supprimer", en: "Delete")) {
                             KeychainStore.deleteAPIKey()
                             hasStoredKey = false
                         }
                     }
-                    Button("Enregistrer") {
+                    Button(loc("Enregistrer", en: "Save")) {
                         let trimmed = apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
                         KeychainStore.saveAPIKey(trimmed)
@@ -200,17 +206,18 @@ private struct APIKeyPane: View {
                     }
                     .disabled(apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                Link("Créer une clé sur console.anthropic.com",
+                Link(loc("Créer une clé sur console.anthropic.com", en: "Create a key on console.anthropic.com"),
                      destination: URL(string: "https://console.anthropic.com/settings/keys")!)
                     .font(.caption)
             }
 
-            Section("Espace de travail") {
-                TextField("Espace de travail", text: $workspaceIDField, prompt: Text("wrkspc_…"))
+            Section(loc("Espace de travail", en: "Workspace")) {
+                TextField(loc("Espace de travail", en: "Workspace"), text: $workspaceIDField, prompt: Text("wrkspc_…"))
                     .onChange(of: workspaceIDField) {
                         AppSettings.workspaceID = workspaceIDField
                     }
-                Text("Requis uniquement si ta clé est « liée à l'identité » (erreur 400 sinon). Console → Réglages → Workspaces → copier l'ID de l'espace.")
+                Text(loc("Requis uniquement si ta clé est « liée à l'identité » (erreur 400 sinon). Console → Réglages → Workspaces → copier l'ID de l'espace.",
+                         en: "Only needed if your key is “identity-bound” (otherwise you get a 400). Console → Settings → Workspaces → copy the workspace ID."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -250,9 +257,10 @@ private struct ShortcutsPane: View {
                     KeyboardShortcuts.Recorder("", name: .freeAction)
                 }
             } header: {
-                Text("Raccourcis globaux")
+                Text(loc("Raccourcis globaux", en: "Global shortcuts"))
             } footer: {
-                Text("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.")
+                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.",
+                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -273,7 +281,7 @@ private struct PromptsPane: View {
     var body: some View {
         Form {
             Section {
-                Picker("Action", selection: $selectedAction) {
+                Picker(loc("Action", en: "Action"), selection: $selectedAction) {
                     ForEach(ClaudioAction.allCases, id: \.self) { action in
                         Text(action.menuTitle).tag(action)
                     }
@@ -284,8 +292,8 @@ private struct PromptsPane: View {
                 }
             }
 
-            Section("Modèle") {
-                Picker("Modèle Claude", selection: $selectedModel) {
+            Section(loc("Modèle", en: "Model")) {
+                Picker(loc("Modèle Claude", en: "Claude model"), selection: $selectedModel) {
                     ForEach(ClaudioModel.allCases, id: \.self) { model in
                         Text(model.displayName).tag(model)
                     }
@@ -293,12 +301,12 @@ private struct PromptsPane: View {
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text("\(selectedModel.costHint). \(selectedModel == selectedAction.defaultModel ? "Modèle par défaut pour cette action." : "Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).")")
+                Text("\(selectedModel.costHint). \(selectedModel == selectedAction.defaultModel ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Prompt système") {
+            Section(loc("Prompt système", en: "System prompt")) {
                 TextEditor(text: $promptText)
                     .font(.callout)
                     .frame(minHeight: 260)
@@ -309,22 +317,23 @@ private struct PromptsPane: View {
                     }
                 HStack {
                     if isCustomized {
-                        Label("Personnalisé", systemImage: "pencil")
+                        Label(loc("Personnalisé", en: "Customised"), systemImage: "pencil")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     } else {
-                        Label("Prompt par défaut", systemImage: "checkmark.circle")
+                        Label(loc("Prompt par défaut", en: "Default prompt"), systemImage: "checkmark.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Réinitialiser") {
+                    Button(loc("Réinitialiser", en: "Reset")) {
                         AppSettings.setCustomSystemPrompt(nil, for: selectedAction)
                         promptText = selectedAction.defaultSystem
                     }
                     .disabled(!isCustomized)
                 }
-                Text("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part, balisé <texte_source> pour les actions de prompt : ce prompt ne définit que la tâche.")
+                Text(loc("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part, balisé <texte_source> pour les actions de prompt : ce prompt ne définit que la tâche. Les prompts par défaut sont écrits en français, et demandent à Claude de répondre dans la langue du texte sélectionné.",
+                         en: "Changes take effect immediately. The selected text is sent separately, wrapped in <texte_source> for the prompt actions: this prompt only defines the task. The default prompts are written in French, and ask Claude to answer in the language of the selected text."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -354,10 +363,11 @@ private struct AboutPane: View {
                         .frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Claudio").font(.title3.bold())
-                        Text("Version \(version)")
+                        Text(loc("Version \(version)", en: "Version \(version)"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("Des actions IA sur votre texte sélectionné, partout sur macOS.")
+                        Text(loc("Des actions IA sur votre texte sélectionné, partout sur macOS.",
+                                 en: "AI actions on your selected text, anywhere on macOS."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -365,20 +375,23 @@ private struct AboutPane: View {
                 .padding(.vertical, 4)
             }
 
-            Section("Mises à jour") {
+            Section(loc("Mises à jour", en: "Updates")) {
                 HStack {
-                    Button("Vérifier maintenant") {
+                    Button(loc("Vérifier maintenant", en: "Check now")) {
                         checking = true
                         Task { @MainActor in
                             switch await UpdateChecker.shared.checkNow() {
                             case .upToDate:
-                                updateMessage = "Claudio est à jour (version \(version))."
+                                updateMessage = loc("Claudio est à jour (version \(version)).",
+                                                    en: "Claudio is up to date (version \(version)).")
                                 pendingUpdate = nil
                             case .updateAvailable(let feed):
-                                updateMessage = "Mise à jour \(feed.version) disponible."
+                                updateMessage = loc("Mise à jour \(feed.version) disponible.",
+                                                    en: "Update \(feed.version) available.")
                                 pendingUpdate = feed
                             case .failed:
-                                updateMessage = "Vérification impossible, réessayez plus tard."
+                                updateMessage = loc("Vérification impossible, réessayez plus tard.",
+                                                    en: "Could not check, try again later.")
                                 pendingUpdate = nil
                             }
                             checking = false
@@ -390,32 +403,34 @@ private struct AboutPane: View {
                     }
                     Spacer()
                     if let pendingUpdate {
-                        Button("Installer et redémarrer") { install(pendingUpdate) }
+                        Button(loc("Installer et redémarrer", en: "Install and restart")) { install(pendingUpdate) }
                             .disabled(installing)
                     }
                 }
                 if let updateMessage {
                     Text(updateMessage).font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée. L'installation remplace l'app en place et relance Claudio, sans rien laisser dans les Téléchargements.")
+                Text(loc("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée. L'installation remplace l'app en place et relance Claudio, sans rien laisser dans les Téléchargements.",
+                         en: "Checked automatically once a day: a plain read of version.json on claudio.okonoma.com, nothing sent. Installing replaces the app in place and relaunches Claudio, leaving nothing in Downloads."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 Link(destination: URL(string: "https://claudio.okonoma.com")!) {
-                    Label("Site web", systemImage: "globe")
+                    Label(loc("Site web", en: "Website"), systemImage: "globe")
                 }
                 Link(destination: URL(string: "https://github.com/gdhios/claudio")!) {
-                    Label("Code source (MIT)", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label(loc("Code source (MIT)", en: "Source code (MIT)"), systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 Link(destination: URL(string: "https://buymeacoffee.com/gdhios")!) {
-                    Label("Offrir un café ☕", systemImage: "heart")
+                    Label(loc("Offrir un café ☕", en: "Buy me a coffee ☕"), systemImage: "heart")
                 }
             }
 
             Section {
-                Text("Fait main en Swift. Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.")
+                Text(loc("Fait main en Swift. Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.",
+                         en: "Hand-made in Swift. Independent project, not affiliated with Anthropic. Claude is a trademark of Anthropic, PBC."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -427,7 +442,8 @@ private struct AboutPane: View {
     /// la nouvelle version se relance seule.
     private func install(_ feed: UpdateChecker.Feed) {
         installing = true
-        updateMessage = "Téléchargement de la version \(feed.version)…"
+        updateMessage = loc("Téléchargement de la version \(feed.version)…",
+                            en: "Downloading version \(feed.version)…")
         Task { @MainActor in
             do {
                 let newApp = try await UpdateInstaller.prepare(from: feed.url)

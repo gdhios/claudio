@@ -9,9 +9,9 @@ enum ClaudioModel: String, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .haiku45: "Haiku 4.5 (rapide et économique)"
-        case .sonnet5: "Sonnet 5 (qualité supérieure)"
-        case .opus5: "Opus 5 (le plus capable)"
+        case .haiku45: loc("Haiku 4.5 (rapide et économique)", en: "Haiku 4.5 (fast and cheap)")
+        case .sonnet5: loc("Sonnet 5 (qualité supérieure)", en: "Sonnet 5 (higher quality)")
+        case .opus5: loc("Opus 5 (le plus capable)", en: "Opus 5 (the most capable)")
         }
     }
 
@@ -60,7 +60,8 @@ enum ClaudioModel: String, CaseIterable, Sendable {
     /// dollar : on en compte cent pour rester lisible.
     var costHint: String {
         let hundred = cost(inputTokens: 200, outputTokens: 200) * 100
-        return "≈ \(Money.format(hundred)) pour 100 actions courtes"
+        return loc("≈ \(Money.format(hundred)) pour 100 actions courtes",
+                   en: "≈ \(Money.format(hundred)) per 100 short actions")
     }
 
     /// Tarif brut, tel qu'Anthropic l'affiche.

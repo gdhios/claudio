@@ -16,10 +16,10 @@ enum PanelTextSize: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .small: "Petit"
-        case .normal: "Normal"
-        case .large: "Grand"
-        case .extraLarge: "Très grand"
+        case .small: loc("Petit", en: "Small")
+        case .normal: loc("Normal", en: "Normal")
+        case .large: loc("Grand", en: "Large")
+        case .extraLarge: loc("Très grand", en: "Extra large")
         }
     }
 

@@ -4,14 +4,17 @@ import Foundation
 /// taux de change inventé. Virgule décimale, comme partout ailleurs dans l'app.
 enum Money {
     static func format(_ dollars: Double) -> String {
-        if dollars > 0 && dollars < 0.005 { return "< 0,01 $" }
-        let rounded = String(format: "%.2f", dollars).replacingOccurrences(of: ".", with: ",")
-        return "\(rounded) $"
+        // La ponctuation du nombre suit la langue de l'interface : virgule et
+        // dollar en fin de phrase en français, point et dollar devant en anglais.
+        if dollars > 0 && dollars < 0.005 { return loc("< 0,01 $", en: "< $0.01") }
+        let amount = String(format: "%.2f", dollars)
+        return loc("\(amount.replacingOccurrences(of: ".", with: ",")) $", en: "$\(amount)")
     }
 
     /// Sans centimes quand il n'y en a pas : les tarifs par million sont ronds.
     static func formatRounded(_ dollars: Double) -> String {
-        dollars == dollars.rounded() ? "\(Int(dollars)) $" : format(dollars)
+        guard dollars == dollars.rounded() else { return format(dollars) }
+        return loc("\(Int(dollars)) $", en: "$\(Int(dollars))")
     }
 }
 
