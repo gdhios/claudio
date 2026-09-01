@@ -6,5 +6,13 @@ dist/
 
 # Sources de l'icône (non publiées)
 icon/*.svg
+# … sauf le maître de la mascotte : c'est lui qu'on édite, et la référence
+# dont se sert l'agent illustrateur.
+!icon/claudio_mascotte.svg
 *.af
 *.af~lock~
+
+# Réglages Claude Code propres à la machine (launch.json, lui, est partagé)
+.claude/settings.local.json
+# Références visuelles collectées pour la mascotte : images de stock, pas à nous
+moodboard pour mascotte/

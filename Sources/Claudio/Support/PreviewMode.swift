@@ -49,6 +49,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .shortcuts)
         } else if mode == "settings-about" {
             settingsController.show(initialSection: .about)
+        } else if mode == "barre-de-menus" {
+            showMenuBarPreview()
         } else if mode.hasPrefix("palette") {
             showPalettePreview()
         } else {
@@ -162,6 +164,18 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 860))
     }
 
+    /// Claudio dans la barre de menus, à sa taille réelle puis grossi, sur
+    /// fond clair et sur fond sombre : c'est là que se juge la lisibilité.
+    private func showMenuBarPreview() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 232),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.title = "Regards"
+        window.contentView = MenuBarPreviewView(frame: NSRect(x: 0, y: 0, width: 460, height: 232))
+        let screen = NSScreen.screens.first?.frame ?? .zero
+        window.setFrameOrigin(NSPoint(x: screen.minX + 480, y: screen.minY + 760))
+        window.makeKeyAndOrderFront(nil)
+    }
+
     /// Coordonnées pour `screencapture -R x,y,w,h` : origine top-left de l'écran principal.
     private func printCaptureRect() {
         let frame: NSRect
@@ -181,5 +195,65 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         let h = Int(frame.height + margin * 2)
         print("PREVIEW_RECT=\(x),\(y),\(w),\(h)")
         fflush(stdout)  // stdout redirigé vers un fichier = bufferisé
+    }
+}
+
+
+/// Les quatre regards sur les deux fonds de la barre de menus : à leur taille
+/// réelle, puis grossis sans lissage. C'est là que se juge la lisibilité — un
+/// regard qui ne se distingue pas ici ne sert à rien dans l'application.
+private final class MenuBarPreviewView: NSView {
+    private let regards: [(String, ClaudioMascot.Gaze)] = [
+        ("repos", .repos), ("veille", .veille), ("fait", .fait), ("vide", .vide),
+    ]
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let fonds: [(NSColor, NSColor)] = [
+            (NSColor(white: 0.96, alpha: 1), .black),   // barre claire
+            (NSColor(white: 0.11, alpha: 1), .white),   // barre sombre
+        ]
+        let colonne: CGFloat = 104, bande: CGFloat = 116
+
+        for (rang, (fond, encre)) in fonds.enumerated() {
+            let haut = CGFloat(rang) * bande
+            fond.setFill()
+            NSRect(x: 0, y: haut, width: bounds.width, height: bande).fill()
+
+            for (index, (nom, gaze)) in regards.enumerated() {
+                let x = 20 + CGFloat(index) * colonne
+                let image = ClaudioMascot.menuBarImage(gaze: gaze).teinte(encre)
+                let taille = image.size
+
+                NSAttributedString(string: nom, attributes: [
+                    .font: NSFont.systemFont(ofSize: 9),
+                    .foregroundColor: encre.withAlphaComponent(0.55),
+                ]).draw(at: NSPoint(x: x, y: haut + 10))
+
+                // Taille réelle, celle de la barre de menus.
+                image.draw(in: NSRect(x: x, y: haut + 28,
+                                      width: taille.width, height: taille.height))
+
+                // Grossi trois fois, pixels apparents.
+                NSGraphicsContext.current?.imageInterpolation = .none
+                image.draw(in: NSRect(x: x, y: haut + 54,
+                                      width: taille.width * 3, height: taille.height * 3))
+                NSGraphicsContext.current?.imageInterpolation = .default
+            }
+        }
+    }
+}
+
+private extension NSImage {
+    /// Une image gabarit ne porte que son alpha : voici sa version encrée.
+    func teinte(_ couleur: NSColor) -> NSImage {
+        let copie = NSImage(size: size)
+        copie.lockFocus()
+        draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1)
+        couleur.set()
+        NSRect(origin: .zero, size: size).fill(using: .sourceAtop)
+        copie.unlockFocus()
+        return copie
     }
 }
