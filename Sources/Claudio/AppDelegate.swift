@@ -1,9 +1,13 @@
 import AppKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
+    /// L'entrée « Récentes ▸ » et son sous-menu : masquée tant que l'historique
+    /// est vide, repeuplée à chaque ouverture (les récentes changent).
+    private var recentsItem: NSMenuItem?
+    private var recentsMenu: NSMenu?
     private let updateMenuItemTag = 777
     private let coordinator = CorrectionCoordinator()
     private let settingsController = SettingsWindowController()
@@ -78,6 +82,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                               action: #selector(freeActionFromMenu), keyEquivalent: "")
         free.target = self
         menu.addItem(free)
+
+        // Les consignes libres déjà lancées, à relancer d'un geste sur la
+        // sélection courante. Son contenu se reconstruit à l'ouverture.
+        let recentsMenu = NSMenu()
+        recentsMenu.autoenablesItems = false
+        recentsMenu.delegate = self
+        let recentsItem = NSMenuItem(title: loc("Récentes", en: "Recent"),
+                                     action: nil, keyEquivalent: "")
+        recentsItem.submenu = recentsMenu
+        menu.addItem(recentsItem)
+        self.recentsMenu = recentsMenu
+        self.recentsItem = recentsItem
+
         menu.addItem(.separator())
 
         let settings = NSMenuItem(title: loc("Réglages…", en: "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
@@ -87,9 +104,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
+        menu.delegate = self
         item.menu = menu
         statusItem = item
         statusMenu = menu
+    }
+
+    // MARK: - Historique (« Récentes »)
+
+    /// À l'ouverture du menu principal, « Récentes ▸ » n'apparaît que s'il y a
+    /// quelque chose à relancer. À l'ouverture du sous-menu lui-même, on le
+    /// repeuple : l'historique a pu changer depuis la dernière fois.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === statusMenu {
+            recentsItem?.isHidden = TransformHistory.shared.recents.entries.isEmpty
+        } else if menu === recentsMenu {
+            rebuildRecentsMenu(menu)
+        }
+    }
+
+    private func rebuildRecentsMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for entry in TransformHistory.shared.recents.entries {
+            let item = NSMenuItem(title: AppDelegate.recentTitle(entry.instruction),
+                                  action: #selector(recentFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = entry.instruction
+            item.toolTip = entry.instruction  // le libellé tronqué, en entier au survol
+            menu.addItem(item)
+        }
+        guard !menu.items.isEmpty else { return }
+        menu.addItem(.separator())
+        let clear = NSMenuItem(title: loc("Vider l'historique", en: "Clear history"),
+                               action: #selector(clearRecents), keyEquivalent: "")
+        clear.target = self
+        menu.addItem(clear)
+    }
+
+    /// La consigne pour une ligne de menu : sur une seule ligne, tronquée pour
+    /// ne pas étirer le menu.
+    private static func recentTitle(_ instruction: String) -> String {
+        let flat = instruction.replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        let limit = 48
+        guard flat.count > limit else { return flat }
+        return String(flat.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
+    @objc private func recentFromMenu(_ sender: NSMenuItem) {
+        guard let instruction = sender.representedObject as? String else { return }
+        afterMenuCloses { $0.triggerRecent(instruction: instruction) }
+    }
+
+    @objc private func clearRecents() {
+        TransformHistory.shared.clear()
     }
 
     private func updateMenuTitle(_ feed: UpdateChecker.Feed) -> String {
