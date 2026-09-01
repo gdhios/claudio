@@ -2,76 +2,42 @@ import XCTest
 import AppKit
 @testable import Claudio
 
-/// Le panneau ne se pose jamais sous le pointeur.
-///
-/// Sinon la ligne recouverte se croit survolée à la seconde où le panneau
-/// paraît : la sélection saute sur elle sans que la main ait bougé, et ⏎ lance
-/// autre chose que ce qui est mis en avant — près du bas de l'écran, la
-/// dernière ligne de la palette, l'action libre.
-final class PanelPlacementTests: XCTestCase {
+/// Le panneau s'ouvre toujours au centre de l'écran actif — jamais dans un
+/// coin ni débordant — et il y reste centré quand sa hauteur suit le contenu.
+final class PanelCenteringTests: XCTestCase {
     /// Un écran 1920×1080 avec sa barre de menus : ce que voit `visibleFrame`.
     private let visible = NSRect(x: 0, y: 52, width: 1920, height: 998)
-    /// La palette mesurée : neuf lignes au corps de texte normal.
-    private let palette = NSSize(width: 460, height: 563)
 
-    private func frame(pointer: NSPoint, size: NSSize) -> NSRect {
-        let side = ResultPanel.preferredSide(anchor: pointer, size: size, in: visible)
-        return ResultPanel.placement(anchor: pointer, size: size, in: visible, side: side)
+    func testLePanneauEstCentre() {
+        let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: visible)
+        XCTAssertEqual(placed.midX, visible.midX, accuracy: 0.01)
+        XCTAssertEqual(placed.midY, visible.midY, accuracy: 0.01)
     }
 
-    func testLePointeurNEstJamaisSurLaPalette() {
-        var y = visible.minY
-        while y <= visible.maxY {
-            var x = visible.minX
-            while x <= visible.maxX {
-                let pointer = NSPoint(x: x, y: y)
-                XCTAssertFalse(NSPointInRect(pointer, frame(pointer: pointer, size: palette)),
-                               "pointeur \(pointer) recouvert par la palette")
-                x += 10
-            }
-            y += 10
+    /// Chaque hauteur possible, du panneau d'accueil à la palette pleine, reste
+    /// centrée au même milieu : il grandit sans glisser.
+    func testLeMilieuNeBougePasQuandLaHauteurChange() {
+        for height in stride(from: 180.0, through: 900.0, by: 30.0) {
+            let placed = ResultPanel.centered(size: NSSize(width: 460, height: height), in: visible)
+            XCTAssertEqual(placed.midX, visible.midX, accuracy: 0.01, "hauteur \(height)")
+            XCTAssertEqual(placed.midY, visible.midY, accuracy: 0.01, "hauteur \(height)")
         }
     }
 
-    func testLaPaletteResteDansLEcran() {
-        for pointer in [NSPoint(x: 0, y: 52), NSPoint(x: 1920, y: 1050),
-                        NSPoint(x: 1900, y: 100), NSPoint(x: 20, y: 1000)] {
-            let placed = frame(pointer: pointer, size: palette)
-            XCTAssertTrue(visible.contains(placed), "cadre hors écran pour \(pointer)")
+    func testLePanneauResteDansLEcran() {
+        for height in [180.0, 300.0, 560.0, 900.0] {
+            let placed = ResultPanel.centered(size: NSSize(width: 460, height: height), in: visible)
+            XCTAssertTrue(visible.contains(placed), "cadre hors écran pour hauteur \(height)")
         }
     }
 
-    func testSousLePointeurQuandIlYALaPlace() {
-        let pointer = NSPoint(x: 400, y: 900)
-        let placed = frame(pointer: pointer, size: palette)
-        XCTAssertEqual(placed.maxY, pointer.y - 12, accuracy: 0.01)
-        XCTAssertEqual(placed.minX, pointer.x + 12, accuracy: 0.01)
-    }
-
-    func testAuDessusQuandLaPlaceManqueDessous() {
-        let pointer = NSPoint(x: 400, y: 200)
-        XCTAssertTrue(ResultPanel.preferredSide(anchor: pointer, size: palette, in: visible).above)
-        XCTAssertEqual(frame(pointer: pointer, size: palette).minY, pointer.y + 12, accuracy: 0.01)
-    }
-
-    /// Ni dessous ni dessus, et le bord droit ramènerait le panneau sur le
-    /// curseur : il passe à gauche.
-    func testAGaucheQuandIlNeTientNiDessousNiDessus() {
-        let pointer = NSPoint(x: 1500, y: 550)
-        let side = ResultPanel.preferredSide(anchor: pointer, size: palette, in: visible)
-        XCTAssertFalse(side.above)
-        XCTAssertTrue(side.left)
-        XCTAssertEqual(frame(pointer: pointer, size: palette).maxX, pointer.x - 12, accuracy: 0.01)
-    }
-
-    /// Un panneau court n'a jamais besoin de basculer : il tient sous le
-    /// pointeur partout, y compris pendant qu'un résultat s'écrit.
-    func testLePanneauCourtResteSousLePointeur() {
-        let court = NSSize(width: 460, height: 180)
-        for y in stride(from: 300.0, through: 1000.0, by: 50.0) {
-            let pointer = NSPoint(x: 700, y: y)
-            XCTAssertFalse(ResultPanel.preferredSide(anchor: pointer, size: court, in: visible).above)
-        }
+    /// Sur un second écran (origine décalée), le centre visé est bien celui de
+    /// cet écran-là, pas de l'écran principal.
+    func testCentreSurLEcranDonne() {
+        let autre = NSRect(x: 1920, y: 0, width: 1440, height: 900)
+        let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: autre)
+        XCTAssertEqual(placed.midX, autre.midX, accuracy: 0.01)
+        XCTAssertEqual(placed.midY, autre.midY, accuracy: 0.01)
     }
 }
 

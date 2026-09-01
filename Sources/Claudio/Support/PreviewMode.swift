@@ -140,8 +140,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         }
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
-        let screen = NSScreen.screens.first?.frame ?? .zero
-        panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 760))
+        panel.present()
     }
 
     /// Palette : le vrai panneau, arrêté sur la phase de choix.
@@ -160,8 +159,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
-        let screen = NSScreen.screens.first?.frame ?? .zero
-        panel.present(near: NSPoint(x: screen.minX + 480, y: screen.minY + 860))
+        panel.present()
     }
 
     /// Claudio dans la barre de menus, à sa taille réelle puis grossi, sur
