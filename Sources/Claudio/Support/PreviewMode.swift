@@ -17,6 +17,19 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
     init(mode: String) { self.mode = mode }
 
+    /// Texte d'exemple des aperçus : un courriel écrit vite, avec les fautes
+    /// qui vont avec. Il suit la langue de l'interface — une capture anglaise
+    /// dont la sélection est en français ne montrerait pas ce qu'elle annonce.
+    private var sampleText: String {
+        loc("Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance",
+            en: "Hi, i wanted to know if you could send me the document before tomorow morning. thanks in advance")
+    }
+
+    /// Consigne d'exemple pour les aperçus d'action libre.
+    private var sampleInstruction: String {
+        loc("Traduis en espagnol", en: "Translate to Spanish")
+    }
+
     /// Taille du texte de l'aperçu : `--size large`, sinon le réglage courant.
     private var textSize: PanelTextSize {
         guard let index = CommandLine.arguments.firstIndex(of: "--size"),
@@ -111,12 +124,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.phase = .noSelection
         case "panel-free":
             session = CorrectionSession(request: .awaitingInstruction)
-            session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+            session.originalText = sampleText
             session.phase = .askingInstruction
         case "panel-free-filled":
             session = CorrectionSession(request: .awaitingInstruction)
-            session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
-            session.instruction = "Traduis en espagnol"
+            session.originalText = sampleText
+            session.instruction = sampleInstruction
             session.phase = .askingInstruction
         default:  // "panel"
             session = CorrectionSession(action: .translateEN)
@@ -132,12 +145,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     /// Palette : le vrai panneau, arrêté sur la phase de choix.
     private func showPalettePreview() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
-        session.originalText = "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance"
+        session.originalText = sampleText
         switch mode {
         case "palette-filtre":
             session.paletteQuery = "trad"
         case "palette-libre":
-            session.paletteQuery = "Traduis en espagnol"
+            session.paletteQuery = sampleInstruction
         default:  // "palette"
             break
         }
