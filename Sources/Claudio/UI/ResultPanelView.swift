@@ -225,7 +225,9 @@ struct ResultPanelView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            ClaudioBadge()
+            // Claudio en personne, en haut de sa fenêtre. Son regard suit la
+            // phase : il écoute, il réfléchit, il a fini.
+            ClaudioMascot(gaze: .init(session.phase))
             Text("Claudio").font(.headline)
             // Pendant la palette, aucune action n'est choisie : la pastille
             // mentirait. La dépense du jour prend sa place.

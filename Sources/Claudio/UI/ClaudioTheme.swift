@@ -89,19 +89,6 @@ struct IconBadge: View {
     }
 }
 
-/// Variante Claudio : pastille au dégradé maison (le badge moustache du panneau).
-struct ClaudioBadge: View {
-    var size: CGFloat = 22
-
-    var body: some View {
-        Image(systemName: "mustache.fill")
-            .font(.system(size: size * 0.5, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(ClaudioTheme.gradient, in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
-    }
-}
-
 /// Badge « pill » façon Vibe Island : fond discret, texte compact.
 struct StatusPill<Content: View>: View {
     var background: Color = .white.opacity(0.08)

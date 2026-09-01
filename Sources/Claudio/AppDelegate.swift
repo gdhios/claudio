@@ -52,8 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "mustache.fill", accessibilityDescription: "Claudio")
+        // Claudio lui-même dans la barre de menus. Longueur variable : le
+        // buste est plus large que haut, un carré l'écraserait.
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.image = ClaudioMascot.menuBarImage()
+        item.button?.setAccessibilityLabel("Claudio")
 
         let menu = NSMenu()
 
