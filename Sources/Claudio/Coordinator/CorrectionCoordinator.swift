@@ -31,6 +31,13 @@ final class CorrectionCoordinator {
         trigger(.awaitingChoice, opensPalette: true)
     }
 
+    /// Consigne relancée depuis l'historique : même cycle qu'une action libre,
+    /// mais la consigne est déjà connue, donc pas d'escale de saisie — la
+    /// capture vise la sélection courante et le stream part aussitôt.
+    func triggerRecent(instruction: String) {
+        trigger(.free(instruction: instruction))
+    }
+
     func trigger(_ request: ClaudioRequest, opensPalette: Bool = false) {
         dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
 
@@ -161,6 +168,11 @@ final class CorrectionCoordinator {
             }
             guard !Task.isCancelled else { return }
             session.finishStreaming(with: result.text, truncated: result.truncated)
+            // Une action libre qui aboutit entre dans l'historique : sa consigne
+            // pourra être relancée d'un geste depuis la barre de menus.
+            if case .free(let instruction) = request.origin {
+                TransformHistory.shared.record(instruction)
+            }
             CostLedger.shared.record(model: request.model,
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)
