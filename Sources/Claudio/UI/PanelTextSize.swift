@@ -47,6 +47,13 @@ enum PanelTextSize: String, CaseIterable, Identifiable, Sendable {
         max((Constants.panelWidth * (1 + (scale - 1) * 0.7)).rounded(), Constants.panelWidth)
     }
 
+    /// Hauteur minimale de la zone de texte : le panneau s'ouvre à cette taille
+    /// d'accueil et une phrase courte s'y pose sans faire bouger la fenêtre.
+    /// Elle suit le corps du texte, sans jamais dépasser le plafond.
+    var minTextHeight: CGFloat {
+        min((Constants.panelMinTextHeight * scale).rounded(), maxTextHeight)
+    }
+
     /// Hauteur maximale de la zone de texte : elle suit aussi, mais plafonnée
     /// pour que le panneau reste un panneau. Au-delà, on défile.
     var maxTextHeight: CGFloat {

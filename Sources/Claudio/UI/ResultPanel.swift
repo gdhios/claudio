@@ -21,13 +21,10 @@ final class ResultPanel: NSPanel {
     /// navigation de la palette restent vrais pendant la frappe.
     private var keyMonitor: Any?
 
-    /// Le pointeur au moment du déclenchement : c'est lui qu'on évite de
-    /// recouvrir, à l'ouverture comme à chaque changement de hauteur.
-    private var anchor: NSPoint?
-    /// Côté retenu, décidé une seule fois à la première hauteur réelle : un
-    /// panneau qui basculerait d'un bord à l'autre en grandissant sauterait
-    /// sous les yeux.
-    private var side: (above: Bool, left: Bool)?
+    /// L'écran visible sur lequel le panneau s'est ouvert. Retenu à l'ouverture
+    /// pour que les changements de hauteur le gardent centré au même endroit,
+    /// sans le faire glisser d'un écran à l'autre pendant qu'un résultat s'écrit.
+    private var homeVisibleFrame: NSRect?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -86,79 +83,60 @@ final class ResultPanel: NSPanel {
         return panel
     }
 
-    /// Ajuste la hauteur de la fenêtre au contenu, du côté du pointeur retenu
-    /// à la première mesure : le panneau grandit vers le bas, ou vers le haut
-    /// s'il n'y avait pas la place dessous.
+    /// Ajuste la hauteur de la fenêtre au contenu en la gardant centrée sur son
+    /// écran : le panneau grandit et rétrécit autour de son milieu, sans jamais
+    /// sauter d'un bord à l'autre.
     func updateContentHeight(_ height: CGFloat) {
         // Borne haute : au plus grand corps de texte, la palette entière peut
         // dépasser un petit écran. Mieux vaut un panneau qui s'arrête au bord
         // qu'un panneau qui le franchit.
-        let visible = (screen ?? NSScreen.main)?.visibleFrame
+        let visible = homeVisibleFrame ?? (screen ?? NSScreen.main)?.visibleFrame
         let newHeight = min(max(height, 60), (visible?.height ?? .greatestFiniteMagnitude) - 16)
         guard abs(frame.height - newHeight) > 0.5 else { return }
         let size = NSSize(width: frame.width, height: newHeight)
 
-        // Sans écran ni ancre, le bord haut reste en place : c'est tout ce
-        // qu'on peut promettre.
-        guard let visible, let anchor else {
+        // Sans écran connu, on grandit autour du centre courant : le milieu du
+        // panneau ne bouge pas, faute de pouvoir viser celui de l'écran.
+        guard let visible else {
             var newFrame = frame
-            newFrame.origin.y += newFrame.height - newHeight
+            newFrame.origin.y += (newFrame.height - newHeight) / 2
             newFrame.size.height = newHeight
             setFrame(newFrame, display: true)
             return
         }
 
-        let side = self.side ?? ResultPanel.preferredSide(anchor: anchor, size: size, in: visible)
-        self.side = side
-        setFrame(ResultPanel.placement(anchor: anchor, size: size, in: visible, side: side),
-                 display: true)
+        setFrame(ResultPanel.centered(size: size, in: visible), display: true)
     }
 
-    /// De quel côté du pointeur poser un panneau de cette taille.
+    /// Cadre d'un panneau de cette taille centré dans l'écran visible, borné à
+    /// ses bords : un panneau trop haut s'arrête au bord plutôt que de le
+    /// franchir.
+    static func centered(size: NSSize, in visible: NSRect) -> NSRect {
+        let x = min(max(visible.midX - size.width / 2, visible.minX + 8),
+                    visible.maxX - size.width - 8)
+        let y = min(max(visible.midY - size.height / 2, visible.minY + 8),
+                    visible.maxY - size.height - 8)
+        return NSRect(origin: NSPoint(x: x, y: y), size: size)
+    }
+
+    /// Centre le panneau sur l'écran actif — celui qui porte le pointeur, donc
+    /// celui où la sélection vient d'être faite — et le montre en fondu, sans
+    /// NSApp.activate() (grâce à .nonactivatingPanel).
     ///
-    /// Dessous par défaut. S'il n'y tient pas, au-dessus. S'il ne tient nulle
-    /// part, il couvrira forcément la hauteur du pointeur : on le décale alors
-    /// à sa gauche — mais seulement s'il y a la place, sinon le recadrage sur
-    /// le bord droit le ramènerait précisément sous le curseur.
-    static func preferredSide(anchor: NSPoint, size: NSSize,
-                              in visible: NSRect) -> (above: Bool, left: Bool) {
-        let fitsBelow = anchor.y - size.height - 12 >= visible.minY + 8
-        let fitsAbove = anchor.y + 12 + size.height <= visible.maxY - 8
-        let left = !fitsBelow && !fitsAbove
-            && anchor.x + 12 > visible.maxX - size.width - 8
-            && anchor.x - 12 - size.width >= visible.minX + 8
-        return (above: !fitsBelow && fitsAbove, left: left)
-    }
-
-    /// Cadre d'un panneau de cette taille posé du côté retenu, contraint à
-    /// l'écran visible.
-    static func placement(anchor: NSPoint, size: NSSize, in visible: NSRect,
-                          side: (above: Bool, left: Bool)) -> NSRect {
-        var origin = NSPoint(x: side.left ? anchor.x - 12 - size.width : anchor.x + 12,
-                             y: side.above ? anchor.y + 12 : anchor.y - size.height - 12)
-        origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
-        origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
-        return NSRect(origin: origin, size: size)
-    }
-
-    /// Place le panneau près du pointeur, contraint à l'écran visible, et le
-    /// montre en fondu sans NSApp.activate() (grâce à .nonactivatingPanel).
-    ///
-    /// Le pointeur reste dehors : une ligne de palette posée sous le curseur
-    /// se croirait survolée avant que la main ait bougé, et ⏎ lancerait autre
-    /// chose que la ligne mise en avant.
-    func present(near location: NSPoint) {
-        let screen = NSScreen.screens.first { NSMouseInRect(location, $0.frame, false) } ?? NSScreen.main
+    /// Toujours au centre : fini le panneau collé dans un coin ou débordant de
+    /// l'écran selon l'endroit d'où l'on a lancé le raccourci.
+    func present() {
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
         guard let visible = screen?.visibleFrame else {
             center()
             fadeIn()
             return
         }
-        anchor = location
-        // Le côté se tranche à la première hauteur réelle : la vue SwiftUI
-        // n'est pas encore mesurée, celle d'ici n'est qu'un gabarit.
-        setFrameOrigin(ResultPanel.placement(anchor: location, size: frame.size, in: visible,
-                                             side: (above: false, left: false)).origin)
+        homeVisibleFrame = visible
+        // Gabarit d'abord : la vue SwiftUI n'est pas encore mesurée. La première
+        // hauteur réelle recentrera par updateContentHeight, au même milieu.
+        setFrame(ResultPanel.centered(size: frame.size, in: visible), display: false)
         fadeIn()
     }
 

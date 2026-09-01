@@ -267,7 +267,7 @@ final class CorrectionCoordinator {
             self?.launchPaletteRank(rank, withCommand: withCommand) ?? false
         }
         self.panel = panel
-        panel.present(near: NSEvent.mouseLocation)
+        panel.present()
     }
 
     func dismiss() {

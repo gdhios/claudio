@@ -317,7 +317,7 @@ struct ResultPanelView: View {
                         }
                     }
                 }
-                .frame(height: min(max(textHeight, 52), textSize.maxTextHeight))
+                .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
                 .onPreferenceChange(TextHeightKey.self) { height in
                     // La hauteur mesurée saute d'une ligne entière à la fois.
                     // L'interpoler ici plutôt que de la reporter telle quelle
