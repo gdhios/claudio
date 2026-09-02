@@ -41,6 +41,26 @@ final class PanelCenteringTests: XCTestCase {
     }
 }
 
+/// Pendant le streaming, le texte grandit d'un cran à la fois : la fenêtre suit
+/// ces petits pas à l'instant, image par image, et glisse d'un easeOut sur les
+/// seuls grands sauts (ouverture, bascule vers la palette ou une erreur). Sans
+/// ce partage, un easeOut sur chaque cran rendrait la croissance saccadée.
+final class PanelResizeAnimationTests: XCTestCase {
+    func testUnPetitPasSuitLeTexteSansSAnimer() {
+        XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 200, to: 200))
+        XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 200, to: 224),
+                       "une ligne de plus se suit à l'instant, pas en animation")
+        XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 300, to: 260))
+    }
+
+    func testUnGrandSautSAnime() {
+        XCTAssertTrue(ResultPanel.shouldAnimateResize(from: 200, to: 460),
+                      "l'ouverture d'un long résultat glisse au lieu de cogner")
+        XCTAssertTrue(ResultPanel.shouldAnimateResize(from: 480, to: 210),
+                      "le retour à une petite taille glisse aussi")
+    }
+}
+
 /// Le survol de la palette ne choisit qu'une fois la main en mouvement.
 @MainActor
 final class PaletteHoverTests: XCTestCase {
