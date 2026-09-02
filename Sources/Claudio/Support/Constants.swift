@@ -31,8 +31,9 @@ enum Constants {
     // Panneau : largeur fixe, hauteur adaptée au contenu (zone de texte bornée).
     static let panelWidth: CGFloat = 460
     // Zone de texte : un plancher assez haut pour que la plupart des phrases
-    // s'affichent sans faire grandir la fenêtre (≈ 5 lignes au corps normal), et
-    // un plafond au-delà duquel on défile plutôt que d'agrandir encore.
-    static let panelMinTextHeight: CGFloat = 96
+    // s'affichent sans faire grandir la fenêtre (≈ 8 lignes au corps normal), et
+    // un plafond au-delà duquel on défile plutôt que d'agrandir encore. Le
+    // plancher fixe aussi la taille d'accueil du panneau, volontairement posée.
+    static let panelMinTextHeight: CGFloat = 160
     static let panelMaxTextHeight: CGFloat = 380
 }

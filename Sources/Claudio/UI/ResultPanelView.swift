@@ -212,7 +212,12 @@ struct ResultPanelView: View {
             }
         }
         .onPreferenceChange(PanelHeightKey.self) { [onHeightChange] height in
-            Task { @MainActor in onHeightChange?(height) }
+            // Reporter la hauteur à la fenêtre dans la même passe que le layout,
+            // sans saut de tour de boucle : elle suit le texte image par image
+            // au lieu d'accuser une image de retard — c'est ce décalage qui
+            // rognait le bas puis le révélait, d'où les à-coups. Le report est
+            // synchrone ; c'est la fenêtre qui décide d'animer ou non le saut.
+            MainActor.assumeIsolated { onHeightChange?(height) }
         }
         .background(ClaudioTheme.panelBackground,
                     in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))

@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 /// Panneau flottant sans bordure qui reçoit le clavier (Entrée/Esc)
@@ -25,6 +26,11 @@ final class ResultPanel: NSPanel {
     /// pour que les changements de hauteur le gardent centré au même endroit,
     /// sans le faire glisser d'un écran à l'autre pendant qu'un résultat s'écrit.
     private var homeVisibleFrame: NSRect?
+
+    /// Faux tant que le panneau n'a pas pris sa première taille réelle : la
+    /// toute première mesure se pose net, sans glisser, pour une ouverture
+    /// franche plutôt qu'un dépliage.
+    private var hasSizedOnce = false
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -86,6 +92,10 @@ final class ResultPanel: NSPanel {
     /// Ajuste la hauteur de la fenêtre au contenu en la gardant centrée sur son
     /// écran : le panneau grandit et rétrécit autour de son milieu, sans jamais
     /// sauter d'un bord à l'autre.
+    ///
+    /// Un cran de streaming (petit pas) se pose à l'instant : la fenêtre suit le
+    /// texte image par image. Un saut d'état (ouverture, palette, erreur) glisse
+    /// d'un easeOut court, pour changer de taille sans cogner.
     func updateContentHeight(_ height: CGFloat) {
         // Borne haute : au plus grand corps de texte, la palette entière peut
         // dépasser un petit écran. Mieux vaut un panneau qui s'arrête au bord
@@ -93,19 +103,44 @@ final class ResultPanel: NSPanel {
         let visible = homeVisibleFrame ?? (screen ?? NSScreen.main)?.visibleFrame
         let newHeight = min(max(height, 60), (visible?.height ?? .greatestFiniteMagnitude) - 16)
         guard abs(frame.height - newHeight) > 0.5 else { return }
-        let size = NSSize(width: frame.width, height: newHeight)
 
-        // Sans écran connu, on grandit autour du centre courant : le milieu du
-        // panneau ne bouge pas, faute de pouvoir viser celui de l'écran.
-        guard let visible else {
+        let target: NSRect
+        if let visible {
+            target = ResultPanel.centered(size: NSSize(width: frame.width, height: newHeight), in: visible)
+        } else {
+            // Sans écran connu, on grandit autour du centre courant : le milieu
+            // du panneau ne bouge pas, faute de pouvoir viser celui de l'écran.
             var newFrame = frame
             newFrame.origin.y += (newFrame.height - newHeight) / 2
             newFrame.size.height = newHeight
-            setFrame(newFrame, display: true)
-            return
+            target = newFrame
         }
 
-        setFrame(ResultPanel.centered(size: size, in: visible), display: true)
+        // La première mesure (à l'ouverture) se pose net ; ensuite, seuls les
+        // sauts d'état glissent — le streaming, lui, se suit image par image.
+        let glide = hasSizedOnce && ResultPanel.shouldAnimateResize(from: frame.height, to: newHeight)
+        hasSizedOnce = true
+
+        guard glide else {
+            setFrame(target, display: true)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().setFrame(target, display: true)
+        }
+    }
+
+    /// Au-delà de ce saut de hauteur, la fenêtre ne suit plus le texte qui
+    /// s'écrit mais change d'état (ouverture, palette, erreur) : mieux vaut alors
+    /// glisser que sauter.
+    private static let abruptResizeThreshold: CGFloat = 120
+
+    /// Vrai si le changement de hauteur est un saut d'état plutôt qu'un cran de
+    /// streaming. Pur et statique : la décision se teste sans fenêtre.
+    static func shouldAnimateResize(from old: CGFloat, to new: CGFloat) -> Bool {
+        abs(new - old) > abruptResizeThreshold
     }
 
     /// Cadre d'un panneau de cette taille centré dans l'écran visible, borné à
@@ -134,6 +169,7 @@ final class ResultPanel: NSPanel {
             return
         }
         homeVisibleFrame = visible
+        hasSizedOnce = false
         // Gabarit d'abord : la vue SwiftUI n'est pas encore mesurée. La première
         // hauteur réelle recentrera par updateContentHeight, au même milieu.
         setFrame(ResultPanel.centered(size: frame.size, in: visible), display: false)
