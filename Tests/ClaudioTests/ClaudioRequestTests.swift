@@ -85,4 +85,15 @@ final class ClaudioRequestTests: XCTestCase {
         XCTAssertEqual(waiting.origin, .free(instruction: ""))
         XCTAssertEqual(waiting.panelTitle, ClaudioRequest.free(instruction: "peu importe").panelTitle)
     }
+
+    /// La palette est un garnissage distinct : sans sélection, son panneau ne
+    /// doit pas s'intituler « Action libre » (elle n'a pas encore d'action), mais
+    /// porter son propre titre.
+    func testLaPaletteEnAttenteNePasSeFaisantPasserPourUneActionLibre() {
+        let palette = ClaudioRequest.awaitingChoice
+        let libre = ClaudioRequest.awaitingInstruction
+        XCTAssertNotEqual(palette.panelTitle, libre.panelTitle,
+                          "la palette sans sélection ne doit pas s'intituler « Action libre »")
+        XCTAssertFalse(palette.panelTitle.isEmpty)
+    }
 }
