@@ -12,6 +12,12 @@ enum Constants {
     // Moteur local : Ollama sur la machine. L'URL est éditable dans les
     // Réglages pour viser un autre Mac du réseau local.
     static let ollamaDefaultURL = URL(string: "http://localhost:11434")!
+    /// Le modèle reste chargé entre deux actions : sans cela Ollama le décharge
+    /// au bout de cinq minutes et l'action suivante paie un rechargement.
+    static let ollamaKeepAlive = "1h"
+    /// Fenêtre de contexte demandée à chaque requête. Fixe exprès : Ollama
+    /// recharge le modèle dès qu'elle change d'une requête à l'autre.
+    static let ollamaContextLength = 8192
 
     static let keychainService = "com.guillaumedhios.claudio"
     static let keychainAccount = "anthropic-api-key"

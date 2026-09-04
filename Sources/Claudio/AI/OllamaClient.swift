@@ -70,12 +70,19 @@ struct OllamaClient: TextStreamClient {
     /// Corps du POST /api/chat. Le budget de sortie s'appelle `num_predict` et
     /// vit sous `options` : posé ailleurs, il est ignoré en silence et la
     /// réponse part sans limite.
+    /// `think: false` coupe la réflexion des modèles hybrides (qwen3.5, qwen3…) :
+    /// laissée allumée, elle dévore tout `num_predict` et la réponse n'arrive
+    /// jamais. Un modèle sans mode réflexion ignore le champ sans broncher, on
+    /// l'envoie donc toujours. `keep_alive` et `num_ctx` sont posés ici pour
+    /// que l'app ne dépende pas de la configuration du serveur.
     static func makeBody(
         text: String, system: String, model: String, maxTokens: Int
     ) -> [String: Any] {
         [
             "model": model,
             "stream": true,
+            "think": false,
+            "keep_alive": Constants.ollamaKeepAlive,
             "messages": [
                 ["role": "system", "content": system],
                 ["role": "user", "content": text]
@@ -84,9 +91,21 @@ struct OllamaClient: TextStreamClient {
             // on l'envoie toujours.
             "options": [
                 "num_predict": maxTokens,
-                "temperature": Constants.temperature
+                "temperature": Constants.temperature,
+                "num_ctx": contextLength(text: text, system: system, maxTokens: maxTokens)
             ] as [String: Any]
         ]
+    }
+
+    /// Fenêtre de contexte demandée. Fixe exprès : Ollama recharge le modèle
+    /// dès qu'elle change d'une requête à l'autre, deux secondes perdues. Elle
+    /// ne grandit, par paliers de 4096, que pour une entrée qui n'y tiendrait
+    /// pas avec son budget de sortie — sinon Ollama tronque l'entrée en silence.
+    static func contextLength(text: String, system: String, maxTokens: Int) -> Int {
+        let approxInputTokens = (text.count + system.count) / 4
+        let needed = approxInputTokens + maxTokens + 256
+        guard needed > Constants.ollamaContextLength else { return Constants.ollamaContextLength }
+        return (needed + 4095) / 4096 * 4096
     }
 
     // MARK: - Modèles installés
