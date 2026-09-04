@@ -140,10 +140,10 @@ private struct GeneralPane: View {
             }
 
             Section(loc("Modèle", en: "Model")) {
-                LabeledContent(loc("Moteur", en: "Engine"),
+                LabeledContent(loc("Modèle", en: "Model"),
                                value: loc("réglable par action", en: "set per action"))
-                Text(loc("Le moteur se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
-                         en: "The engine is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
+                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
+                         en: "The model is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -417,8 +417,8 @@ private struct PromptsPane: View {
                 }
             }
 
-            Section(loc("Moteur", en: "Engine")) {
-                Picker(loc("Moteur de cette action", en: "Engine for this action"), selection: $selectedModel) {
+            Section(loc("Modèle", en: "Model")) {
+                Picker(loc("Modèle de cette action", en: "Model for this action"), selection: $selectedModel) {
                     Section("Claude") {
                         ForEach(ClaudioModel.allCases, id: \.self) { model in
                             Text(model.displayName).tag(ModelChoice.claude(model))
@@ -433,7 +433,7 @@ private struct PromptsPane: View {
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Moteur par défaut pour cette action.", en: "Default engine for this action.") : loc("Moteur personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom engine; the default is \(selectedAction.defaultModel.displayName)."))")
+                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if offeredLocalModels.isEmpty {
