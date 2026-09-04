@@ -45,6 +45,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show()
         } else if mode == "settings-prompts" {
             settingsController.show(initialSection: .prompts)
+        } else if mode == "settings-ollama" {
+            settingsController.show(initialSection: .ollama)
         } else if mode == "settings-shortcuts" {
             settingsController.show(initialSection: .shortcuts)
         } else if mode == "settings-about" {

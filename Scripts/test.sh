@@ -68,8 +68,9 @@ preview_shot() {
 }
 
 # Les écrans par lesquels tout passe : panneau (résultat, flux, erreur,
-# consigne libre), palette (nue et filtrée), Réglages (clé API, raccourcis).
-for mode in panel panel-streaming panel-error panel-free palette palette-filtre settings settings-shortcuts; do
+# consigne libre), palette (nue et filtrée), Réglages (clé API, moteur par
+# action, serveur local, raccourcis).
+for mode in panel panel-streaming panel-error panel-free palette palette-filtre settings settings-prompts settings-ollama settings-shortcuts; do
     preview_shot "$mode"
 done
 echo "✅ Les écrans critiques se construisent et se rendent ($SHOTS/)."

@@ -89,7 +89,7 @@ Le travail lui-même doit être commité avant : le script ne publie que le chan
 - **Icône** : `icon/AppIcon.icns`, embarquée par `build_app.sh`. Les sources de l'icône ne sont pas versionnées (`Scripts/make_icon.sh` sert à la régénérer en local).
 - **Mises à jour** : vérification automatique une fois par jour (simple lecture de `version.json` sur claudio.okonoma.com, aucune donnée envoyée) + bouton « Vérifier maintenant » dans Réglages → À propos. Une mise à jour disponible apparaît en tête du menu de la barre.
 - **Troncature** : si la réponse atteint `max_tokens`, badge « Réponse tronquée » + bouton « Réessayer + » avec budget doublé.
-- **Aperçus UI sans réseau** : `.build/release/Claudio --preview <mode> [--shot fichier.png]`, avec mode ∈ `panel`, `panel-streaming`, `panel-long`, `panel-error`, `panel-noselection`, `panel-free`, `panel-free-filled`, `palette`, `palette-filtre`, `palette-libre`, `settings`, `settings-prompts`, `settings-shortcuts`, `settings-about`. `--size small|normal|large|extraLarge` force la taille du texte du panneau. Aucun raccourci global ni item de barre de menus n'est installé, aucune clé n'est requise.
+- **Aperçus UI sans réseau** : `.build/release/Claudio --preview <mode> [--shot fichier.png]`, avec mode ∈ `panel`, `panel-streaming`, `panel-long`, `panel-error`, `panel-noselection`, `panel-free`, `panel-free-filled`, `palette`, `palette-filtre`, `palette-libre`, `settings`, `settings-prompts`, `settings-ollama`, `settings-shortcuts`, `settings-about`. `--size small|normal|large|extraLarge` force la taille du texte du panneau. Aucun raccourci global ni item de barre de menus n'est installé, aucune clé n'est requise.
 - **Test CLI sans UI** :
 
 ```bash
