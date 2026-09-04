@@ -405,9 +405,28 @@ struct ResultPanelView: View {
         .padding(.vertical, 26)
     }
 
+    /// Le modèle qui a traité la sélection, discret en bas à gauche : il rend
+    /// vérifiable d'un coup d'œil ce qui a répondu, Claude ou un modèle local.
+    /// Rien à montrer tant que la requête n'est qu'un garnissage de palette,
+    /// ou qu'aucun appel n'est parti.
+    private var showsModelName: Bool {
+        switch session.phase {
+        case .askingInstruction, .streaming, .done, .error: return true
+        case .capturing, .choosingAction, .noSelection, .missingKey: return false
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 8) {
             Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
+            if showsModelName {
+                // Ni le séparateur ni le nom du modèle ne se traduisent.
+                Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
+                Text(session.request.model.shortName)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
             Spacer()
             switch session.phase {
             case .askingInstruction:
