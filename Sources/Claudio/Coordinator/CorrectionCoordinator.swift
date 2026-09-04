@@ -148,16 +148,25 @@ final class CorrectionCoordinator {
     }
 
     private func stream(session: CorrectionSession) async {
-        guard let apiKey = KeychainStore.currentAPIKey() else {
-            session.phase = .missingKey
-            return
+        let request = session.request
+
+        // Le moteur de l'action décide du client. La clé API ne manque qu'à
+        // Claude : une action réglée en local marche sans clé.
+        let client: TextStreamClient
+        switch request.model {
+        case .claude(let model):
+            guard let apiKey = KeychainStore.currentAPIKey() else {
+                session.phase = .missingKey
+                return
+            }
+            client = AnthropicClient(apiKey: apiKey,
+                                     workspaceID: AppSettings.currentWorkspaceID(),
+                                     model: model)
+        case .ollama(let name):
+            client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
         }
         session.beginStreaming()
 
-        let request = session.request
-        let client = AnthropicClient(apiKey: apiKey,
-                                     workspaceID: AppSettings.currentWorkspaceID(),
-                                     model: request.model)
         do {
             let result = try await client.streamCompletion(
                 of: request.userMessage(forText: session.originalText),

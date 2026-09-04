@@ -84,23 +84,52 @@ enum AppSettings {
         }
     }
 
+    // MARK: - Serveur Ollama
+
+    private static let ollamaBaseURLKey = "ollamaBaseURL"
+
+    /// Adresse du serveur Ollama. La machine elle-même par défaut, éditable
+    /// pour viser un autre Mac du réseau local. Une valeur vide ou illisible
+    /// retombe sur le défaut plutôt que de casser toutes les actions locales.
+    static var ollamaBaseURL: URL {
+        get {
+            UserDefaults.standard.string(forKey: ollamaBaseURLKey)
+                .flatMap(normalizedOllamaURL) ?? Constants.ollamaDefaultURL
+        }
+        set { UserDefaults.standard.set(newValue.absoluteString, forKey: ollamaBaseURLKey) }
+    }
+
+    /// Une adresse n'est utilisable qu'avec un schéma http(s) et un hôte.
+    /// Le schéma est sous-entendu : « 192.168.1.20:11434 » saisi tel quel se
+    /// lirait sinon comme un chemin, sans hôte.
+    static func normalizedOllamaURL(_ text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let candidate = trimmed.contains("://") ? trimmed : "http://\(trimmed)"
+        guard let url = URL(string: candidate),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
     // MARK: - Modèles par action
 
     private static func modelKey(for action: ClaudioAction) -> String {
         "model.\(action.rawValue)"
     }
 
-    /// Modèle personnalisé de l'action (nil = défaut du code).
-    static func customModel(for action: ClaudioAction) -> ClaudioModel? {
+    /// Moteur personnalisé de l'action (nil = défaut du code). Les réglages
+    /// écrits avant Ollama ne portaient pas de préfixe : `ModelChoice` les relit.
+    static func customModel(for action: ClaudioAction) -> ModelChoice? {
         UserDefaults.standard.string(forKey: modelKey(for: action))
-            .flatMap(ClaudioModel.init(rawValue:))
+            .flatMap(ModelChoice.init(storageValue:))
     }
 
     /// nil ou identique au défaut → retour au défaut (suit les mises à jour de l'app).
-    static func setCustomModel(_ model: ClaudioModel?, for action: ClaudioAction) {
+    static func setCustomModel(_ choice: ModelChoice?, for action: ClaudioAction) {
         let key = modelKey(for: action)
-        if let model, model != action.defaultModel {
-            UserDefaults.standard.set(model.rawValue, forKey: key)
+        if let choice, choice != .claude(action.defaultModel) {
+            UserDefaults.standard.set(choice.storageValue, forKey: key)
         } else {
             UserDefaults.standard.removeObject(forKey: key)
         }

@@ -80,6 +80,6 @@ extension ClaudioAction {
         }
     }
 
-    /// Modèle effectif : personnalisé (Réglages) sinon défaut.
-    var model: ClaudioModel { AppSettings.customModel(for: self) ?? defaultModel }
+    /// Moteur effectif : personnalisé (Réglages) sinon le défaut Claude.
+    var model: ModelChoice { AppSettings.customModel(for: self) ?? .claude(defaultModel) }
 }

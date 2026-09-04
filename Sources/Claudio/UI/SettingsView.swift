@@ -274,7 +274,7 @@ private struct ShortcutsPane: View {
 private struct PromptsPane: View {
     @State private var selectedAction: ClaudioAction = .correct
     @State private var promptText: String = ClaudioAction.correct.system
-    @State private var selectedModel: ClaudioModel = ClaudioAction.correct.model
+    @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
 
@@ -295,13 +295,13 @@ private struct PromptsPane: View {
             Section(loc("Modèle", en: "Model")) {
                 Picker(loc("Modèle Claude", en: "Claude model"), selection: $selectedModel) {
                     ForEach(ClaudioModel.allCases, id: \.self) { model in
-                        Text(model.displayName).tag(model)
+                        Text(model.displayName).tag(ModelChoice.claude(model))
                     }
                 }
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text("\(selectedModel.costHint). \(selectedModel == selectedAction.defaultModel ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
+                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -29,7 +29,7 @@ struct ClaudioRequest: Sendable {
     let panelTitle: String
     let progressLabel: String
     let system: String
-    let model: ClaudioModel
+    let model: ModelChoice
     let budget: Budget
     /// `false` pour la seule correction : elle envoie le texte nu.
     let wrapsSource: Bool
@@ -96,7 +96,7 @@ extension ClaudioRequest {
     /// et mise en forme préservées) pour que le résultat reste collable tel quel.
     /// `panelTitle` n'est surchargé que pour le garnissage de la palette.
     static func free(instruction: String,
-                     model: ClaudioModel = .haiku45,
+                     model: ModelChoice = .claude(.haiku45),
                      panelTitle: String = loc("Action libre", en: "Custom action")) -> ClaudioRequest {
         let task = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         let system = """

@@ -77,7 +77,10 @@ final class CostLedger: ObservableObject {
 
     /// Enregistre un appel terminé. Une annulation ou une erreur n'annonce
     /// aucun jeton : on ne compte alors rien plutôt que d'estimer.
-    func record(model: ClaudioModel, inputTokens: Int, outputTokens: Int, at date: Date = Date()) {
+    /// Un appel local ne coûte rien et n'est donc pas une dépense : il ne
+    /// gonfle ni le montant, ni le nombre d'actions facturées.
+    func record(model: ModelChoice, inputTokens: Int, outputTokens: Int, at date: Date = Date()) {
+        guard !model.isLocal else { return }
         guard AppSettings.costCounterEnabled else { return }
         guard inputTokens > 0 || outputTokens > 0 else { return }
         let dollars = model.cost(inputTokens: inputTokens, outputTokens: outputTokens)

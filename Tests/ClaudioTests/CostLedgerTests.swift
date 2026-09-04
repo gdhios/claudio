@@ -106,4 +106,25 @@ final class CostLedgerTests: XCTestCase {
         XCTAssertEqual(ledger.day.total, 0)
         XCTAssertEqual(ledger.day.actions, 0)
     }
+
+    /// Un appel Claude est une dépense ; un appel local n'en est pas une, et
+    /// ne doit gonfler ni le montant ni le nombre d'actions facturées.
+    @MainActor
+    func testSeulsLesAppelsClaudeEntrentDansLaDepense() {
+        let previous = AppSettings.costCounterEnabled
+        AppSettings.costCounterEnabled = true
+        defer { AppSettings.costCounterEnabled = previous }
+
+        let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
+        let ledger = CostLedger(defaults: defaults, now: midi)
+
+        ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: midi)
+        XCTAssertEqual(ledger.day.actions, 1)
+        XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
+
+        ledger.record(model: .ollama(model: "qwen2.5:14b"),
+                      inputTokens: 5_000, outputTokens: 5_000, at: midi)
+        XCTAssertEqual(ledger.day.actions, 1, "un appel local n'est pas une dépense")
+        XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
+    }
 }
