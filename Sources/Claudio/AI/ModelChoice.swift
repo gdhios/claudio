@@ -4,7 +4,7 @@ import Foundation
 /// ou un modèle local servi par Ollama, gratuit et sans réseau sortant.
 /// Distinct de `ClaudioModel`, qui reste le catalogue Claude (ID d'API, tarifs,
 /// température) : ce type-ci ne fait que dire lequel des deux mondes répond.
-enum ModelChoice: Sendable, Equatable {
+enum ModelChoice: Sendable, Hashable {
     case claude(ClaudioModel)
     /// Nom du modèle tel qu'Ollama le connaît, ex. « qwen2.5:14b ».
     case ollama(model: String)

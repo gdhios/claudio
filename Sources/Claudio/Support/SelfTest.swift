@@ -15,22 +15,30 @@ enum SelfTest {
             ? ClaudioRequest.free(instruction: extras[1])
             : ClaudioAction.correct.request
 
-        guard let apiKey = KeychainStore.currentAPIKey() else {
-            print("❌ Aucune clé API : exporte \(Constants.apiKeyEnvVar) ou enregistre une clé dans les Réglages.")
-            exit(1)
+        // Le moteur de l'action décide du client, comme dans l'app. Une action
+        // réglée en local se teste sans clé API.
+        let client: TextStreamClient
+        switch request.model {
+        case .claude(let model):
+            guard let apiKey = KeychainStore.currentAPIKey() else {
+                print("❌ Aucune clé API : exporte \(Constants.apiKeyEnvVar) ou enregistre une clé dans les Réglages.")
+                exit(1)
+            }
+            client = AnthropicClient(apiKey: apiKey,
+                                     workspaceID: AppSettings.currentWorkspaceID(),
+                                     model: model)
+        case .ollama(let name):
+            client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
         }
 
         print("→ Action : \(request.panelTitle)")
-        print("→ Modèle : \(request.model.rawValue)")
+        print("→ Modèle : \(request.model.displayName)")
         print("→ Texte  : \(sample)")
         print("---")
 
         // Semaphore + Task.detached : le travail reste hors du main thread
         // (bloqué par wait()), aucun saut vers le MainActor dans ce chemin.
         let semaphore = DispatchSemaphore(value: 0)
-        let client = AnthropicClient(apiKey: apiKey,
-                                     workspaceID: AppSettings.currentWorkspaceID(),
-                                     model: request.model)
         Task.detached {
             do {
                 let result = try await client.streamCompletion(

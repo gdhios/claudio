@@ -145,6 +145,23 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertTrue(absent.contains("ollama pull"), absent)
     }
 
+    // MARK: - Adresse du serveur
+
+    /// L'adresse se saisit à la main dans les Réglages : elle doit tolérer la
+    /// forme courte, et refuser ce qui n'est pas joignable plutôt que de casser
+    /// toutes les actions locales.
+    func testLAdresseDuServeurTolereLaFormeCourte() {
+        XCTAssertEqual(AppSettings.normalizedOllamaURL("192.168.1.20:11434")?.absoluteString,
+                       "http://192.168.1.20:11434")
+        XCTAssertEqual(AppSettings.normalizedOllamaURL("  http://localhost:11434  ")?.absoluteString,
+                       "http://localhost:11434")
+        XCTAssertEqual(AppSettings.normalizedOllamaURL("https://mac-atelier.local:11434")?.absoluteString,
+                       "https://mac-atelier.local:11434")
+        XCTAssertNil(AppSettings.normalizedOllamaURL(""))
+        XCTAssertNil(AppSettings.normalizedOllamaURL("   "))
+        XCTAssertNil(AppSettings.normalizedOllamaURL("ftp://ailleurs:21"))
+    }
+
     func testLeMessageDErreurHTTPVientDuChampError() {
         XCTAssertEqual(
             OllamaClient.apiErrorMessage(from: Data(#"{"error":"model 'x' not found"}"#.utf8)),
