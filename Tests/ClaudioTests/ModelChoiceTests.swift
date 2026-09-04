@@ -61,6 +61,36 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertEqual(ModelChoice(storageValue: "claude-opus-5"), .claude(.opus5))
     }
 
+    // MARK: - Réglage d'une action
+
+    /// Le chemin réel des réglages, clé de stockage comprise : un réglage écrit
+    /// avant Ollama doit encore se charger, un moteur local doit se relire, et
+    /// revenir au défaut doit retirer la clé pour suivre les mises à jour.
+    func testLeReglageDUneActionSeRelitEtTolereLHerite() {
+        let key = "model.\(ClaudioAction.correct.rawValue)"
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: key)
+        defer {
+            if let previous { defaults.set(previous, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+
+        // Cas hérité : la valeur nue que stockaient les versions d'avant Ollama.
+        defaults.set("claude-sonnet-5", forKey: key)
+        XCTAssertEqual(AppSettings.customModel(for: .correct), .claude(.sonnet5))
+        XCTAssertEqual(ClaudioAction.correct.model, .claude(.sonnet5))
+
+        // Aller-retour d'un moteur local.
+        AppSettings.setCustomModel(.ollama(model: "qwen2.5:14b"), for: .correct)
+        XCTAssertEqual(defaults.string(forKey: key), "ollama:qwen2.5:14b")
+        XCTAssertEqual(ClaudioAction.correct.model, .ollama(model: "qwen2.5:14b"))
+
+        // Le défaut ne se stocke pas : l'action suit les mises à jour de l'app.
+        AppSettings.setCustomModel(.claude(ClaudioAction.correct.defaultModel), for: .correct)
+        XCTAssertNil(defaults.string(forKey: key))
+        XCTAssertEqual(ClaudioAction.correct.model, .claude(ClaudioAction.correct.defaultModel))
+    }
+
     /// Une valeur qu'on ne sait pas lire (réglage écrit par une version future,
     /// stock corrompu) rend nil : l'action repart alors sur son défaut.
     func testUneValeurIllisibleNeDonneAucunChoix() {
