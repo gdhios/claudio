@@ -9,6 +9,13 @@ import SwiftUI
 /// Affiche l'élément à une position fixe et
 /// imprime la région à capturer (top-left, pour `screencapture -R`).
 /// Aucun raccourci global ni item de barre de menus n'est installé.
+/// Vrai quand l'app tourne en aperçu (`--preview`). Une vue s'en sert pour ne
+/// rien demander au réseau : un aperçu doit rendre le même écran sur toutes les
+/// machines, y compris sur un runner de CI où rien n'écoute (TESTING.md, niveau 2).
+enum PreviewRun {
+    static let isActive = CommandLine.arguments.contains("--preview")
+}
+
 @MainActor
 final class PreviewDelegate: NSObject, NSApplicationDelegate {
     private let mode: String

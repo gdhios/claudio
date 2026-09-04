@@ -284,7 +284,17 @@ private struct OllamaPane: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { Task { await test() } }
+        .onAppear {
+            if PreviewRun.isActive { showFixedState() } else { Task { await test() } }
+        }
+    }
+
+    /// Aperçu : l'écran peuplé, sans appeler le serveur.
+    private func showFixedState() {
+        models = ["qwen2.5:14b", "llama3.2:3b"]
+        failed = false
+        report = loc("Connexion OK — \(models.count) modèles détectés.",
+                     en: "Connected — \(models.count) models found.")
     }
 
     /// Une adresse illisible n'écrase pas celle qui marchait : le champ revient
@@ -468,6 +478,10 @@ private struct PromptsPane: View {
         }
         .formStyle(.grouped)
         .onAppear {
+            guard !PreviewRun.isActive else {
+                localModels = ["qwen2.5:14b", "llama3.2:3b"]
+                return
+            }
             Task {
                 // La découverte ne dépend pas d'un modèle : n'importe lequel
                 // ferait l'affaire, il s'agit seulement de peupler le menu.

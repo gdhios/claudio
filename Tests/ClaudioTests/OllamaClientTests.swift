@@ -113,6 +113,38 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: body))
     }
 
+    /// Les modèles hybrides (qwen3.5, qwen3…) réfléchissent avant de répondre
+    /// si on ne le leur interdit pas : la réflexion dévore tout `num_predict`
+    /// et la réponse n'arrive jamais. Le corps la coupe toujours — un modèle
+    /// sans mode réflexion ignore le champ sans broncher — et pose lui-même
+    /// ce qui garde le modèle chaud, pour ne pas dépendre du serveur.
+    func testLeCorpsCoupeLaReflexionEtGardeLeModeleChaud() {
+        let body = OllamaClient.makeBody(text: "Bonjour", system: "Corrige.",
+                                         model: "qwen3.5:4b", maxTokens: 512)
+        XCTAssertEqual(body["think"] as? Bool, false)
+        XCTAssertEqual(body["keep_alive"] as? String, Constants.ollamaKeepAlive)
+        let options = body["options"] as? [String: Any]
+        XCTAssertEqual(options?["num_ctx"] as? Int, Constants.ollamaContextLength)
+        XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: body))
+    }
+
+    /// La fenêtre de contexte est fixe : la changer d'une requête à l'autre
+    /// force Ollama à recharger le modèle. Elle ne grandit, par paliers, que
+    /// pour une entrée qui n'y tiendrait pas — sinon Ollama tronque l'entrée
+    /// en silence et l'action travaille sur un texte amputé.
+    func testLaFenetreDeContexteNeGranditQuePourLesTextesLongs() {
+        XCTAssertEqual(OllamaClient.contextLength(text: "Bonjour", system: "Corrige.", maxTokens: 512),
+                       Constants.ollamaContextLength)
+
+        let long = String(repeating: "a", count: 40_000)  // ~10 000 jetons
+        let fenetre = OllamaClient.contextLength(text: long, system: "Corrige.", maxTokens: 8192)
+        XCTAssertGreaterThanOrEqual(fenetre, 10_000 + 8192)
+        XCTAssertEqual(fenetre % 4096, 0, "des paliers, pas une valeur par texte")
+        let options = OllamaClient.makeBody(text: long, system: "Corrige.",
+                                            model: "qwen3.5:4b", maxTokens: 8192)["options"] as? [String: Any]
+        XCTAssertEqual(options?["num_ctx"] as? Int, fenetre)
+    }
+
     // MARK: - Modèles installés
 
     func testLaListeDesModelesLitLesNoms() throws {
