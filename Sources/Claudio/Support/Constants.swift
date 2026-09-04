@@ -9,6 +9,10 @@ enum Constants {
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
     static let anthropicVersion = "2023-06-01"
 
+    // Moteur local : Ollama sur la machine. L'URL est éditable dans les
+    // Réglages pour viser un autre Mac du réseau local.
+    static let ollamaDefaultURL = URL(string: "http://localhost:11434")!
+
     static let keychainService = "com.guillaumedhios.claudio"
     static let keychainAccount = "anthropic-api-key"
     static let apiKeyEnvVar = "ANTHROPIC_API_KEY"
