@@ -6,6 +6,7 @@ import KeyboardShortcuts
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
+    case ollama
     case shortcuts
     case prompts
     case about
@@ -16,6 +17,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: loc("Général", en: "General")
         case .apiKey: loc("Clé API", en: "API key")
+        case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
@@ -26,6 +28,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .apiKey: "key.fill"
+        case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .prompts: "text.quote"
         case .about: "info"
@@ -36,6 +39,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: .gray
         case .apiKey: ClaudioTheme.accent
+        case .ollama: .green
         case .shortcuts: .indigo
         case .prompts: .orange
         case .about: .blue
@@ -66,6 +70,7 @@ struct SettingsView: View {
             switch selection ?? .general {
             case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
+            case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
             case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
             case .about: AboutPane().navigationTitle(SettingsSection.about.title)
@@ -135,10 +140,10 @@ private struct GeneralPane: View {
             }
 
             Section(loc("Modèle", en: "Model")) {
-                LabeledContent(loc("Modèle Claude", en: "Claude model"),
+                LabeledContent(loc("Moteur", en: "Engine"),
                                value: loc("réglable par action", en: "set per action"))
-                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")).",
-                         en: "The model is chosen per action in the Prompts tab. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", "))."))
+                Text(loc("Le moteur se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
+                         en: "The engine is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -226,6 +231,105 @@ private struct APIKeyPane: View {
     }
 }
 
+// MARK: - Local (Ollama)
+
+@MainActor
+private struct OllamaPane: View {
+    @State private var addressField = AppSettings.ollamaBaseURL.absoluteString
+    @State private var testing = false
+    @State private var models: [String] = []
+    /// Résultat du dernier test : le message et s'il annonce un échec.
+    @State private var report: String?
+    @State private var failed = false
+
+    var body: some View {
+        Form {
+            Section(loc("Serveur", en: "Server")) {
+                TextField(loc("Adresse", en: "Address"), text: $addressField,
+                          prompt: Text(Constants.ollamaDefaultURL.absoluteString))
+                    .onSubmit { save() }
+                HStack {
+                    Button(loc("Tester la connexion", en: "Test connection")) {
+                        Task { await test() }
+                    }
+                    .disabled(testing)
+                    if testing { ProgressView().controlSize(.small) }
+                }
+                if let report {
+                    Label(report, systemImage: failed ? "exclamationmark.triangle" : "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(failed ? .orange : .secondary)
+                }
+                Text(loc("Ollama tourne sur ta machine, ou sur un autre Mac du réseau local. Rien n'est envoyé ailleurs qu'à cette adresse, et un appel local ne coûte rien. Sans authentification : Ollama n'en propose pas.",
+                         en: "Ollama runs on this Mac, or on another Mac on your local network. Nothing is sent anywhere but this address, and a local call costs nothing. No authentication: Ollama doesn't offer any."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(loc("Modèles détectés", en: "Models found")) {
+                if models.isEmpty {
+                    Text(loc("Aucun modèle détecté. Teste la connexion, et tire un modèle avec « ollama pull qwen2.5:14b ».",
+                             en: "No model found. Test the connection, then pull one with “ollama pull qwen2.5:14b”."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(models, id: \.self) { model in
+                        Text(model).monospaced()
+                    }
+                    Text(loc("Ces modèles se choisissent action par action dans l'onglet Prompts.",
+                             en: "Pick one of these per action in the Prompts tab."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { Task { await test() } }
+    }
+
+    /// Une adresse illisible n'écrase pas celle qui marchait : le champ revient
+    /// à la valeur retenue.
+    @discardableResult
+    private func save() -> URL? {
+        guard let url = AppSettings.normalizedOllamaURL(addressField) else {
+            addressField = AppSettings.ollamaBaseURL.absoluteString
+            return nil
+        }
+        AppSettings.ollamaBaseURL = url
+        addressField = url.absoluteString
+        return url
+    }
+
+    private func test() async {
+        guard let url = save() else {
+            models = []
+            failed = true
+            report = loc("Adresse illisible : attendu « http://machine:11434 ».",
+                         en: "Unreadable address: expected “http://host:11434”.")
+            return
+        }
+        testing = true
+        defer { testing = false }
+
+        do {
+            // La découverte ne dépend pas d'un modèle : n'importe lequel ferait
+            // l'affaire, aucun n'est encore choisi ici.
+            let found = try await OllamaClient(baseURL: url, model: "").reachableModels()
+            models = found
+            failed = false
+            report = found.isEmpty
+                ? loc("Connexion OK, mais aucun modèle tiré sur ce serveur.",
+                      en: "Connected, but no model has been pulled on that server.")
+                : loc("Connexion OK — \(found.count) modèle\(found.count > 1 ? "s" : "") détecté\(found.count > 1 ? "s" : "").",
+                      en: "Connected — \(found.count) model\(found.count > 1 ? "s" : "") found.")
+        } catch {
+            models = []
+            failed = true
+            report = error.localizedDescription
+        }
+    }
+}
+
 // MARK: - Raccourcis
 
 private struct ShortcutsPane: View {
@@ -275,8 +379,19 @@ private struct PromptsPane: View {
     @State private var selectedAction: ClaudioAction = .correct
     @State private var promptText: String = ClaudioAction.correct.system
     @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
+    /// Modèles tirés sur le serveur Ollama, relevés à l'ouverture du volet.
+    @State private var localModels: [String] = []
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
+
+    /// Le modèle déjà réglé reste proposé même si le serveur ne répond pas :
+    /// sans lui, le sélecteur afficherait une ligne vide sur un réglage valide.
+    private var offeredLocalModels: [String] {
+        guard case .ollama(let current) = selectedModel, !localModels.contains(current) else {
+            return localModels
+        }
+        return [current] + localModels
+    }
 
     var body: some View {
         Form {
@@ -292,18 +407,31 @@ private struct PromptsPane: View {
                 }
             }
 
-            Section(loc("Modèle", en: "Model")) {
-                Picker(loc("Modèle Claude", en: "Claude model"), selection: $selectedModel) {
-                    ForEach(ClaudioModel.allCases, id: \.self) { model in
-                        Text(model.displayName).tag(ModelChoice.claude(model))
+            Section(loc("Moteur", en: "Engine")) {
+                Picker(loc("Moteur de cette action", en: "Engine for this action"), selection: $selectedModel) {
+                    Section("Claude") {
+                        ForEach(ClaudioModel.allCases, id: \.self) { model in
+                            Text(model.displayName).tag(ModelChoice.claude(model))
+                        }
+                    }
+                    Section(loc("Local (Ollama)", en: "Local (Ollama)")) {
+                        ForEach(offeredLocalModels, id: \.self) { model in
+                            Text(model).tag(ModelChoice.ollama(model: model))
+                        }
                     }
                 }
                 .onChange(of: selectedModel) {
                     AppSettings.setCustomModel(selectedModel, for: selectedAction)
                 }
-                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
+                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Moteur par défaut pour cette action.", en: "Default engine for this action.") : loc("Moteur personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom engine; the default is \(selectedAction.defaultModel.displayName)."))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if offeredLocalModels.isEmpty {
+                    Text(loc("Aucun modèle local détecté : règle le serveur dans l'onglet Local (Ollama).",
+                             en: "No local model found: set the server up in the Local (Ollama) tab."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section(loc("Prompt système", en: "System prompt")) {
@@ -339,6 +467,14 @@ private struct PromptsPane: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            Task {
+                // La découverte ne dépend pas d'un modèle : n'importe lequel
+                // ferait l'affaire, il s'agit seulement de peupler le menu.
+                localModels = await OllamaClient(baseURL: AppSettings.ollamaBaseURL,
+                                                 model: "").availableModels()
+            }
+        }
     }
 }
 
