@@ -27,24 +27,16 @@ enum AnthropicError: LocalizedError {
 
 /// Client minimal pour POST /v1/messages en streaming SSE.
 /// (Pas de SDK Swift officiel Anthropic → HTTP brut via URLSession.)
-struct AnthropicClient: Sendable {
+struct AnthropicClient: TextStreamClient {
     let apiKey: String
     /// Requis par les clés « liées à l'identité » (identity-linked), sinon 400.
     var workspaceID: String? = nil
-
-    struct StreamResult: Sendable {
-        let text: String
-        let truncated: Bool
-        /// Jetons facturés, annoncés par l'API elle-même. Zéro quand le flux
-        /// s'interrompt avant de les avoir donnés.
-        let inputTokens: Int
-        let outputTokens: Int
-    }
+    /// Un client parle à un modèle : celui de l'action qui l'a construit.
+    let model: ClaudioModel
 
     func streamCompletion(
         of text: String,
         system: String,
-        model: ClaudioModel,
         maxTokens: Int,
         onDelta: @escaping @Sendable (String) async -> Void
     ) async throws -> StreamResult {

@@ -154,13 +154,14 @@ final class CorrectionCoordinator {
         }
         session.beginStreaming()
 
-        let client = AnthropicClient(apiKey: apiKey, workspaceID: AppSettings.currentWorkspaceID())
         let request = session.request
+        let client = AnthropicClient(apiKey: apiKey,
+                                     workspaceID: AppSettings.currentWorkspaceID(),
+                                     model: request.model)
         do {
             let result = try await client.streamCompletion(
                 of: request.userMessage(forText: session.originalText),
                 system: request.system,
-                model: request.model,
                 maxTokens: request.maxTokens(forText: session.originalText,
                                              multiplier: session.maxTokensMultiplier)
             ) { @MainActor piece in
