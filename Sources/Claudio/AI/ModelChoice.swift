@@ -25,6 +25,14 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
+    /// Nom nu, pour les endroits où la place manque — le pied du panneau.
+    var shortName: String {
+        switch self {
+        case .claude(let model): model.shortName
+        case .ollama(let name): name
+        }
+    }
+
     /// Repère de tarif dans les Réglages, à côté du sélecteur de modèle.
     var costHint: String {
         switch self {

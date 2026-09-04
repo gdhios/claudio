@@ -61,6 +61,13 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertEqual(ModelChoice(storageValue: "claude-opus-5"), .claude(.opus5))
     }
 
+    /// Le pied du panneau n'a pas la place du qualificatif : le nom nu suffit,
+    /// et un modèle local se nomme déjà court.
+    func testLeNomCourtLaisseTomberLeQualificatif() {
+        XCTAssertEqual(ModelChoice.claude(.haiku45).shortName, "Haiku 4.5")
+        XCTAssertEqual(ModelChoice.ollama(model: "qwen2.5:14b").shortName, "qwen2.5:14b")
+    }
+
     // MARK: - Réglage d'une action
 
     /// Le chemin réel des réglages, clé de stockage comprise : un réglage écrit
