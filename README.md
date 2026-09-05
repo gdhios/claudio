@@ -25,6 +25,10 @@ L'app source garde le focus pendant tout le cycle : le panneau ne « vole » jam
 
 ## Installation
 
+L'app signée et notarisée se télécharge sur [claudio.okonoma.com](https://claudio.okonoma.com) ou dans les [releases GitHub](https://github.com/gdhios/claudio/releases/latest) : dézipper dans /Applications, double-cliquer.
+
+Depuis les sources :
+
 ```bash
 Scripts/build_app.sh
 open /Applications/Claudio.app
@@ -39,9 +43,13 @@ Au premier lancement :
 
 Une signature ad-hoc change à chaque build → macOS redemande Accessibilité et l'accès Trousseau après chaque recompilation. Pour éviter ça, créer une fois un certificat auto-signé :
 
-Trousseau d'accès → menu Trousseau d'accès → Assistant de certification → **Créer un certificat…** → nom `Plume Local Dev`, type de certificat « Signature de code », racine auto-signée.
+Trousseau d'accès → menu Trousseau d'accès → Assistant de certification → **Créer un certificat…** → nom au choix, type de certificat « Signature de code », racine auto-signée. Ce nom est celui que le script doit signer avec :
 
-Le script l'utilise automatiquement (sinon il se replie sur ad-hoc avec un avertissement).
+```bash
+SIGN_IDENTITY="Mon Certificat" Scripts/build_app.sh
+```
+
+Sans certificat, le script se replie sur une signature ad-hoc avec un avertissement.
 
 ### Partager l'app (notarisation Apple)
 
@@ -51,7 +59,7 @@ Pour donner l'app à quelqu'un sans avertissement Gatekeeper. Prérequis, une se
 2. **Identifiants notarytool** : créer un mot de passe d'application sur [account.apple.com](https://account.apple.com) (Connexion et sécurité → Mots de passe d'app), puis l'enregistrer dans le Trousseau (le `TEAMID` est entre parenthèses dans le nom du certificat, visible via `security find-identity -v -p codesigning`) :
 
 ```bash
-xcrun notarytool store-credentials claudio-notary --apple-id guillaume.dhios@gmail.com --team-id TEAMID --password xxxx-xxxx-xxxx-xxxx
+xcrun notarytool store-credentials claudio-notary --apple-id votre-apple-id@example.com --team-id TEAMID --password xxxx-xxxx-xxxx-xxxx
 ```
 
 Ensuite, à chaque version à partager :
@@ -62,17 +70,17 @@ NOTARIZE=1 Scripts/build_app.sh
 
 → signe avec le certificat Developer ID (hardened runtime), soumet à Apple (~2 à 5 min), agrafe le ticket et produit `dist/Claudio-1.0.0.zip`. Le destinataire dézippe dans /Applications et double-clique, sans aucun avertissement. Il lui reste à créer sa clé API Anthropic (le champ « Espace de travail » ne concerne que les clés liées à l'identité) et à accorder Accessibilité.
 
-Note : Developer ID étant une identité différente de « Plume Local Dev », macOS redemande une fois Accessibilité/Trousseau sur ta machine quand tu alternes entre build local et build notarisé.
+Note : Developer ID et certificat local étant deux identités différentes, macOS redemande une fois Accessibilité/Trousseau quand on alterne entre build local et build notarisé.
 
 ### Publier une version
 
-Une version n'est pas « faite » quand elle compile : elle l'est quand elle est notarisée, poussée, publiée en release GitHub, déployée sur le site, annoncée par `version.json` et vérifiée en ligne. Toute cette chaîne tient dans un script, dans cet ordre, avec arrêt à la première étape qui échoue :
+Une version n'est pas « faite » quand elle compile : elle l'est quand elle est notarisée, taguée, publiée en release GitHub, mise en ligne et vérifiée telle qu'elle est réellement servie. Toute cette chaîne tient dans un script, dans cet ordre, avec arrêt à la première étape qui échoue :
 
 ```bash
 Scripts/release.sh 1.4.0 "palette d'actions"
 ```
 
-Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications (branche `main`, arbre propre, tag libre, `gh` authentifié, VPS joignable) → numéro de version dans `build_app.sh` et sur les deux landings → protocole de test complet (`Scripts/test.sh --release`, voir [TESTING.md](TESTING.md)) → build notarisé → commit + tag + push → release GitHub (notes reprises de `dist/release_notes_X.Y.Z.md` s'il existe) → `rsync` du site, envoi du zip en `Claudio.zip`, réécriture de `version.json` → vérification de ce qui est réellement servi : le flux annonce la bonne version, le zip téléchargé a le même SHA-256 que le zip notarisé, les quatre pages répondent et affichent le bon numéro, la release GitHub porte son asset.
+Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications préalables → numéro de version → protocole de test complet (`Scripts/test.sh --release`, voir [TESTING.md](TESTING.md)) → build notarisé → commit + tag + push → release GitHub → mise en ligne → vérification (bonne version annoncée, zip téléchargé au même SHA-256 que le zip notarisé, release GitHub porteuse de son asset). Les étapes de mise en ligne demandent les accès du mainteneur : sur un fork, la chaîne s'arrête au tag.
 
 ## Détails
 
