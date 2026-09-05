@@ -1,13 +1,13 @@
 # CI : les niveaux 1 et 2 du protocole de test (TESTING.md) — tests unitaires
-# puis aperçus UI rendus en PNG — sur main, sur les branches de travail
-# claude/** et sur chaque pull request.
-# Le niveau 3 (API réelle) reste dans Scripts/release.sh : il demande une clé
-# et coûte de vrais jetons ; la CI n'en a pas besoin pour garder main sain.
+# puis aperçus UI rendus en PNG — sur main et sur chaque pull request.
+# Le niveau 3 (API réelle) reste à la publication, chez le mainteneur : il
+# demande une clé et coûte de vrais jetons ; la CI n'en a pas besoin pour garder
+# main sain.
 name: CI
 
 on:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

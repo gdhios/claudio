@@ -20,7 +20,7 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertFalse(UpdateChecker.isNewer("1.9.9", than: "1.10.0"))
     }
 
-    /// Le format exact que release.sh écrit sur le serveur (étape 6) : si l'un
+    /// Le format exact que la chaîne de release écrit sur le serveur : si l'un
     /// des deux bouge sans l'autre, plus personne n'est prévenu des mises à jour.
     @MainActor
     func testLeFluxEcritParLeScriptDeReleaseSeDecode() throws {

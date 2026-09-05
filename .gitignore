@@ -12,7 +12,5 @@ icon/*.svg
 *.af
 *.af~lock~
 
-# Réglages Claude Code propres à la machine (launch.json, lui, est partagé)
-.claude/settings.local.json
 # Références visuelles collectées pour la mascotte : images de stock, pas à nous
 moodboard pour mascotte/

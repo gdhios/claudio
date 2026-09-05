@@ -74,13 +74,7 @@ Note : Developer ID et certificat local étant deux identités différentes, mac
 
 ### Publier une version
 
-Une version n'est pas « faite » quand elle compile : elle l'est quand elle est notarisée, taguée, publiée en release GitHub, mise en ligne et vérifiée telle qu'elle est réellement servie. Toute cette chaîne tient dans un script, dans cet ordre, avec arrêt à la première étape qui échoue :
-
-```bash
-Scripts/release.sh 1.4.0 "palette d'actions"
-```
-
-Le travail lui-même doit être commité avant : le script ne publie que le changement de version. Il enchaîne vérifications préalables → numéro de version → protocole de test complet (`Scripts/test.sh --release`, voir [TESTING.md](TESTING.md)) → build notarisé → commit + tag + push → release GitHub → mise en ligne → vérification (bonne version annoncée, zip téléchargé au même SHA-256 que le zip notarisé, release GitHub porteuse de son asset). Les étapes de mise en ligne demandent les accès du mainteneur : sur un fork, la chaîne s'arrête au tag.
+Une version n'est pas « faite » quand elle compile : elle l'est quand elle est notarisée, taguée, publiée en release GitHub, mise en ligne et vérifiée telle qu'elle est réellement servie. La chaîne est tenue par le mainteneur, dans cet ordre, avec arrêt à la première étape qui échoue : vérifications préalables → numéro de version dans `Scripts/build_app.sh` → protocole de test complet (`Scripts/test.sh --release`, voir [TESTING.md](TESTING.md)) → build notarisé (`NOTARIZE=1 Scripts/build_app.sh`) → commit + tag → release GitHub avec le zip → mise en ligne sur claudio.okonoma.com, `version.json` compris → vérification (bonne version annoncée, zip téléchargé au même SHA-256 que le zip notarisé, release GitHub porteuse de son asset). Sur un fork, tout se rejoue jusqu'au tag ; la mise en ligne demande les accès du mainteneur.
 
 ## Détails
 
@@ -119,7 +113,7 @@ Le protocole complet est décrit dans [TESTING.md](TESTING.md) : trois niveaux, 
 ```bash
 swift test                  # niveau 1 : unitaires — à chaque modification (secondes)
 Scripts/test.sh --smoke     # + niveau 2 : l'app rend ses écrans critiques en PNG (CI sur chaque push)
-Scripts/test.sh --release   # + niveau 3 : appels API réels — exécuté par release.sh à la publication
+Scripts/test.sh --release   # + niveau 3 : appels API réels — à la publication
 ```
 
 La CI (GitHub Actions, runner macOS) déroule les niveaux 1+2 sur chaque push et PR, et publie les aperçus rendus en artefacts. Ce que l'automatisation ne peut pas atteindre (capture Accessibilité, collage, restauration du presse-papiers) tient dans une checklist manuelle de 2 minutes, dans TESTING.md.
