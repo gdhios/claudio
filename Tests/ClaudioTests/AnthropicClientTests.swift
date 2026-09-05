@@ -8,6 +8,22 @@ import XCTest
 /// toucher au réseau.
 final class AnthropicClientTests: XCTestCase {
 
+    /// Les libellés attendus sont français : la suite fixe la langue plutôt
+    /// que d'hériter de celle de la machine, sinon elle échoue sur un runner
+    /// anglais (la CI) et passe sur un Mac français.
+    private var previousLanguage: AppLanguage = .system
+
+    override func setUp() {
+        super.setUp()
+        previousLanguage = AppSettings.language
+        AppSettings.language = .french
+    }
+
+    override func tearDown() {
+        AppSettings.language = previousLanguage
+        super.tearDown()
+    }
+
     /// Passe une transcription au parseur, en vérifiant au passage que les
     /// fragments livrés au fil de l'eau recomposent exactement le texte final :
     /// c'est eux que le panneau affiche pendant le stream.

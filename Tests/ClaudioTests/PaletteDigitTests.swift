@@ -8,6 +8,22 @@ import XCTest
 /// consigne qui contient des chiffres.
 final class PaletteDigitTests: XCTestCase {
 
+    /// Les libellés attendus sont français : la suite fixe la langue plutôt
+    /// que d'hériter de celle de la machine, sinon elle échoue sur un runner
+    /// anglais (la CI) et passe sur un Mac français.
+    private var previousLanguage: AppLanguage = .system
+
+    override func setUp() {
+        super.setUp()
+        previousLanguage = AppSettings.language
+        AppSettings.language = .french
+    }
+
+    override func tearDown() {
+        AppSettings.language = previousLanguage
+        super.tearDown()
+    }
+
     // MARK: - Lecture de la frappe
 
     func testChiffreNuDonneSonRang() {
