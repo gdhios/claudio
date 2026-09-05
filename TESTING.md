@@ -14,7 +14,7 @@ modification ne coûte que le niveau 1 ; la publication paie les trois.
 |---|---|---|---|
 | 1 · Unitaires | `swift test` (ou `Scripts/test.sh`) | secondes | à chaque modification, et en CI sur chaque push et PR |
 | 2 · Aperçus UI | `Scripts/test.sh --smoke` | ~2 min | en CI sur chaque push et PR, avec les PNG en artefacts |
-| 3 · Bout en bout | `Scripts/test.sh --release` | + ~30 s et quelques millièmes de $ | à la publication (`Scripts/release.sh` l'exécute) |
+| 3 · Bout en bout | `Scripts/test.sh --release` | + ~30 s et quelques millièmes de $ | à la publication, par la chaîne de release du mainteneur |
 
 - **Niveau 1** : toute la logique critique, sans réseau, sans permission, sans
   UI. Le flux SSE se teste sur des transcriptions, le temps s'injecte, les
@@ -42,14 +42,14 @@ modification ne coûte que le niveau 1 ; la publication paie les trois.
 | Palette (filtrage, rangs 1–9, ligne libre toujours présente) | une action devient introuvable au clavier | `PaletteCatalogTests`, `PaletteDigitTests`, `ClaudioCatalogTests` — niveau 1 |
 | Compteur de dépense (tarifs, cumul, remise à zéro quotidienne) | dépense affichée fausse | `CostLedgerTests` — niveau 1 |
 | Clés de stockage et IDs (rawValue des actions, modèles, tailles de texte) | réglages perdus à la mise à jour, appels API en erreur | `ClaudioCatalogTests`, `PanelTextSizeTests` — niveau 1 |
-| Mise à jour automatique (comparaison de versions, format de `version.json`) | mise à jour proposée en boucle, ou plus jamais | `UpdateCheckerTests` — niveau 1 ; `release.sh` vérifie en ligne ce qui est réellement servi |
+| Mise à jour automatique (comparaison de versions, format de `version.json`) | mise à jour proposée en boucle, ou plus jamais | `UpdateCheckerTests` — niveau 1 ; la chaîne de release vérifie en ligne ce qui est réellement servi |
 | Les écrans se construisent (panneau, palette, Réglages) | l'app plante à l'ouverture d'un écran | niveau 2 (aperçus rendus et vérifiés) |
 | Contrat vivant avec l'API Anthropic | tout ce qui précède, mais en production | niveau 3 (`--selftest`, deux chemins) |
 | Capture de la sélection, collage simulé, restauration du presse-papiers, raccourcis globaux | le cœur du geste | non automatisable (permission Accessibilité + vraie session) → checklist ci-dessous |
 
 ## Ce que la machine ne peut pas tester — checklist de publication (2 min)
 
-À dérouler à la main avant `Scripts/release.sh`, sur le build local du travail
+À dérouler à la main avant de publier, sur le build local du travail
 commité (`Scripts/build_app.sh`) :
 
 1. Sélection dans une app native (Notes) + ⌃⌥⌘I : le résultat colle **à la
@@ -66,11 +66,11 @@ commité (`Scripts/build_app.sh`) :
 ## En CI
 
 `.github/workflows/ci.yml` déroule `Scripts/test.sh --smoke` (niveaux 1+2) sur
-un runner macOS à chaque push sur `main` ou sur une branche `claude/**`, et à
-chaque pull request, avec cache SwiftPM. Les PNG rendus sont publiés en artefacts : une régression visuelle se
+un runner macOS à chaque push sur `main` et à chaque pull request, avec cache
+SwiftPM. Les PNG rendus sont publiés en artefacts : une régression visuelle se
 juge d'un œil depuis la page du run. Le niveau 3 n'est volontairement pas en
-CI : il exige une clé et facture des jetons ; il vit dans `release.sh`, là où
-il gate réellement quelque chose.
+CI : il exige une clé et facture des jetons ; il vit dans la chaîne de release,
+là où il gate réellement quelque chose.
 
 ## Ajouter une fonctionnalité, c'est étendre le filet
 
