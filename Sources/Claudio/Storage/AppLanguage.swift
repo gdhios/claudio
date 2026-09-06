@@ -1,8 +1,8 @@
 import Foundation
 
-/// La langue de l'interface, réglable dans Réglages → Général.
+/// The interface language, adjustable in Settings → General.
 ///
-/// Le `rawValue` est la clé de stockage dans UserDefaults : il ne change plus.
+/// The `rawValue` is the storage key in UserDefaults: it no longer changes.
 enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case system
     case french = "fr"
@@ -10,8 +10,8 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// Chaque langue s'annonce dans sa propre langue : c'est le seul libellé
-    /// qu'on doit pouvoir lire avant d'avoir choisi.
+    /// Each language announces itself in its own language: it's the only
+    /// label that must be readable before making a choice.
     var title: String {
         switch self {
         case .system: loc("Système", en: "System")
@@ -20,9 +20,9 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Vrai quand l'interface doit s'afficher en anglais. Sur « Système », le
-    /// français ne l'emporte que si c'est bien la langue préférée de la
-    /// machine : partout ailleurs, l'anglais est le repli le plus large.
+    /// True when the interface must display in English. On "System", French
+    /// only wins if it's really the machine's preferred language: everywhere
+    /// else, English is the broadest fallback.
     var showsEnglish: Bool {
         switch self {
         case .french: false
@@ -32,11 +32,11 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Un libellé dans les deux langues, choisi au moment de l'affichage.
+/// A label in both languages, chosen at display time.
 ///
-/// Pas de `Localizable.strings` : le réglage doit pouvoir contredire la langue
-/// du système, ce que le mécanisme d'Apple ne fait pas sans détour. Et garder
-/// les deux versions côte à côte évite les tables qui se désynchronisent.
+/// No `Localizable.strings`: the setting must be able to contradict the
+/// system language, which Apple's mechanism doesn't do without a detour. And
+/// keeping both versions side by side avoids tables that drift out of sync.
 func loc(_ french: String, en english: String) -> String {
     AppSettings.language.showsEnglish ? english : french
 }

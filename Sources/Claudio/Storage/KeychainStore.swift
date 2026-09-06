@@ -38,7 +38,7 @@ enum KeychainStore {
         _ = SecItemDelete(query as CFDictionary)
     }
 
-    /// Clé effective : la variable d'environnement (pratique en dev) prime sur le Trousseau.
+    /// Effective key: the environment variable (handy in dev) takes priority over the Keychain.
     static func currentAPIKey() -> String? {
         if let env = ProcessInfo.processInfo.environment[Constants.apiKeyEnvVar],
            !env.trimmingCharacters(in: .whitespaces).isEmpty {

@@ -25,13 +25,13 @@ enum AnthropicError: LocalizedError {
     }
 }
 
-/// Client minimal pour POST /v1/messages en streaming SSE.
-/// (Pas de SDK Swift officiel Anthropic → HTTP brut via URLSession.)
+/// Minimal client for POST /v1/messages in SSE streaming.
+/// (No official Anthropic Swift SDK, so raw HTTP via URLSession.)
 struct AnthropicClient: TextStreamClient {
     let apiKey: String
-    /// Requis par les clés « liées à l'identité » (identity-linked), sinon 400.
+    /// Required for "identity-linked" keys, otherwise a 400.
     var workspaceID: String? = nil
-    /// Un client parle à un modèle : celui de l'action qui l'a construit.
+    /// A client talks to one model: the one from the action that built it.
     let model: ClaudioModel
 
     func streamCompletion(
@@ -55,7 +55,7 @@ struct AnthropicClient: TextStreamClient {
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw AnthropicError.badResponse }
         guard http.statusCode == 200 else {
-            // Les erreurs HTTP arrivent en JSON classique, pas en SSE.
+            // HTTP errors arrive as plain JSON, not SSE.
             var data = Data()
             for try await byte in bytes { data.append(byte) }
             throw AnthropicError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
@@ -70,9 +70,9 @@ struct AnthropicClient: TextStreamClient {
         return parser.result
     }
 
-    /// Corps du POST /v1/messages. Un champ mal nommé ou une température
-    /// envoyée à un modèle qui la refuse est un 400 pour tout le monde :
-    /// c'est ce que les tests verrouillent.
+    /// Body of the POST /v1/messages. A misnamed field or a temperature
+    /// sent to a model that rejects it is a 400 for everyone: that's what
+    /// the tests lock down.
     static func makeBody(
         text: String, system: String, model: ClaudioModel, maxTokens: Int
     ) -> [String: Any] {
@@ -89,9 +89,10 @@ struct AnthropicClient: TextStreamClient {
         return body
     }
 
-    /// Lit le flux SSE ligne à ligne et en tire tout ce que l'app en attend :
-    /// le texte, la troncature et les jetons facturés. Séparé du transport
-    /// réseau pour être exerçable en test sur des transcriptions du flux.
+    /// Reads the SSE stream line by line and pulls out everything the app
+    /// needs from it: the text, the truncation, and the billed tokens.
+    /// Kept separate from the network transport so it's testable against
+    /// stream transcripts.
     struct StreamParser {
         private(set) var text = ""
         private(set) var truncated = false
@@ -103,10 +104,10 @@ struct AnthropicClient: TextStreamClient {
                          inputTokens: inputTokens, outputTokens: outputTokens)
         }
 
-        /// Consomme une ligne du flux et renvoie le fragment de texte qu'elle
-        /// apporte, s'il y en a un. Lève l'erreur que l'API signale en flux.
+        /// Consumes one line of the stream and returns the text fragment it
+        /// carries, if any. Throws whatever error the API reports in-stream.
         mutating func consume(line: String) throws -> String? {
-            guard line.hasPrefix("data: ") else { return nil }  // ignore "event: …" et lignes vides
+            guard line.hasPrefix("data: ") else { return nil }  // ignore "event: …" and blank lines
             guard let data = String(line.dropFirst(6)).data(using: .utf8),
                   let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let type = event["type"] as? String else { return nil }
@@ -120,7 +121,7 @@ struct AnthropicClient: TextStreamClient {
                     return piece
                 }
             case "message_start":
-                // Seul endroit où les jetons d'entrée sont annoncés.
+                // The only place input tokens are reported.
                 if let message = event["message"] as? [String: Any],
                    let usage = message["usage"] as? [String: Any] {
                     inputTokens = usage["input_tokens"] as? Int ?? inputTokens
@@ -131,7 +132,7 @@ struct AnthropicClient: TextStreamClient {
                    let stop = delta["stop_reason"] as? String {
                     truncated = (stop == "max_tokens")
                 }
-                // Le compte de sortie est cumulatif : le dernier fait foi.
+                // The output count is cumulative: the last one wins.
                 if let usage = event["usage"] as? [String: Any] {
                     inputTokens = usage["input_tokens"] as? Int ?? inputTokens
                     outputTokens = usage["output_tokens"] as? Int ?? outputTokens

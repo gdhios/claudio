@@ -1,28 +1,27 @@
 import XCTest
 @testable import Claudio
 
-/// Verrouille les identités du catalogue : les rawValue partent dans
-/// UserDefaults (prompts et modèles personnalisés) et sur le réseau (IDs de
-/// modèles). Les renommer perdrait des réglages ou casserait tous les appels —
-/// sans qu'aucun autre test le voie.
+/// Locks down the catalog's identities: rawValues go into UserDefaults
+/// (custom prompts and models) and onto the network (model IDs). Renaming
+/// them would lose settings or break every call, with no other test to catch it.
 final class ClaudioCatalogTests: XCTestCase {
 
-    /// Clés de stockage des prompts/modèles personnalisés, et ordre du menu.
-    func testLesClesDeStockageDesActionsNeChangentPas() {
+    /// Storage keys for custom prompts/models, and the menu's order.
+    func testTheActionsStorageKeysDontChange() {
         XCTAssertEqual(ClaudioAction.allCases.map(\.rawValue),
                        ["correct", "makePrompt", "expertPrompt", "translateFR",
                         "translateEN", "professionalTone", "summarize", "simplify"])
     }
 
-    /// Les rawValue partent tels quels dans le champ `model` de l'API : une
-    /// coquille ici est une erreur immédiate pour toutes les actions du modèle.
-    func testLesIdentifiantsDeModelesSontCeuxDeLAPI() {
+    /// rawValues go straight into the API's `model` field: a typo here is an
+    /// immediate failure for every action of that model.
+    func testTheModelIdentifiersAreTheAPIs() {
         XCTAssertEqual(ClaudioModel.allCases.map(\.rawValue),
                        ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"])
     }
 
-    /// Haiku partout (latence minimale), Sonnet pour la conception de prompt.
-    func testLesModelesParDefaut() {
+    /// Haiku everywhere (minimal latency), Sonnet for prompt design.
+    func testTheDefaultModels() {
         for action in ClaudioAction.allCases {
             XCTAssertEqual(action.defaultModel,
                            action == .expertPrompt ? .sonnet5 : .haiku45,
@@ -30,17 +29,17 @@ final class ClaudioCatalogTests: XCTestCase {
         }
     }
 
-    /// La palette numérote ses lignes de 1 à 9 : au-delà, les rangs promis à
-    /// l'écran deviendraient intapables. Ajouter une action de trop demande de
-    /// repenser l'affichage, pas seulement d'ajouter un cas.
+    /// The palette numbers its rows 1 through 9: beyond that, the ranks
+    /// promised on screen would become untypeable. Adding one action too many
+    /// means rethinking the display, not just adding a case.
     @MainActor
-    func testLaPaletteTientDansLesRangs1A9() {
+    func testThePaletteFitsInRanks1To9() {
         XCTAssertLessThanOrEqual(PaletteCatalog.rows(matching: "").count, 9)
     }
 
-    /// Chaque action doit arriver entière à l'écran : un libellé vide ferait
-    /// une ligne de menu ou de palette muette.
-    func testChaqueActionPorteTousSesLibelles() {
+    /// Every action must arrive on screen whole: an empty label would make a
+    /// silent menu or palette row.
+    func testEveryActionCarriesAllItsLabels() {
         for action in ClaudioAction.allCases {
             XCTAssertFalse(action.panelTitle.isEmpty, action.rawValue)
             XCTAssertFalse(action.menuTitle.isEmpty, action.rawValue)
@@ -51,11 +50,11 @@ final class ClaudioCatalogTests: XCTestCase {
         }
     }
 
-    /// Le prompt et l'enrobage vont par deux : un prompt qui annonce
-    /// <texte_source> sans que le message ne balise (ou l'inverse) désoriente
-    /// le modèle — c'est le bug qui fait « répondre » à la sélection au lieu
-    /// de la transformer.
-    func testPromptEtEnrobageRestentAccordes() {
+    /// The prompt and its wrapping go together: a prompt that announces
+    /// <texte_source> without the message tagging it (or the reverse) confuses
+    /// the model. That's the bug that makes it "answer" the selection instead
+    /// of transforming it.
+    func testPromptAndWrappingStayInSync() {
         for action in ClaudioAction.allCases {
             let annonceLaBalise = action.defaultSystem.contains("<texte_source>")
             XCTAssertEqual(annonceLaBalise, action.request.wrapsSource, action.rawValue)

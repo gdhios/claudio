@@ -2,34 +2,33 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
-/// Panneau flottant sans bordure qui reçoit le clavier (Entrée/Esc)
-/// SANS activer l'app : l'application source garde le focus.
+/// Borderless floating panel that receives the keyboard (Return/Esc)
+/// WITHOUT activating the app: the source application keeps focus.
 final class ResultPanel: NSPanel {
     var onEnter: (() -> Void)?
     var onEscape: (() -> Void)?
     var onCopyShortcut: (() -> Void)?
-    /// Flèches haut/bas : `-1` monter, `+1` descendre. Renvoie `true` si la
-    /// touche a servi — sinon elle poursuit sa route (défiler un résultat long).
+    /// Up/down arrows: `-1` to go up, `+1` to go down. Returns `true` if the
+    /// key was used, otherwise it goes its own way (scrolling a long result).
     var onArrow: ((Int) -> Bool)?
-    /// Chiffre 1…9 : lance la ligne de ce rang. `withCommand` dit si ⌘ était
-    /// tenu — ce que la touche autorise se décide dans la session, pas ici.
-    /// Même contrat de retour.
+    /// Digit 1…9: launches the row at that rank. `withCommand` says whether ⌘ was
+    /// held; what the key is allowed to do is decided in the session, not here.
+    /// Same return contract.
     var onDigit: ((Int, Bool) -> Bool)?
 
-    /// Ces touches n'atteignent `keyDown` que si personne ne les a consommées
-    /// avant : les champs de saisie, eux, les absorbent. Un moniteur local les
-    /// voit avant la chaîne des responders, donc « Échap pour fermer » et la
-    /// navigation de la palette restent vrais pendant la frappe.
+    /// These keys only reach `keyDown` if nobody consumed them first:
+    /// text fields absorb them. A local monitor sees them before the responder
+    /// chain, so "esc to close" and palette navigation stay true while typing.
     private var keyMonitor: Any?
 
-    /// L'écran visible sur lequel le panneau s'est ouvert. Retenu à l'ouverture
-    /// pour que les changements de hauteur le gardent centré au même endroit,
-    /// sans le faire glisser d'un écran à l'autre pendant qu'un résultat s'écrit.
+    /// The visible screen the panel opened on. Kept at opening time
+    /// so height changes keep it centered in the same spot, without
+    /// letting it drift from one screen to another while a result is being written.
     private var homeVisibleFrame: NSRect?
 
-    /// Faux tant que le panneau n'a pas pris sa première taille réelle : la
-    /// toute première mesure se pose net, sans glisser, pour une ouverture
-    /// franche plutôt qu'un dépliage.
+    /// False until the panel has taken its first real size: the very
+    /// first measurement lands cleanly, without sliding, for a crisp
+    /// opening rather than an unfolding.
     private var hasSizedOnce = false
 
     override var canBecomeKey: Bool { true }
@@ -55,9 +54,9 @@ final class ResultPanel: NSPanel {
         self.contentView = contentView
     }
 
-    /// Construit le panneau câblé à sa vue SwiftUI : apparence sombre forcée
-    /// (le panneau garde son thème quel que soit le mode système) et hauteur
-    /// de fenêtre qui suit le contenu.
+    /// Builds the panel wired to its SwiftUI view: forced dark appearance
+    /// (the panel keeps its theme regardless of the system mode) and window
+    /// height that follows the content.
     @MainActor
     static func make(session: CorrectionSession,
                      textSize: PanelTextSize = AppSettings.panelTextSize,
@@ -89,17 +88,17 @@ final class ResultPanel: NSPanel {
         return panel
     }
 
-    /// Ajuste la hauteur de la fenêtre au contenu en la gardant centrée sur son
-    /// écran : le panneau grandit et rétrécit autour de son milieu, sans jamais
-    /// sauter d'un bord à l'autre.
+    /// Adjusts the window height to the content while keeping it centered on its
+    /// screen: the panel grows and shrinks around its middle, without ever
+    /// jumping from one edge to the other.
     ///
-    /// Un cran de streaming (petit pas) se pose à l'instant : la fenêtre suit le
-    /// texte image par image. Un saut d'état (ouverture, palette, erreur) glisse
-    /// d'un easeOut court, pour changer de taille sans cogner.
+    /// A streaming tick (small step) lands instantly: the window follows the
+    /// text frame by frame. A state jump (opening, palette, error) glides
+    /// with a short easeOut, to change size without a jolt.
     func updateContentHeight(_ height: CGFloat) {
-        // Borne haute : au plus grand corps de texte, la palette entière peut
-        // dépasser un petit écran. Mieux vaut un panneau qui s'arrête au bord
-        // qu'un panneau qui le franchit.
+        // Upper bound: at the largest text size, the whole palette can
+        // exceed a small screen. Better a panel that stops at the edge
+        // than one that overruns it.
         let visible = homeVisibleFrame ?? (screen ?? NSScreen.main)?.visibleFrame
         let newHeight = min(max(height, 60), (visible?.height ?? .greatestFiniteMagnitude) - 16)
         guard abs(frame.height - newHeight) > 0.5 else { return }
@@ -108,16 +107,16 @@ final class ResultPanel: NSPanel {
         if let visible {
             target = ResultPanel.centered(size: NSSize(width: frame.width, height: newHeight), in: visible)
         } else {
-            // Sans écran connu, on grandit autour du centre courant : le milieu
-            // du panneau ne bouge pas, faute de pouvoir viser celui de l'écran.
+            // With no known screen, grow around the current center: the panel's
+            // middle doesn't move, for lack of being able to target the screen's.
             var newFrame = frame
             newFrame.origin.y += (newFrame.height - newHeight) / 2
             newFrame.size.height = newHeight
             target = newFrame
         }
 
-        // La première mesure (à l'ouverture) se pose net ; ensuite, seuls les
-        // sauts d'état glissent — le streaming, lui, se suit image par image.
+        // The first measurement (at opening) lands cleanly; after that, only
+        // state jumps glide: streaming, for its part, is followed frame by frame.
         let glide = hasSizedOnce && ResultPanel.shouldAnimateResize(from: frame.height, to: newHeight)
         hasSizedOnce = true
 
@@ -132,20 +131,20 @@ final class ResultPanel: NSPanel {
         }
     }
 
-    /// Au-delà de ce saut de hauteur, la fenêtre ne suit plus le texte qui
-    /// s'écrit mais change d'état (ouverture, palette, erreur) : mieux vaut alors
-    /// glisser que sauter.
+    /// Beyond this height jump, the window is no longer following the text as
+    /// it's written but changing state (opening, palette, error): better then to
+    /// glide than to jump.
     private static let abruptResizeThreshold: CGFloat = 120
 
-    /// Vrai si le changement de hauteur est un saut d'état plutôt qu'un cran de
-    /// streaming. Pur et statique : la décision se teste sans fenêtre.
+    /// True if the height change is a state jump rather than a streaming
+    /// tick. Pure and static: the decision can be tested without a window.
     static func shouldAnimateResize(from old: CGFloat, to new: CGFloat) -> Bool {
         abs(new - old) > abruptResizeThreshold
     }
 
-    /// Cadre d'un panneau de cette taille centré dans l'écran visible, borné à
-    /// ses bords : un panneau trop haut s'arrête au bord plutôt que de le
-    /// franchir.
+    /// Frame for a panel of this size centered in the visible screen, clamped to
+    /// its edges: a panel too tall stops at the edge rather than
+    /// overrunning it.
     static func centered(size: NSSize, in visible: NSRect) -> NSRect {
         let x = min(max(visible.midX - size.width / 2, visible.minX + 8),
                     visible.maxX - size.width - 8)
@@ -154,12 +153,12 @@ final class ResultPanel: NSPanel {
         return NSRect(origin: NSPoint(x: x, y: y), size: size)
     }
 
-    /// Centre le panneau sur l'écran actif — celui qui porte le pointeur, donc
-    /// celui où la sélection vient d'être faite — et le montre en fondu, sans
-    /// NSApp.activate() (grâce à .nonactivatingPanel).
+    /// Centers the panel on the active screen: the one carrying the pointer, so
+    /// the one where the selection was just made, and fades it in, with no
+    /// NSApp.activate() (thanks to .nonactivatingPanel).
     ///
-    /// Toujours au centre : fini le panneau collé dans un coin ou débordant de
-    /// l'écran selon l'endroit d'où l'on a lancé le raccourci.
+    /// Always centered: no more panel stuck in a corner or spilling off
+    /// the screen depending on where the shortcut was triggered from.
     func present() {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
             ?? NSScreen.main
@@ -170,8 +169,8 @@ final class ResultPanel: NSPanel {
         }
         homeVisibleFrame = visible
         hasSizedOnce = false
-        // Gabarit d'abord : la vue SwiftUI n'est pas encore mesurée. La première
-        // hauteur réelle recentrera par updateContentHeight, au même milieu.
+        // Placeholder size first: the SwiftUI view isn't measured yet. The first
+        // real height will re-center via updateContentHeight, at the same middle.
         setFrame(ResultPanel.centered(size: frame.size, in: visible), display: false)
         fadeIn()
     }
@@ -184,25 +183,25 @@ final class ResultPanel: NSPanel {
         super.orderOut(sender)
     }
 
-    /// Rang demandé par la frappe, et si ⌘ l'accompagnait — ou `nil` si ce
-    /// n'est pas un rang qu'on demande.
+    /// Rank requested by the keystroke, and whether ⌘ came with it, or `nil` if
+    /// this isn't a rank being requested.
     ///
-    /// Un vrai chiffre compte toujours, ⇧ compris : sur AZERTY il n'y en a pas
-    /// sans. La position physique, elle, ne compte qu'avec ⌘ : sans lui la
-    /// rangée du haut d'un AZERTY donne « & é " ' », et une consigne qui
-    /// commence par « écris » ne doit pas lancer la deuxième ligne.
+    /// A real digit always counts, ⇧ included: on AZERTY there's no digit
+    /// without it. The physical position, on the other hand, only counts with ⌘:
+    /// without it, the top row of an AZERTY gives "& é " '", and an instruction
+    /// starting with "écris" must not launch the second row.
     static func digitKey(keyCode: UInt16,
                          characters: String?,
                          modifiers: NSEvent.ModifierFlags) -> (rank: Int, withCommand: Bool)? {
         let flags = modifiers.intersection(.deviceIndependentFlagsMask)
-        // ⌥ et ⌃ composent des caractères : ce n'est pas un rang qu'on demande.
+        // ⌥ and ⌃ compose characters: that's not a rank being requested.
         guard !flags.contains(.option), !flags.contains(.control) else { return nil }
         let withCommand = flags.contains(.command)
         if let characters, let rank = Int(characters), (1...9).contains(rank) {
             return (rank, withCommand)
         }
         guard withCommand else { return nil }
-        // kVK_ANSI_1…9, dans l'ordre des chiffres (6 et 7 ne se suivent pas).
+        // kVK_ANSI_1…9, in digit order (6 and 7 aren't adjacent).
         let positions: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
         return positions.firstIndex(of: keyCode).map { ($0 + 1, true) }
     }
@@ -215,12 +214,12 @@ final class ResultPanel: NSPanel {
                 case 53:  // Esc
                     self.onEscape?()
                     return nil
-                case 126 where self.onArrow?(-1) == true,  // Haut
-                     125 where self.onArrow?(1) == true:   // Bas
+                case 126 where self.onArrow?(-1) == true,  // Up
+                     125 where self.onArrow?(1) == true:   // Down
                     return nil
                 default:
-                    // Refusé — hors palette, ou consigne déjà commencée — le
-                    // chiffre poursuit sa route et s'écrit dans le champ.
+                    // Refused, either outside the palette or an instruction already
+                    // started, the digit goes its own way and gets typed into the field.
                     if let digit = ResultPanel.digitKey(keyCode: event.keyCode,
                                                         characters: event.charactersIgnoringModifiers,
                                                         modifiers: event.modifierFlags),
@@ -245,7 +244,7 @@ final class ResultPanel: NSPanel {
             return
         }
         switch event.keyCode {
-        case 36, 76:  // Retour, Entrée (pavé numérique)
+        case 36, 76:  // Return, Enter (numeric keypad)
             onEnter?()
         case 53:      // Esc
             onEscape?()

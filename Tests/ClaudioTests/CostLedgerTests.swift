@@ -1,13 +1,13 @@
 import XCTest
 @testable import Claudio
 
-/// Verrouille le passage des jetons au montant affiché : c'est la seule chose
-/// que l'utilisateur voit du compteur, et une dérive silencieuse y serait
+/// Locks down the path from tokens to the displayed amount: it's the only
+/// thing the user sees of the counter, and a silent drift there would be
 /// invisible.
 final class CostLedgerTests: XCTestCase {
 
-    /// Tarifs publics Anthropic par million de jetons, entrée / sortie.
-    func testLesTarifsSontCeuxPublies() {
+    /// Anthropic's published rates per million tokens, input / output.
+    func testTheRatesAreThePublishedOnes() {
         XCTAssertEqual(ClaudioModel.haiku45.inputPricePerMTok, 1)
         XCTAssertEqual(ClaudioModel.haiku45.outputPricePerMTok, 5)
         XCTAssertEqual(ClaudioModel.sonnet5.inputPricePerMTok, 2)
@@ -16,8 +16,8 @@ final class CostLedgerTests: XCTestCase {
         XCTAssertEqual(ClaudioModel.opus5.outputPricePerMTok, 25)
     }
 
-    /// Un million de jetons de chaque côté = la somme des deux tarifs.
-    func testUnMillionDeJetonsCouteLaSommeDesDeuxTarifs() {
+    /// A million tokens on each side = the sum of the two rates.
+    func testAMillionTokensOnEachSideCostsTheSumOfBothRates() {
         for model in ClaudioModel.allCases {
             XCTAssertEqual(model.cost(inputTokens: 1_000_000, outputTokens: 1_000_000),
                            model.inputPricePerMTok + model.outputPricePerMTok,
@@ -25,8 +25,8 @@ final class CostLedgerTests: XCTestCase {
         }
     }
 
-    func testCoutDUneActionCourte() {
-        // 200 jetons d'entrée à 1 $/MTok + 200 de sortie à 5 $/MTok.
+    func testTheCostOfAShortAction() {
+        // 200 input tokens at $1/MTok + 200 output tokens at $5/MTok.
         XCTAssertEqual(ClaudioModel.haiku45.cost(inputTokens: 200, outputTokens: 200),
                        0.0012, accuracy: 1e-9)
         XCTAssertEqual(ClaudioModel.opus5.cost(inputTokens: 200, outputTokens: 200),
@@ -37,7 +37,7 @@ final class CostLedgerTests: XCTestCase {
         }
     }
 
-    func testFormatMonetaire() {
+    func testMonetaryFormat() {
         withLanguage(.french) {
             XCTAssertEqual(Money.format(0), "0,00 $")
             XCTAssertEqual(Money.format(0.0012), "< 0,01 $")
@@ -47,8 +47,8 @@ final class CostLedgerTests: XCTestCase {
         }
     }
 
-    /// En anglais le dollar passe devant et le séparateur est le point.
-    func testFormatMonetaireAnglais() {
+    /// In English the dollar sign comes first and the separator is the period.
+    func testMonetaryFormatEnglish() {
         withLanguage(.english) {
             XCTAssertEqual(Money.format(0), "$0.00")
             XCTAssertEqual(Money.format(0.0012), "< $0.01")
@@ -57,8 +57,8 @@ final class CostLedgerTests: XCTestCase {
         }
     }
 
-    /// Le temps d'une assertion, la langue est celle qu'on veut éprouver, et
-    /// le réglage de la machine est rendu tel qu'il était.
+    /// For the length of one assertion, the language is the one under test,
+    /// and the machine's setting is restored to what it was.
     private func withLanguage(_ language: AppLanguage, _ body: () -> Void) {
         let previous = AppSettings.language
         AppSettings.language = language
@@ -66,65 +66,65 @@ final class CostLedgerTests: XCTestCase {
         AppSettings.language = previous
     }
 
-    // MARK: - Cumul du jour
+    // MARK: - Daily total
 
-    private let midi = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    private let noon = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    func testLeCumulSAdditionneDansLaJournee() {
-        let start = Calendar.current.startOfDay(for: midi)
+    func testTheTotalAddsUpWithinTheDay() {
+        let start = Calendar.current.startOfDay(for: noon)
         var jour = DailyCost(dayStart: start, total: 0, actions: 0)
-        jour = jour.adding(0.10, at: midi)
-        jour = jour.adding(0.32, at: midi.addingTimeInterval(3600))
+        jour = jour.adding(0.10, at: noon)
+        jour = jour.adding(0.32, at: noon.addingTimeInterval(3600))
         XCTAssertEqual(jour.total, 0.42, accuracy: 1e-9)
         XCTAssertEqual(jour.actions, 2)
         withLanguage(.french) { XCTAssertEqual(jour.formattedTotal, "0,42 $") }
     }
 
-    func testLeCumulRepartDeZeroLeLendemain() {
-        let start = Calendar.current.startOfDay(for: midi)
+    func testTheTotalStartsOverAtZeroTheNextDay() {
+        let start = Calendar.current.startOfDay(for: noon)
         let veille = DailyCost(dayStart: start, total: 5, actions: 12)
-        let lendemain = midi.addingTimeInterval(24 * 3600)
+        let lendemain = noon.addingTimeInterval(24 * 3600)
 
         let apres = veille.adding(0.10, at: lendemain)
         XCTAssertEqual(apres.total, 0.10, accuracy: 1e-9)
         XCTAssertEqual(apres.actions, 1)
         XCTAssertEqual(apres.dayStart, Calendar.current.startOfDay(for: lendemain))
 
-        // Même sans nouvelle action, l'affichage ne montre pas le total d'hier.
+        // Even with no new action, the display doesn't show yesterday's total.
         let affiche = veille.current(at: lendemain)
         XCTAssertEqual(affiche.total, 0)
         XCTAssertEqual(affiche.actions, 0)
-        XCTAssertEqual(veille.current(at: midi), veille, "la journée en cours est intacte")
+        XCTAssertEqual(veille.current(at: noon), veille, "the current day is untouched")
     }
 
-    /// Un stock hérité d'une version antérieure, ou vide, ne doit pas ressortir
-    /// comme dépense du jour.
+    /// Storage inherited from an earlier version, or empty, must not show up
+    /// as today's spend.
     @MainActor
-    func testUnStockVideDemarreAZero() {
+    func testEmptyStorageStartsAtZero() {
         let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
-        let ledger = CostLedger(defaults: defaults, now: midi)
+        let ledger = CostLedger(defaults: defaults, now: noon)
         XCTAssertEqual(ledger.day.total, 0)
         XCTAssertEqual(ledger.day.actions, 0)
     }
 
-    /// Un appel Claude est une dépense ; un appel local n'en est pas une, et
-    /// ne doit gonfler ni le montant ni le nombre d'actions facturées.
+    /// A Claude call is a cost; a local call is not, and must inflate neither
+    /// the amount nor the count of billed actions.
     @MainActor
-    func testSeulsLesAppelsClaudeEntrentDansLaDepense() {
+    func testOnlyClaudeCallsCountTowardTheSpend() {
         let previous = AppSettings.costCounterEnabled
         AppSettings.costCounterEnabled = true
         defer { AppSettings.costCounterEnabled = previous }
 
         let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
-        let ledger = CostLedger(defaults: defaults, now: midi)
+        let ledger = CostLedger(defaults: defaults, now: noon)
 
-        ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: midi)
+        ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: noon)
         XCTAssertEqual(ledger.day.actions, 1)
         XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
 
         ledger.record(model: .ollama(model: "qwen2.5:14b"),
-                      inputTokens: 5_000, outputTokens: 5_000, at: midi)
-        XCTAssertEqual(ledger.day.actions, 1, "un appel local n'est pas une dépense")
+                      inputTokens: 5_000, outputTokens: 5_000, at: noon)
+        XCTAssertEqual(ledger.day.actions, 1, "a local call is not a cost")
         XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
     }
 }

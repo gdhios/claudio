@@ -1,16 +1,17 @@
 import Foundation
 
-/// Le moteur effectif d'une action : un modèle Claude, facturé par Anthropic,
-/// ou un modèle local servi par Ollama, gratuit et sans réseau sortant.
-/// Distinct de `ClaudioModel`, qui reste le catalogue Claude (ID d'API, tarifs,
-/// température) : ce type-ci ne fait que dire lequel des deux mondes répond.
+/// The effective engine behind an action: a Claude model, billed by
+/// Anthropic, or a local model served by Ollama, free and with no outgoing
+/// network traffic. Distinct from `ClaudioModel`, which remains the Claude
+/// catalog (API ID, pricing, temperature): this type only says which of the
+/// two worlds is answering.
 enum ModelChoice: Sendable, Hashable {
     case claude(ClaudioModel)
-    /// Nom du modèle tel qu'Ollama le connaît, ex. « qwen2.5:14b ».
+    /// Model name as Ollama knows it, e.g. "qwen2.5:14b".
     case ollama(model: String)
 
-    /// Coût d'un appel en dollars. Un appel local ne coûte rien : la machine
-    /// tourne de toute façon.
+    /// Cost of a call in dollars. A local call costs nothing: the machine
+    /// runs anyway.
     func cost(inputTokens: Int, outputTokens: Int) -> Double {
         switch self {
         case .claude(let model): model.cost(inputTokens: inputTokens, outputTokens: outputTokens)
@@ -25,7 +26,7 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
-    /// Nom nu, pour les endroits où la place manque — le pied du panneau.
+    /// Bare name, for places short on space, like the panel's footer.
     var shortName: String {
         switch self {
         case .claude(let model): model.shortName
@@ -33,7 +34,7 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
-    /// Repère de tarif dans les Réglages, à côté du sélecteur de modèle.
+    /// Pricing hint in Settings, next to the model picker.
     var costHint: String {
         switch self {
         case .claude(let model): model.costHint
@@ -41,16 +42,16 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
-    /// Vrai quand rien ne sort de la machine (ou du réseau local).
+    /// True when nothing leaves the machine (or the local network).
     var isLocal: Bool {
         if case .ollama = self { return true }
         return false
     }
 
-    // MARK: - Encodage des réglages
+    // MARK: - Settings encoding
 
-    /// Forme stockée dans UserDefaults. Le préfixe dit le fournisseur ; le reste
-    /// est l'ID du modèle, tel quel — un ID Ollama contient des « : ».
+    /// Form stored in UserDefaults. The prefix says the provider; the rest
+    /// is the model ID, as is: an Ollama ID contains ":".
     var storageValue: String {
         switch self {
         case .claude(let model): "claude:\(model.rawValue)"
@@ -58,11 +59,11 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
-    /// Relit un réglage. Découpe sur le **premier** « : » seulement, sinon
-    /// « ollama:qwen2.5:14b » perdrait sa balise de version.
-    /// Sans préfixe reconnu, c'est un réglage écrit avant l'arrivée d'Ollama :
-    /// il ne contenait que le rawValue d'un modèle Claude. Les ID Claude
-    /// n'ont jamais de « : », donc aucune ambiguïté avec le schéma préfixé.
+    /// Reads back a setting. Splits on the **first** ":" only, otherwise
+    /// "ollama:qwen2.5:14b" would lose its version tag.
+    /// With no recognized prefix, it's a setting written before Ollama
+    /// arrived: it only ever contained a Claude model's rawValue. Claude IDs
+    /// never contain ":", so there's no ambiguity with the prefixed scheme.
     init?(storageValue: String) {
         guard let separator = storageValue.firstIndex(of: ":") else {
             guard let model = ClaudioModel(rawValue: storageValue) else { return nil }
@@ -80,8 +81,8 @@ enum ModelChoice: Sendable, Hashable {
             guard !identifier.isEmpty else { return nil }
             self = .ollama(model: identifier)
         default:
-            // Fournisseur inconnu (réglage écrit par une version future) :
-            // reste la chance que ce soit un ID Claude hérité.
+            // Unknown provider (setting written by a future version):
+            // there's still a chance it's a legacy Claude ID.
             guard let model = ClaudioModel(rawValue: storageValue) else { return nil }
             self = .claude(model)
         }

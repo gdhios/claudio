@@ -2,14 +2,13 @@ import AppKit
 import Foundation
 import Security
 
-/// Installe une mise à jour à la place de l'app en cours : téléchargement du
-/// zip, vérification de la signature, remplacement du bundle puis relance.
-/// Avant cela la « mise à jour » se contentait d'ouvrir l'URL du zip dans le
-/// navigateur, laissant l'utilisateur remplacer l'app à la main depuis le
-/// dossier Téléchargements.
+/// Installs an update in place of the running app: download the zip, verify
+/// the signature, replace the bundle, then relaunch. Before this, "updating"
+/// just opened the zip's URL in the browser, leaving the user to replace the
+/// app by hand from the Downloads folder.
 ///
-/// Remplacer l'app conserve la permission Accessibilité et la clé du Trousseau :
-/// la nouvelle version porte la même signature, donc la même identité pour TCC.
+/// Replacing the app keeps the Accessibility permission and the Keychain key:
+/// the new version carries the same signature, hence the same identity for TCC.
 enum UpdateInstaller {
     enum Failure: LocalizedError {
         case download
@@ -43,12 +42,12 @@ enum UpdateInstaller {
         }
     }
 
-    /// Télécharge la nouvelle version, l'extrait et vérifie sa signature.
-    /// Renvoie le bundle prêt à prendre la place de l'app courante.
+    /// Downloads the new version, extracts it, and verifies its signature.
+    /// Returns the bundle ready to take the current app's place.
     static func prepare(from url: URL) async throws -> URL {
         let target = Bundle.main.bundleURL
-        // Une app lancée depuis un zip tourne en lecture seule dans un point de
-        // montage aléatoire : la remplacer là n'aurait aucun effet.
+        // An app launched from a zip runs read-only from a random mount
+        // point: replacing it there would have no effect.
         guard !target.path.contains("/AppTranslocation/") else { throw Failure.translocated }
         let parent = target.deletingLastPathComponent()
         guard FileManager.default.isWritableFile(atPath: parent.path) else {
@@ -68,7 +67,7 @@ enum UpdateInstaller {
         let archive = work.appendingPathComponent("Claudio.zip")
         do {
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-            // Le fichier rendu par `download` est effacé au retour : le déplacer d'abord.
+            // The file handed back by `download` is deleted on return: move it first.
             try FileManager.default.moveItem(at: downloaded, to: archive)
         } catch {
             throw Failure.download
@@ -89,9 +88,9 @@ enum UpdateInstaller {
         return newApp
     }
 
-    /// Remplace l'app courante par `newApp`, puis relance. Le travail est confié
-    /// à un script détaché : une app ne peut pas s'écraser elle-même pendant
-    /// qu'elle tourne. En cas de succès, l'app se termine et ne revient pas.
+    /// Replaces the current app with `newApp`, then relaunches. The work is
+    /// handed to a detached script: an app can't overwrite itself while it's
+    /// running. On success, the app terminates and does not return.
     @MainActor
     static func installAndRelaunch(_ newApp: URL) throws {
         let work = newApp.deletingLastPathComponent().deletingLastPathComponent()
@@ -117,9 +116,9 @@ enum UpdateInstaller {
         NSApp.terminate(nil)
     }
 
-    /// Le script attend la fin de Claudio, échange les bundles et relance.
-    /// L'ancienne app n'est effacée qu'une fois la copie réussie : le moindre
-    /// échec restaure la version en place.
+    /// The script waits for Claudio to exit, swaps the bundles, then relaunches.
+    /// The old app is only deleted once the copy succeeds: any failure
+    /// restores the version that was in place.
     private static let replaceScript = """
     #!/bin/sh
     pid="$1"; new="$2"; target="$3"; work="$4"
@@ -148,9 +147,9 @@ enum UpdateInstaller {
 
     """
 
-    /// La mise à jour doit porter l'identité de l'app installée : signature
-    /// Apple valide, ressources scellées intactes, même bundle id et même
-    /// équipe de développement. Sans quoi on refuse de remplacer quoi que ce soit.
+    /// The update must carry the identity of the installed app: a valid Apple
+    /// signature, intact sealed resources, the same bundle id and the same
+    /// development team. Otherwise we refuse to replace anything.
     private static func hasSameIdentityAsInstalledApp(_ candidate: URL) -> Bool {
         guard let bundleID = Bundle.main.bundleIdentifier else { return false }
         var text = "anchor apple generic and identifier \"\(bundleID)\""

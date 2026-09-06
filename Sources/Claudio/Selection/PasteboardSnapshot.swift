@@ -1,7 +1,7 @@
 import AppKit
 
-/// Copie multi-types du presse-papiers, pour le restaurer après le collage
-/// (préserve images, RTF, etc. — pas seulement le texte).
+/// Multi-type copy of the clipboard, to restore it after pasting (preserves
+/// images, RTF, etc, not just text).
 struct PasteboardSnapshot {
     private let itemsByType: [[NSPasteboard.PasteboardType: Data]]
 

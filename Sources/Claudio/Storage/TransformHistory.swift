@@ -1,25 +1,25 @@
 import Foundation
 
-/// Une transformation libre déjà lancée : sa consigne, et quand. Seule la
-/// consigne — le « quoi faire » — est retenue, jamais le texte source ni le
-/// résultat.
+/// A free-form transform that already ran: its instruction, and when. Only
+/// the instruction, the "what to do", is kept, never the source text or the
+/// result.
 struct RecentTransform: Codable, Equatable, Sendable {
     var instruction: String
     var date: Date
 }
 
-/// Les dernières consignes libres, la plus récente en tête, sans doublon,
-/// plafonnées. Type valeur sans dépendance au stockage : c'est lui que les
-/// tests exercent.
+/// The latest free-form instructions, most recent first, no duplicates,
+/// capped. A value type with no dependency on storage: it's what the tests
+/// exercise.
 struct RecentTransforms: Equatable, Sendable {
-    /// Plus récente d'abord.
+    /// Most recent first.
     private(set) var entries: [RecentTransform]
 
     init(_ entries: [RecentTransform] = []) { self.entries = entries }
 
-    /// Ajoute une consigne en tête. Blanche, elle est ignorée ; déjà présente
-    /// (au trait près), elle remonte avec sa nouvelle date plutôt que de se
-    /// dédoubler ; au-delà du plafond, la plus ancienne tombe.
+    /// Adds an instruction to the front. Blank, it's ignored; already present
+    /// (down to the character), it moves up with its new date instead of
+    /// duplicating; beyond the cap, the oldest one drops off.
     func adding(_ instruction: String, at date: Date, limit: Int = 20) -> RecentTransforms {
         let trimmed = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return self }
@@ -31,9 +31,9 @@ struct RecentTransforms: Equatable, Sendable {
     func cleared() -> RecentTransforms { RecentTransforms() }
 }
 
-/// Historique des consignes libres, pour les relancer d'un geste sur la
-/// sélection courante. Persisté en JSON dans les préférences ; rien n'est
-/// envoyé nulle part. Sur le modèle de `CostLedger`.
+/// History of free-form instructions, to relaunch them with a single gesture
+/// on the current selection. Persisted as JSON in the preferences; nothing
+/// is sent anywhere. Modeled on `CostLedger`.
 @MainActor
 final class TransformHistory {
     static let shared = TransformHistory()
@@ -56,8 +56,8 @@ final class TransformHistory {
         }
     }
 
-    /// Enregistre une consigne libre qui vient d'aboutir. Une consigne vide ou
-    /// inchangée n'écrit rien.
+    /// Records a free-form instruction that just succeeded. An empty or
+    /// unchanged instruction writes nothing.
     func record(_ instruction: String, at date: Date = Date()) {
         let updated = recents.adding(instruction, at: date, limit: limit)
         guard updated != recents else { return }
@@ -65,7 +65,7 @@ final class TransformHistory {
         persist()
     }
 
-    /// Oublie tout l'historique.
+    /// Forgets the whole history.
     func clear() {
         guard !recents.entries.isEmpty else { return }
         recents = recents.cleared()

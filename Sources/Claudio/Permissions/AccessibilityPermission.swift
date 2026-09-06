@@ -5,12 +5,12 @@ import ApplicationServices
 enum AccessibilityPermission {
     static var isGranted: Bool { AXIsProcessTrusted() }
 
-    /// Déclenche la demande système (une seule fois par identité de signature).
+    /// Triggers the system prompt (only once per signing identity).
     @discardableResult
     static func request() -> Bool {
         if AXIsProcessTrusted() { return true }
-        // Valeur littérale de kAXTrustedCheckOptionPrompt (le global C n'est pas
-        // Sendable sous Swift 6 strict).
+        // Literal value of kAXTrustedCheckOptionPrompt (the C global isn't
+        // Sendable under strict Swift 6).
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }

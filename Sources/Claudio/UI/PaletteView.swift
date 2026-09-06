@@ -1,15 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// La palette d'actions : tout le catalogue sous les yeux, filtrable à la
-/// frappe, et une dernière ligne qui reprend la saisie comme consigne libre
-/// quand rien ne convient. Le même châssis que le panneau de résultat — c'est
-/// le même objet qui se transforme une fois l'action choisie.
+/// The action palette: the whole catalog in view, filterable as you
+/// type, and a last row that reuses the input as a custom instruction
+/// when nothing fits. The same frame as the result panel: it's the
+/// same object, transformed once the action is chosen.
 struct PaletteView: View {
     @ObservedObject var session: CorrectionSession
-    /// Corps du texte, réglé dans les Réglages (Général → Panneau).
+    /// Body text size, set in Settings (General → Panel).
     var textSize: PanelTextSize = .normal
-    /// Lance la ligne d'index donné.
+    /// Launches the row at the given index.
     let onLaunch: (Int) -> Void
 
     @FocusState private var queryFocused: Bool
@@ -23,11 +23,11 @@ struct PaletteView: View {
             hints
         }
         .onAppear {
-            // Le pointeur est là où le raccourci a été frappé : son survol ne
-            // vaut choix qu'une fois qu'il aura bougé.
+            // The pointer is wherever the shortcut was triggered: hovering over it
+            // only counts as a choice once it has moved.
             session.armHover(at: NSEvent.mouseLocation)
-            // Même précaution que pour le champ de consigne : le focus posé
-            // dans le cycle d'apparition est perdu, un tour plus tard il tient.
+            // Same precaution as for the instruction field: focus set
+            // in the appearance cycle is lost, a turn later it holds.
             Task { @MainActor in queryFocused = true }
         }
     }
@@ -66,8 +66,8 @@ struct PaletteView: View {
         .padding(.horizontal, 10)
     }
 
-    /// Le champ fait deux métiers à la fois : il filtre le catalogue, et ce qui
-    /// y reste écrit devient la consigne si c'est la dernière ligne qu'on lance.
+    /// The field does two jobs at once: it filters the catalog, and whatever
+    /// stays written in it becomes the instruction if it's the last row that gets launched.
     private var field: some View {
         HStack(spacing: 10) {
             TextField("", text: $session.paletteQuery,
@@ -97,9 +97,9 @@ struct PaletteView: View {
     private var hints: some View {
         HStack(spacing: 12) {
             Text(loc("↑↓ naviguer", en: "↑↓ move"))
-            // Le chiffre nu lance tant que rien n'est écrit ; après, il
-            // s'écrit, et c'est ⌘ qui lance. L'indice suit plutôt qu'il ne
-            // promette à moitié.
+            // The bare digit launches as long as nothing is written; after that, it
+            // gets typed, and it's ⌘ that launches. The hint follows suit rather
+            // than half-promising.
             Text(session.paletteQuery.isEmpty ? loc("1–9 lancer", en: "1–9 run")
                                               : loc("⌘1–9 lancer", en: "⌘1–9 run"))
             Text(loc("échap fermer", en: "esc close"))
@@ -113,15 +113,15 @@ struct PaletteView: View {
     }
 }
 
-/// Une ligne : son rang, son icône, ce qu'elle fait en deux lignes, son
-/// raccourci. La sélection s'annonce par une inversion sobre plutôt que par
-/// une couleur — les seules couleurs de la liste sont les icônes des actions.
+/// A row: its rank, its icon, what it does in two lines, its
+/// shortcut. Selection is announced with a plain inversion rather than
+/// a color: the only colors in the list are the actions' icons.
 private struct PaletteRowView: View {
     let row: PaletteRow
     let number: Int
     let isSelected: Bool
-    /// Le libellé de l'action suit le réglage de taille ; le rang, l'icône et
-    /// le raccourci restent fixes — ce sont des repères, pas de la lecture.
+    /// The action's label follows the size setting; the rank, icon and
+    /// shortcut stay fixed: they're landmarks, not reading material.
     var textSize: PanelTextSize = .normal
 
     var body: some View {
@@ -180,9 +180,9 @@ private struct PaletteRowView: View {
     }
 }
 
-/// Dépense du jour dans le header de la palette : le moment où on choisit une
-/// action est le bon moment pour voir ce que la journée a coûté. Absente si le
-/// compteur est désactivé dans les Réglages.
+/// Today's spending in the palette header: the moment you pick an
+/// action is the right moment to see what the day has cost. Absent if the
+/// counter is disabled in Settings.
 struct CostGauge: View {
     @ObservedObject private var ledger = CostLedger.shared
 

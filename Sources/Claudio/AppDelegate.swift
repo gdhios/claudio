@@ -4,8 +4,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    /// L'entrée « Récentes ▸ » et son sous-menu : masquée tant que l'historique
-    /// est vide, repeuplée à chaque ouverture (les récentes changent).
+    /// The "Recent ▸" entry and its submenu: hidden while history is empty,
+    /// repopulated on every open (recents change).
     private var recentsItem: NSMenuItem?
     private var recentsMenu: NSMenu?
     private let updateMenuItemTag = 777
@@ -23,14 +23,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         UpdateChecker.shared.startPeriodicChecks()
 
-        // Premier lancement sans clé : ouvrir directement les Réglages.
+        // First launch without a key: open Settings directly.
         if KeychainStore.currentAPIKey() == nil {
             settingsController.show()
         }
     }
 
-    /// Menu principal invisible (app .accessory) : sans menu Édition,
-    /// macOS ne route pas ⌘X/⌘C/⌘V/⌘A vers les champs de texte.
+    /// Invisible main menu (app .accessory): without an Edit menu, macOS
+    /// doesn't route ⌘X/⌘C/⌘V/⌘A to text fields.
     private func setupMainMenu() {
         let mainMenu = NSMenu()
 
@@ -56,15 +56,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func setupStatusItem() {
-        // Claudio lui-même dans la barre de menus. Longueur variable : le
-        // buste est plus large que haut, un carré l'écraserait.
+        // Claudio himself in the menu bar. Variable length: the bust is
+        // wider than it is tall, a square would squash it.
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = ClaudioMascot.menuBarImage()
         item.button?.setAccessibilityLabel("Claudio")
 
         let menu = NSMenu()
 
-        // En tête : la porte d'entrée unique, qui contient toutes les autres.
+        // At the top: the single entry point, which contains all the others.
         let palette = NSMenuItem(title: PaletteCatalog.menuTitle,
                                  action: #selector(paletteFromMenu), keyEquivalent: "")
         palette.target = self
@@ -83,8 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         free.target = self
         menu.addItem(free)
 
-        // Les consignes libres déjà lancées, à relancer d'un geste sur la
-        // sélection courante. Son contenu se reconstruit à l'ouverture.
+        // The custom instructions already launched, to relaunch with one
+        // gesture on the current selection. Its content is rebuilt on open.
         let recentsMenu = NSMenu()
         recentsMenu.autoenablesItems = false
         recentsMenu.delegate = self
@@ -110,11 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu = menu
     }
 
-    // MARK: - Historique (« Récentes »)
+    // MARK: - History ("Recent")
 
-    /// À l'ouverture du menu principal, « Récentes ▸ » n'apparaît que s'il y a
-    /// quelque chose à relancer. À l'ouverture du sous-menu lui-même, on le
-    /// repeuple : l'historique a pu changer depuis la dernière fois.
+    /// When the main menu opens, "Recent ▸" only appears if there's
+    /// something to relaunch. When the submenu itself opens, it's
+    /// repopulated: history may have changed since last time.
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === statusMenu {
             recentsItem?.isHidden = TransformHistory.shared.recents.entries.isEmpty
@@ -130,7 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                   action: #selector(recentFromMenu(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = entry.instruction
-            item.toolTip = entry.instruction  // le libellé tronqué, en entier au survol
+            item.toolTip = entry.instruction  // the truncated label, in full on hover
             menu.addItem(item)
         }
         guard !menu.items.isEmpty else { return }
@@ -141,8 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(clear)
     }
 
-    /// La consigne pour une ligne de menu : sur une seule ligne, tronquée pour
-    /// ne pas étirer le menu.
+    /// The instruction for a menu row: on a single line, truncated so it
+    /// doesn't stretch the menu.
     private static func recentTitle(_ instruction: String) -> String {
         let flat = instruction.replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
@@ -164,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loc("Mise à jour \(feed.version) disponible…", en: "Update \(feed.version) available…")
     }
 
-    /// Item « Mise à jour X disponible… » en tête du menu status.
+    /// "Update X available…" item at the top of the status menu.
     private func showUpdateMenuItem(_ feed: UpdateChecker.Feed) {
         guard let menu = statusMenu else { return }
         if let existing = menu.item(withTag: updateMenuItemTag) {
@@ -181,8 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.insertItem(.separator(), at: 1)
     }
 
-    /// Installe la mise à jour à la place de l'app puis relance, après accord
-    /// explicite : remplacer l'app installée n'est pas anodin.
+    /// Installs the update in place of the app then relaunches, after
+    /// explicit consent: replacing the installed app isn't trivial.
     @objc private func installUpdate(_ sender: NSMenuItem) {
         guard let feed = UpdateChecker.shared.availableUpdate else { return }
 
@@ -232,8 +232,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         afterMenuCloses { $0.triggerPalette() }
     }
 
-    /// Laisse le menu se refermer et l'app précédente reprendre le focus avant
-    /// de déclencher : la capture de sélection vise l'app source, pas Claudio.
+    /// Lets the menu close and the previous app regain focus before
+    /// triggering: the selection capture targets the source app, not Claudio.
     private func afterMenuCloses(_ trigger: @escaping @MainActor (CorrectionCoordinator) -> Void) {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 250_000_000)

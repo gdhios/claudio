@@ -1,8 +1,7 @@
-# CI : les niveaux 1 et 2 du protocole de test (TESTING.md) — tests unitaires
-# puis aperçus UI rendus en PNG — sur main et sur chaque pull request.
-# Le niveau 3 (API réelle) reste à la publication, chez le mainteneur : il
-# demande une clé et coûte de vrais jetons ; la CI n'en a pas besoin pour garder
-# main sain.
+# CI: levels 1 and 2 of the test protocol (TESTING.md), unit tests then UI
+# previews rendered to PNG, on main and on every pull request.
+# Level 3 (real API) stays at publish time, with the maintainer: it needs a
+# key and costs real tokens; CI doesn't need it to keep main healthy.
 name: CI
 
 on:
@@ -17,15 +16,15 @@ concurrency:
 
 jobs:
   tests:
-    name: Tests unitaires + aperçus UI
+    name: Unit tests + UI previews
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
-      # KeyboardShortcuts 3.0.1 demande Swift tools 6.2 : le Xcode par défaut
-      # du runner est parfois en retard, on prend le plus récent installé.
-      - name: Sélectionner le Xcode le plus récent
+      # KeyboardShortcuts 3.0.1 requires Swift tools 6.2: the runner's default
+      # Xcode sometimes lags behind, so we pick the most recent one installed.
+      - name: Select the most recent Xcode
         run: |
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           swift --version
@@ -37,12 +36,12 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: Protocole de test (niveaux 1 et 2)
+      - name: Test protocol (levels 1 and 2)
         run: Scripts/test.sh --smoke
 
-      # Les écrans rendus, tels que la CI les a vus : de quoi juger d'un œil
-      # une régression visuelle sans lancer l'app.
-      - name: Publier les aperçus rendus
+      # The rendered screens, as CI saw them: enough to judge a visual
+      # regression at a glance without launching the app.
+      - name: Publish rendered previews
         if: always()
         uses: actions/upload-artifact@v7
         with:

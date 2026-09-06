@@ -1,25 +1,25 @@
 import XCTest
 @testable import Claudio
 
-/// Le réglage de langue touche à une clé écrite dans UserDefaults, et à des
-/// libellés qu'on ne relit plus une fois qu'ils sont traduits.
+/// The language setting touches a key written to UserDefaults, and labels
+/// that are never re-read once translated.
 final class AppLanguageTests: XCTestCase {
 
-    /// Les rawValue sont des clés de stockage : les renommer perdrait la
-    /// langue de tous ceux qui en ont choisi une.
-    func testLesIdentifiantsStockesNeChangentPas() {
+    /// The rawValues are storage keys: renaming them would lose the language
+    /// of everyone who chose one.
+    func testTheStoredIdentifiersDontChange() {
         XCTAssertEqual(AppLanguage.allCases.map(\.rawValue), ["system", "fr", "en"])
     }
 
-    /// Un choix explicite prime sur la langue de la machine, dans les deux sens.
-    func testUnChoixExpliciteContreditLeSysteme() {
+    /// An explicit choice overrides the machine's language, in both directions.
+    func testAnExplicitChoiceOverridesTheSystem() {
         XCTAssertFalse(AppLanguage.french.showsEnglish)
         XCTAssertTrue(AppLanguage.english.showsEnglish)
     }
 
-    /// Le filet : chaque libellé de la palette doit vraiment changer de langue.
-    /// Un `loc` oublié laisserait du français dans une interface anglaise.
-    func testToutLeCataloguePasseEnAnglais() {
+    /// The safety net: every palette label must actually change language.
+    /// A forgotten `loc` would leave French in an English interface.
+    func testTheWholeCatalogSwitchesToEnglish() {
         let previous = AppSettings.language
         defer { AppSettings.language = previous }
 
@@ -29,10 +29,10 @@ final class AppLanguageTests: XCTestCase {
         let english = ClaudioAction.allCases.map { [$0.paletteTitle, $0.paletteDetail] }
 
         for (action, (fr, en)) in zip(ClaudioAction.allCases, zip(french, english)) {
-            // « Depuis n'importe quelle langue » est le seul sous-titre partagé
-            // par deux actions : on compare bien paire à paire, pas en vrac.
-            XCTAssertNotEqual(fr[0], en[0], "titre de \(action.rawValue)")
-            XCTAssertNotEqual(fr[1], en[1], "sous-titre de \(action.rawValue)")
+            // "From any language" is the only subtitle shared by two actions:
+            // compare pair by pair, not in bulk.
+            XCTAssertNotEqual(fr[0], en[0], "title of \(action.rawValue)")
+            XCTAssertNotEqual(fr[1], en[1], "subtitle of \(action.rawValue)")
         }
     }
 }

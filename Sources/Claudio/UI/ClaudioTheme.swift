@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Identité visuelle de Claudio : violet profond du robot moustachu (le même
-/// dégradé que l'icône), panneau sombre en permanence, badges « pill » et
-/// pastilles d'icônes colorées.
+/// Claudio's visual identity: the deep purple of the mustachioed robot (the same
+/// gradient as the icon), permanently dark panel, "pill" badges and
+/// colored icon dots.
 enum ClaudioTheme {
     static let violetHaut = Color(red: 0.369, green: 0.208, blue: 0.651)  // #5e35a6
     static let violetBas = Color(red: 0.243, green: 0.063, blue: 0.435)   // #3e106f
@@ -12,16 +12,16 @@ enum ClaudioTheme {
                                          startPoint: .top,
                                          endPoint: .bottom)
 
-    // Panneau : sombre quel que soit le mode système (l'app source garde son thème,
-    // le panneau garde le sien — même parti pris que la landing).
+    // Panel: dark regardless of the system mode (the source app keeps its theme,
+    // the panel keeps its own, same stance as the landing page).
     static let panelBackground = Color(red: 0.075, green: 0.075, blue: 0.09)
     static let panelBorder = Color.white.opacity(0.09)
     static let panelSeparator = Color.white.opacity(0.06)
     static let panelCornerRadius: CGFloat = 18
 }
 
-/// Icône et teinte par action — utilisées dans le header du panneau
-/// et devant chaque raccourci dans les Réglages.
+/// Icon and tint per action, used in the panel header
+/// and in front of each shortcut in Settings.
 extension ClaudioAction {
     var symbolName: String {
         switch self {
@@ -50,8 +50,8 @@ extension ClaudioAction {
     }
 }
 
-/// Même paire pour une requête, quelle que soit son origine : le catalogue
-/// délègue à l'action, l'action libre a son propre couple.
+/// Same pair for a request, whatever its origin: the catalog
+/// delegates to the action, the custom action has its own pair.
 extension ClaudioRequest.Origin {
     var symbolName: String {
         switch self {
@@ -68,13 +68,13 @@ extension ClaudioRequest.Origin {
     }
 }
 
-/// La palette n'est pas une action : elle les contient toutes.
+/// The palette isn't an action: it contains them all.
 extension PaletteCatalog {
     static let symbolName = "square.grid.2x2.fill"
     static let tint = ClaudioTheme.accent
 }
 
-/// Pastille d'icône colorée façon Réglages Système.
+/// Colored icon dot, styled after System Settings.
 struct IconBadge: View {
     let systemName: String
     let color: Color
@@ -89,7 +89,7 @@ struct IconBadge: View {
     }
 }
 
-/// Badge « pill » façon Vibe Island : fond discret, texte compact.
+/// "Pill" badge, styled after Vibe Island: discreet background, compact text.
 struct StatusPill<Content: View>: View {
     var background: Color = .white.opacity(0.08)
     var foreground: Color = .secondary
@@ -105,7 +105,7 @@ struct StatusPill<Content: View>: View {
     }
 }
 
-/// Bouton principal du panneau : dégradé Claudio.
+/// Panel's main button: Claudio gradient.
 struct ClaudioProminentButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -123,7 +123,7 @@ struct ClaudioProminentButtonStyle: ButtonStyle {
     }
 }
 
-/// Boutons secondaires du panneau : pill sombre discret.
+/// Panel's secondary buttons: discreet dark pill.
 struct PanelPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

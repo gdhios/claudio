@@ -1,16 +1,16 @@
 import XCTest
 @testable import Claudio
 
-/// Verrouille le comportement de `ClaudioRequest` sur celui de la 1.2.3, où
-/// `userMessage` et `maxTokens` vivaient encore sur `ClaudioAction`. Toute
-/// dérive de ces valeurs change ce que les utilisateurs reçoivent.
+/// Locks down `ClaudioRequest`'s behavior against that of 1.2.3, where
+/// `userMessage` and `maxTokens` still lived on `ClaudioAction`. Any drift in
+/// these values changes what users receive.
 final class ClaudioRequestTests: XCTestCase {
 
-    /// 400 caractères → 100 tokens d'entrée estimés, valeurs calculées à la main
-    /// depuis les bornes de la 1.2.3.
+    /// 400 characters → 100 estimated input tokens, values computed by hand
+    /// from 1.2.3's bounds.
     private let text = String(repeating: "a", count: 400)
 
-    func testBudgetsReproduisentLesValeursDeLa123() {
+    func testBudgetsReproduceThe123Values() {
         XCTAssertEqual(ClaudioAction.correct.request.maxTokens(forText: text), 328)
         XCTAssertEqual(ClaudioAction.translateFR.request.maxTokens(forText: text), 328)
         XCTAssertEqual(ClaudioAction.translateEN.request.maxTokens(forText: text), 328)
@@ -21,17 +21,17 @@ final class ClaudioRequestTests: XCTestCase {
         XCTAssertEqual(ClaudioAction.summarize.request.maxTokens(forText: text), 384)
     }
 
-    func testPlanchersEtPlafonds() {
-        // Texte vide : le plancher de la forme s'applique.
+    func testFloorsAndCeilings() {
+        // Empty text: the shape's floor applies.
         XCTAssertEqual(ClaudioAction.correct.request.maxTokens(forText: ""), 256)
         XCTAssertEqual(ClaudioAction.summarize.request.maxTokens(forText: ""), 384)
-        // Le « Réessayer + » double, sans dépasser le plafond dur.
+        // "Retry +" doubles it, without exceeding the hard ceiling.
         XCTAssertEqual(ClaudioAction.correct.request.maxTokens(forText: text, multiplier: 2), 656)
         let enorme = String(repeating: "a", count: 500_000)
         XCTAssertEqual(ClaudioAction.expertPrompt.request.maxTokens(forText: enorme, multiplier: 4), 16384)
     }
 
-    func testSeuleLaCorrectionEnvoieLeTexteNu() {
+    func testOnlyCorrectionSendsBareText() {
         for action in ClaudioAction.allCases {
             let request = action.request
             XCTAssertEqual(request.wrapsSource, action != .correct, "\(action.rawValue)")
@@ -45,7 +45,7 @@ final class ClaudioRequestTests: XCTestCase {
         }
     }
 
-    func testLeCatalogueSeReporteFidelementDansLaRequete() {
+    func testTheCatalogCarriesOverFaithfullyIntoTheRequest() {
         for action in ClaudioAction.allCases {
             let request = action.request
             XCTAssertEqual(request.origin, .catalog(action))
@@ -56,44 +56,45 @@ final class ClaudioRequestTests: XCTestCase {
         }
     }
 
-    func testActionLibrePorteLInstructionEtBaliseLaSource() {
+    func testFreeActionCarriesTheInstructionAndTagsTheSource() {
         let request = ClaudioRequest.free(instruction: "  Traduis en espagnol  ")
         XCTAssertEqual(request.origin, .free(instruction: "Traduis en espagnol"))
         XCTAssertTrue(request.system.contains("Traduis en espagnol"))
-        XCTAssertFalse(request.system.contains("  Traduis"), "l'instruction doit être détourée")
+        XCTAssertFalse(request.system.contains("  Traduis"), "the instruction must be trimmed")
         XCTAssertTrue(request.wrapsSource)
         XCTAssertTrue(request.userMessage(forText: "Le chat dort.").contains("<texte_source>"))
         XCTAssertEqual(request.maxTokens(forText: text), 556)
     }
 
-    /// `needsInstruction` est la porte qui décide d'ouvrir la saisie plutôt que
-    /// d'appeler l'API : elle ne doit s'ouvrir que pour l'action libre sans consigne.
-    func testSeuleLActionLibreSansConsigneReclameUneSaisie() {
+    /// `needsInstruction` is the gate that decides whether to open input entry
+    /// rather than call the API: it must open only for the free action with no
+    /// instruction.
+    func testOnlyTheFreeActionWithNoInstructionNeedsInput() {
         XCTAssertTrue(ClaudioRequest.awaitingInstruction.needsInstruction)
         XCTAssertFalse(ClaudioRequest.free(instruction: "Traduis en espagnol").needsInstruction)
         XCTAssertTrue(ClaudioRequest.free(instruction: "   ").needsInstruction,
-                      "une consigne d'espaces est détourée, donc vide")
+                      "a whitespace-only instruction is trimmed, so it's empty")
         for action in ClaudioAction.allCases {
             XCTAssertFalse(action.request.needsInstruction, "\(action.rawValue)")
         }
     }
 
-    /// Le panneau s'habille avant que la consigne existe : titre et icône de
-    /// l'action libre doivent déjà être bons pendant la saisie.
-    func testLaRequeteEnAttentePorteDejaLIdentiteDeLActionLibre() {
+    /// The panel dresses itself before the instruction exists: the free
+    /// action's title and icon must already be correct during input entry.
+    func testThePendingRequestAlreadyCarriesTheFreeActionsIdentity() {
         let waiting = ClaudioRequest.awaitingInstruction
         XCTAssertEqual(waiting.origin, .free(instruction: ""))
         XCTAssertEqual(waiting.panelTitle, ClaudioRequest.free(instruction: "peu importe").panelTitle)
     }
 
-    /// La palette est un garnissage distinct : sans sélection, son panneau ne
-    /// doit pas s'intituler « Action libre » (elle n'a pas encore d'action), mais
-    /// porter son propre titre.
-    func testLaPaletteEnAttenteNePasSeFaisantPasserPourUneActionLibre() {
+    /// The palette is a distinct filling: with no selection, its panel must
+    /// not be titled "Free action" (it has no action yet), but carry its own
+    /// title.
+    func testThePendingPaletteDoesNotPassItselfOffAsAFreeAction() {
         let palette = ClaudioRequest.awaitingChoice
         let libre = ClaudioRequest.awaitingInstruction
         XCTAssertNotEqual(palette.panelTitle, libre.panelTitle,
-                          "la palette sans sélection ne doit pas s'intituler « Action libre »")
+                          "the palette with no selection must not be titled \"Free action\"")
         XCTAssertFalse(palette.panelTitle.isEmpty)
     }
 }

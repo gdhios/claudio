@@ -1,14 +1,14 @@
 import Foundation
 
-/// Une ligne de la palette : de quoi l'afficher, et l'origine qui donnera la
-/// requête au moment du lancement. La requête n'est construite qu'à ce
-/// moment-là : la bâtir à chaque frappe relirait les prompts personnalisés
-/// des Réglages pour rien.
+/// One row of the palette: what's needed to display it, and the origin that
+/// will produce the request at launch time. The request is only built at
+/// that moment: building it on every keystroke would re-read the custom
+/// prompts from Settings for nothing.
 struct PaletteRow: Identifiable {
     let origin: ClaudioRequest.Origin
     let title: String
     let detail: String
-    /// Colonne de droite : le raccourci global, ou l'étiquette de l'action libre.
+    /// Right-hand column: the global shortcut, or the custom action's label.
     let trailing: String
 
     var id: String {
@@ -26,20 +26,20 @@ struct PaletteRow: Identifiable {
     }
 }
 
-/// Ce que la palette propose, et comment la saisie le filtre.
+/// What the palette offers, and how typing filters it.
 enum PaletteCatalog {
-    /// Libellé dans le menu de la barre et dans les Réglages.
+    /// Label in the menu bar's menu and in Settings.
     static var menuTitle: String { loc("Palette d'actions…", en: "Action palette…") }
 
-    /// Étiquette de la ligne d'action libre quand une consigne est écrite : ce
-    /// qui est tapé part tel quel comme instruction.
+    /// Label of the custom-action row when an instruction has been typed: what
+    /// was typed goes out as is as the instruction.
     static var freeBadge: String { loc("consigne", en: "custom") }
 
-    /// Actions du catalogue retenues par la saisie. Chaque mot de la requête
-    /// doit commencer un mot du titre ou du sous-titre : « trad ang » trouve la
-    /// traduction en anglais, et pas la française — dont le sous-titre contient
-    /// pourtant « langue ». Accents et casse sont ignorés : personne ne tape
-    /// « français » avec la cédille au troisième caractère.
+    /// Catalog actions kept by the typed query. Every word of the query must
+    /// start a word of the title or subtitle: "trad ang" finds the English
+    /// translation, not the French one, even though its subtitle contains
+    /// "langue". Accents and case are ignored: nobody types "français" with
+    /// the cedilla as the third character.
     static func matches(_ query: String) -> [ClaudioAction] {
         let needles = query.searchWords
         guard !needles.isEmpty else { return ClaudioAction.allCases }
@@ -51,10 +51,10 @@ enum PaletteCatalog {
         }
     }
 
-    /// Lignes affichées pour une saisie donnée : les actions retenues, puis
-    /// l'action libre en dernier. Elle est toujours là — c'est la porte de
-    /// sortie quand le catalogue ne couvre pas ce qu'on veut, et elle reprend
-    /// la saisie comme consigne.
+    /// Rows shown for a given query: the matched actions, then the custom
+    /// action last. It's always there: it's the escape hatch for when the
+    /// catalog doesn't cover what's wanted, and it takes the typed text as
+    /// its instruction.
     @MainActor
     static func rows(matching query: String) -> [PaletteRow] {
         let instruction = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -76,7 +76,7 @@ enum PaletteCatalog {
 }
 
 private extension String {
-    /// Mots comparables : sans accents, sans casse, sans ponctuation.
+    /// Comparable words: no accents, no case, no punctuation.
     var searchWords: [String] {
         folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             .split { !$0.isLetter && !$0.isNumber }

@@ -53,4 +53,4 @@ On the local build of the committed work (`Scripts/build_app.sh`):
 - **New raw value** (action, model, setting): add it to the list fixed by `ClaudioCatalogTests`. It is a storage key and will not change.
 - **Anything that needs Accessibility**: a line in the manual checklist.
 
-Conventions: XCTest, test names state the behaviour, a header comment says what is at stake, not what the test does. The code base keeps French comments and strings; test names follow.
+Conventions: XCTest, test names state the behaviour, a header comment says what is at stake, not what the test does. Comments and test names are in English; user-facing strings are bilingual through `loc("…", en: "…")`, and the tests pin the app language to compare French labels.

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Génère icon/AppIcon.icns à partir des SVG maîtres :
-#   icon/claudio_icon.svg       — dessin détaillé (tailles physiques >= 64 px)
-#   icon/claudio_icon_small.svg — dessin simplifié (16 et 32 px, lisibilité)
-# Nécessite rsvg-convert (brew install librsvg).
-# Usage : Scripts/make_icon.sh
+# Generates icon/AppIcon.icns from the master SVGs:
+#   icon/claudio_icon.svg       — detailed artwork (physical sizes >= 64 px)
+#   icon/claudio_icon_small.svg — simplified artwork (16 and 32 px, legibility)
+# Requires rsvg-convert (brew install librsvg).
+# Usage: Scripts/make_icon.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,15 +16,15 @@ ICONSET="icon/AppIcon.iconset"
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
 
-render() { # render <svg> <px> <fichier>
+render() { # render <svg> <px> <file>
     "$RSVG" -w "$2" -h "$2" "$1" -o "$ICONSET/$3"
 }
 
-# Petites tailles physiques (16/32 px) : variante simplifiée.
+# Small physical sizes (16/32 px): simplified variant.
 render icon/claudio_icon_small.svg 16  icon_16x16.png
 render icon/claudio_icon_small.svg 32  icon_16x16@2x.png
 render icon/claudio_icon_small.svg 32  icon_32x32.png
-# À partir de 64 px physiques : dessin détaillé.
+# From 64 px physical and up: detailed artwork.
 render icon/claudio_icon.svg       64  icon_32x32@2x.png
 render icon/claudio_icon.svg      128  icon_128x128.png
 render icon/claudio_icon.svg      256  icon_128x128@2x.png

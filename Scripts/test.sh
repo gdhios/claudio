@@ -1,21 +1,21 @@
 #!/bin/bash
-# Protocole de test de Claudio — trois niveaux, du moins cher au plus complet.
+# Claudio's test protocol — three levels, from cheapest to most complete.
 #
-#   Scripts/test.sh             niveau 1 : tests unitaires (boucle de dev, CI)
-#   Scripts/test.sh --smoke     niveaux 1+2 : + build + aperçus UI rendus hors réseau
-#   Scripts/test.sh --release   niveaux 1+2+3 : + appels API réels (--selftest)
+#   Scripts/test.sh             level 1: unit tests (dev loop, CI)
+#   Scripts/test.sh --smoke     levels 1+2: + build + UI previews rendered offline
+#   Scripts/test.sh --release   levels 1+2+3: + real API calls (--selftest)
 #
-# Niveau 1 — `swift test` : toute la logique critique (parsing du flux SSE,
-#   corps de requête, budgets, palette, compteur de dépense, mise à jour) sans
-#   réseau ni permission. Quelques secondes.
-# Niveau 2 — aperçus : l'app compilée démarre et rend chaque écran critique en
-#   PNG (`--preview … --shot`), sans clé ni raccourci global. Attrape ce que
-#   les tests unitaires ne voient pas : un écran qui ne se construit plus.
-# Niveau 3 — bout en bout : `--selftest` appelle la vraie API (clé requise :
-#   ANTHROPIC_API_KEY ou Trousseau) sur le chemin catalogue puis le chemin
-#   libre. Quelques millièmes de dollar ; réservé à la publication.
+# Level 1 — `swift test`: all the critical logic (SSE stream parsing, request
+#   bodies, budgets, palette, cost counter, updates) with no network and no
+#   permission. A few seconds.
+# Level 2 — previews: the compiled app starts and renders each critical
+#   screen to PNG (`--preview … --shot`), with no key and no global shortcut.
+#   Catches what unit tests don't see: a screen that no longer builds.
+# Level 3 — end to end: `--selftest` calls the real API (key required:
+#   ANTHROPIC_API_KEY or Keychain) on the catalog path then the free path.
+#   A few thousandths of a dollar; reserved for publishing.
 #
-# Voir TESTING.md pour la cartographie complète : quoi est couvert, où, pourquoi.
+# See TESTING.md for the full map: what's covered, where, why.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,24 +25,24 @@ case "$LEVEL" in
     *) echo "usage : Scripts/test.sh [--smoke|--release]"; exit 1 ;;
 esac
 
-[ "$(uname)" = "Darwin" ] || { echo "❌ Claudio est une app macOS : ce protocole s'exécute sur macOS."; exit 1; }
+[ "$(uname)" = "Darwin" ] || { echo "❌ Claudio is a macOS app: this protocol runs on macOS."; exit 1; }
 
-# ── Niveau 1 : tests unitaires ────────────────────────────────────────────────
-echo "── Niveau 1 · Tests unitaires (swift test) ──"
+# ── Level 1: unit tests ────────────────────────────────────────────────
+echo "── Level 1 · Unit tests (swift test) ──"
 swift test
-echo "✅ Tests unitaires verts."
+echo "✅ Unit tests green."
 if [ -z "$LEVEL" ]; then exit 0; fi
 
-# ── Niveau 2 : l'app démarre et rend ses écrans ───────────────────────────────
+# ── Level 2: the app starts and renders its screens ───────────────────────────────
 echo ""
-echo "── Niveau 2 · Aperçus UI hors réseau ──"
+echo "── Level 2 · Offline UI previews ──"
 swift build
 BIN=".build/debug/Claudio"
 SHOTS=".build/previews"
 mkdir -p "$SHOTS"
 
-# Rend un aperçu en PNG, borné à 30 s (alarm) : un écran qui ne se construit
-# plus se voit au code de sortie, un blocage au chien de garde.
+# Renders a preview to PNG, bounded to 30s (alarm): a screen that no longer
+# builds shows up as the exit code, a hang shows up at the watchdog.
 preview_shot() {
     local mode="$1"
     local png="$SHOTS/$mode.png"
@@ -52,37 +52,37 @@ preview_shot() {
     perl -e 'alarm shift; exec @ARGV' 30 \
         "$BIN" --preview "$mode" --shot "$png" >"$log" 2>&1 || status=$?
     if [ "$status" -ne 0 ]; then
-        echo "❌ Aperçu « $mode » : code de sortie $status (142 = bloqué 30 s puis tué)."
+        echo "❌ Preview \"$mode\": exit code $status (142 = hung for 30s then killed)."
         cat "$log"
         exit 1
     fi
-    # Un PNG minuscule est un rendu vide : le fichier doit peser son écran.
+    # A tiny PNG is an empty render: the file should weigh in at its screen's size.
     local size
     size=$(stat -f%z "$png" 2>/dev/null || echo 0)
     if [ "$size" -lt 5000 ]; then
-        echo "❌ Aperçu « $mode » : $png absent ou vide ($size octets)."
+        echo "❌ Preview \"$mode\": $png missing or empty ($size bytes)."
         cat "$log"
         exit 1
     fi
-    echo "   $mode : $size octets"
+    echo "   $mode: $size bytes"
 }
 
-# Les écrans par lesquels tout passe : panneau (résultat, flux, erreur,
-# consigne libre), palette (nue et filtrée), Réglages (clé API, moteur par
-# action, serveur local, raccourcis).
+# The screens everything passes through: panel (result, streaming, error,
+# free instruction), palette (plain and filtered), Settings (API key, engine
+# per action, local server, shortcuts).
 for mode in panel panel-streaming panel-error panel-free palette palette-filtre settings settings-prompts settings-ollama settings-shortcuts; do
     preview_shot "$mode"
 done
-echo "✅ Les écrans critiques se construisent et se rendent ($SHOTS/)."
+echo "✅ Critical screens build and render ($SHOTS/)."
 if [ "$LEVEL" = "--smoke" ]; then exit 0; fi
 
-# ── Niveau 3 : la vraie API, sur les deux chemins de requête ──────────────────
+# ── Level 3: the real API, on both request paths ──────────────────
 echo ""
-echo "── Niveau 3 · Bout en bout contre l'API (--selftest) ──"
-echo "→ Chemin catalogue (correction)…"
+echo "── Level 3 · End to end against the API (--selftest) ──"
+echo "→ Catalog path (correction)…"
 "$BIN" --selftest "Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin."
 echo ""
-echo "→ Chemin libre (consigne saisie à l'exécution)…"
+echo "→ Free path (instruction typed at runtime)…"
 "$BIN" --selftest "Le chat dort profondément." "Traduis en espagnol"
 echo ""
-echo "✅ Protocole complet vert : unitaires, aperçus, API réelle."
+echo "✅ Full protocol green: unit tests, previews, real API."

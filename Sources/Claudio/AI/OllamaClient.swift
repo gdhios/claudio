@@ -14,8 +14,8 @@ enum OllamaError: LocalizedError {
         case .badResponse:
             return loc("Réponse inattendue d'Ollama.", en: "Unexpected response from Ollama.")
         case .http(let status, let message):
-            // 404 = modèle absent du disque : c'est la panne courante, et elle
-            // se répare d'une commande.
+            // 404 = model missing from disk: it's the common failure, and it
+            // fixes itself with a single command.
             if status == 404 {
                 return loc("Modèle introuvable dans Ollama : \(message). Tire-le avec « ollama pull ».",
                            en: "Model not found in Ollama: \(message). Pull it with “ollama pull”.")
@@ -27,14 +27,14 @@ enum OllamaError: LocalizedError {
     }
 }
 
-/// Client pour l'API native d'Ollama, en local ou sur le réseau local.
-/// On vise `/api/chat` plutôt que l'endpoint compatible OpenAI : le natif
-/// annonce les jetons consommés et la cause d'arrêt, donc le compteur et la
-/// détection de troncature marchent sans rustine.
-/// Aucune authentification : Ollama n'en propose pas.
+/// Client for Ollama's native API, locally or over the local network.
+/// Targets `/api/chat` rather than the OpenAI-compatible endpoint: the native
+/// one reports the tokens consumed and the stop reason, so the counter and
+/// truncation detection work without a workaround.
+/// No authentication: Ollama doesn't offer any.
 struct OllamaClient: TextStreamClient {
     let baseURL: URL
-    /// Nom du modèle tel qu'Ollama le connaît, ex. « qwen2.5:14b ».
+    /// Model name as Ollama knows it, e.g. "qwen2.5:14b".
     let model: String
 
     func streamCompletion(
@@ -52,7 +52,7 @@ struct OllamaClient: TextStreamClient {
         let (bytes, response) = try await Self.send(request, baseURL: baseURL)
         guard let http = response as? HTTPURLResponse else { throw OllamaError.badResponse }
         guard http.statusCode == 200 else {
-            // Les erreurs HTTP arrivent en JSON d'un bloc, pas en NDJSON.
+            // HTTP errors arrive as a single JSON block, not as NDJSON.
             var data = Data()
             for try await byte in bytes { data.append(byte) }
             throw OllamaError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
@@ -67,14 +67,14 @@ struct OllamaClient: TextStreamClient {
         return parser.result
     }
 
-    /// Corps du POST /api/chat. Le budget de sortie s'appelle `num_predict` et
-    /// vit sous `options` : posé ailleurs, il est ignoré en silence et la
-    /// réponse part sans limite.
-    /// `think: false` coupe la réflexion des modèles hybrides (qwen3.5, qwen3…) :
-    /// laissée allumée, elle dévore tout `num_predict` et la réponse n'arrive
-    /// jamais. Un modèle sans mode réflexion ignore le champ sans broncher, on
-    /// l'envoie donc toujours. `keep_alive` et `num_ctx` sont posés ici pour
-    /// que l'app ne dépende pas de la configuration du serveur.
+    /// Body of the POST /api/chat. The output budget is called `num_predict`
+    /// and lives under `options`: set anywhere else, it's silently ignored
+    /// and the response goes out with no limit.
+    /// `think: false` turns off reasoning on hybrid models (qwen3.5, qwen3…):
+    /// left on, it eats up all of `num_predict` and the response never
+    /// arrives. A model without a reasoning mode ignores the field without
+    /// complaint, so it's always sent. `keep_alive` and `num_ctx` are set
+    /// here so the app doesn't depend on the server's own configuration.
     static func makeBody(
         text: String, system: String, model: String, maxTokens: Int
     ) -> [String: Any] {
@@ -87,8 +87,8 @@ struct OllamaClient: TextStreamClient {
                 ["role": "system", "content": system],
                 ["role": "user", "content": text]
             ],
-            // Un modèle local n'a pas les caprices de température des modèles 5 :
-            // on l'envoie toujours.
+            // A local model doesn't have the temperature quirks of the 5
+            // models: it's always sent.
             "options": [
                 "num_predict": maxTokens,
                 "temperature": Constants.temperature,
@@ -97,10 +97,10 @@ struct OllamaClient: TextStreamClient {
         ]
     }
 
-    /// Fenêtre de contexte demandée. Fixe exprès : Ollama recharge le modèle
-    /// dès qu'elle change d'une requête à l'autre, deux secondes perdues. Elle
-    /// ne grandit, par paliers de 4096, que pour une entrée qui n'y tiendrait
-    /// pas avec son budget de sortie — sinon Ollama tronque l'entrée en silence.
+    /// Requested context window. Fixed on purpose: Ollama reloads the model
+    /// every time it changes between requests, wasting two seconds. It only
+    /// grows, in steps of 4096, for an input that wouldn't fit alongside its
+    /// output budget: otherwise Ollama silently truncates the input.
     static func contextLength(text: String, system: String, maxTokens: Int) -> Int {
         let approxInputTokens = (text.count + system.count) / 4
         let needed = approxInputTokens + maxTokens + 256
@@ -108,17 +108,17 @@ struct OllamaClient: TextStreamClient {
         return (needed + 4095) / 4096 * 4096
     }
 
-    // MARK: - Modèles installés
+    // MARK: - Installed models
 
-    /// Modèles tirés sur la machine qui sert Ollama. Injoignable → liste vide :
-    /// le sélecteur des Réglages se contente de ne rien proposer.
+    /// Models pulled on the machine serving Ollama. Unreachable → empty list:
+    /// the Settings picker simply has nothing to offer.
     func availableModels() async -> [String] {
         (try? await reachableModels()) ?? []
     }
 
-    /// Même liste, mais l'échec se dit : c'est ce qu'attend le bouton
-    /// « Tester la connexion », qui doit distinguer « injoignable » de
-    /// « joignable, aucun modèle tiré ».
+    /// Same list, but the failure is reported: that's what the "Test
+    /// connection" button expects, since it must distinguish "unreachable"
+    /// from "reachable, no model pulled".
     func reachableModels() async throws -> [String] {
         let request = URLRequest(url: baseURL.appending(path: "api/tags"))
         let (bytes, response) = try await Self.send(request, baseURL: baseURL)
@@ -132,7 +132,7 @@ struct OllamaClient: TextStreamClient {
         return Self.modelNames(from: data)
     }
 
-    /// Noms de `GET /api/tags`, dans l'ordre rendu par Ollama.
+    /// Names from `GET /api/tags`, in the order Ollama returns them.
     static func modelNames(from data: Data) -> [String] {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let models = object["models"] as? [[String: Any]] else { return [] }
@@ -141,8 +141,8 @@ struct OllamaClient: TextStreamClient {
 
     // MARK: - Transport
 
-    /// Un serveur éteint est la panne la plus banale du moteur local : elle se
-    /// dit avec l'URL visée, pas avec un code d'URLSession.
+    /// A server that's off is the most banal failure of the local engine: it
+    /// should be reported with the URL it was aiming at, not a raw URLSession code.
     private static func send(
         _ request: URLRequest, baseURL: URL
     ) async throws -> (URLSession.AsyncBytes, URLResponse) {
@@ -163,7 +163,7 @@ struct OllamaClient: TextStreamClient {
         }
     }
 
-    /// Ollama annonce ses erreurs dans un champ `error` à la racine.
+    /// Ollama reports its errors in a top-level `error` field.
     static func apiErrorMessage(from data: Data) -> String {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let message = object["error"] as? String else {
@@ -174,10 +174,10 @@ struct OllamaClient: TextStreamClient {
     }
 }
 
-/// Lit le flux NDJSON d'Ollama ligne à ligne — un objet JSON complet par ligne,
-/// pas du SSE — et en tire ce que l'app attend : le texte, la troncature et les
-/// jetons consommés. Séparé du transport réseau pour être exerçable en test sur
-/// des transcriptions du flux.
+/// Reads Ollama's NDJSON stream line by line (one complete JSON object per
+/// line, not SSE) and pulls out what the app needs: the text, the truncation,
+/// and the tokens consumed. Kept separate from the network transport so it's
+/// testable against stream transcripts.
 struct OllamaStreamParser {
     private(set) var text = ""
     private(set) var truncated = false
@@ -189,19 +189,19 @@ struct OllamaStreamParser {
                      inputTokens: inputTokens, outputTokens: outputTokens)
     }
 
-    /// Consomme une ligne du flux et renvoie le fragment de texte qu'elle
-    /// apporte, s'il y en a un. Lève l'erreur qu'Ollama signale en flux.
+    /// Consumes one line of the stream and returns the text fragment it
+    /// carries, if any. Throws whatever error Ollama reports in-stream.
     mutating func consume(line: String) throws -> String? {
         guard let data = line.data(using: .utf8),
               let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }  // ligne vide ou tronquée : rien à en tirer
+        else { return nil }  // blank or truncated line: nothing to pull from it
 
         if let message = event["error"] as? String {
             throw OllamaError.stream(message)
         }
 
-        // La dernière ligne porte les comptes : `done:true` est le seul endroit
-        // où les jetons et la cause d'arrêt sont annoncés.
+        // The last line carries the counts: `done:true` is the only place
+        // where the tokens and stop reason are reported.
         if event["done"] as? Bool == true {
             truncated = (event["done_reason"] as? String) == "length"
             inputTokens = event["prompt_eval_count"] as? Int ?? inputTokens

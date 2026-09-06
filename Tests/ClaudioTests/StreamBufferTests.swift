@@ -1,9 +1,9 @@
 import XCTest
 @testable import Claudio
 
-/// Le tampon de flux est ce qui empêche la fenêtre d'avancer par à-coups sur
-/// les réponses longues. S'il retenait un fragment de trop, du texte
-/// disparaîtrait de l'écran — et personne ne le verrait en relisant le code.
+/// The stream buffer is what keeps the window from advancing in jerks on
+/// long responses. If it held onto one fragment too many, text would vanish
+/// from the screen, and no one would catch it just by rereading the code.
 @MainActor
 final class StreamBufferTests: XCTestCase {
 
@@ -11,7 +11,7 @@ final class StreamBufferTests: XCTestCase {
         CorrectionSession(action: .correct)
     }
 
-    func testOuvrirUnFluxRepartDUnePageBlanche() {
+    func testOpeningAStreamStartsFromABlankPage() {
         let session = session()
         session.correctedText = "d'avant"
         session.truncated = true
@@ -25,9 +25,9 @@ final class StreamBufferTests: XCTestCase {
         XCTAssertEqual(session.phase, .streaming)
     }
 
-    /// Le premier fragment ne doit pas attendre : c'est lui qui dit à
-    /// l'utilisateur que ça répond.
-    func testLePremierFragmentSAfficheImmediatement() {
+    /// The first fragment must not wait: it's the one that tells the user
+    /// something is responding.
+    func testTheFirstFragmentDisplaysImmediately() {
         let session = session()
         session.beginStreaming()
 
@@ -35,9 +35,8 @@ final class StreamBufferTests: XCTestCase {
         XCTAssertEqual(session.correctedText, "Bon")
     }
 
-    /// Les suivants attendent le vidage, puis arrivent dans l'ordre et en une
-    /// seule fois.
-    func testLesFragmentsSuivantsAttendentLeVidage() {
+    /// The next ones wait for the flush, then arrive in order and all at once.
+    func testTheNextFragmentsWaitForTheFlush() {
         let session = session()
         session.beginStreaming()
         session.appendStreamed("Bon")
@@ -51,7 +50,7 @@ final class StreamBufferTests: XCTestCase {
         XCTAssertEqual(session.correctedText, "Bonjour tout le monde")
     }
 
-    func testViderUnTamponVideNeChangeRien() {
+    func testFlushingAnEmptyBufferChangesNothing() {
         let session = session()
         session.beginStreaming()
         session.appendStreamed("Bonjour")
@@ -61,27 +60,27 @@ final class StreamBufferTests: XCTestCase {
         XCTAssertEqual(session.correctedText, "Bonjour")
     }
 
-    /// La fin du flux fait foi : elle remplace le texte publié en route, et ce
-    /// qui restait en tampon part avec lui.
-    func testLaFinDuFluxRemplaceToutEtNeLaisseRienDerriere() {
+    /// The end of the stream is authoritative: it replaces the text
+    /// published along the way, and whatever was still buffered goes with it.
+    func testTheEndOfTheStreamReplacesEverythingAndLeavesNothingBehind() {
         let session = session()
         session.beginStreaming()
         session.appendStreamed("Bon")
-        session.appendStreamed("jou")  // reste en tampon
+        session.appendStreamed("jou")  // stays in the buffer
 
         session.finishStreaming(with: "Bonjour tout le monde", truncated: true)
         XCTAssertEqual(session.correctedText, "Bonjour tout le monde")
         XCTAssertTrue(session.truncated)
         XCTAssertEqual(session.phase, .done)
 
-        // Le tampon a été vidé, pas seulement ignoré : un vidage tardif ne doit
-        // pas venir recoller un morceau à la fin du texte final.
+        // The buffer was flushed, not just ignored: a late flush must not
+        // come back and stick a piece onto the end of the final text.
         session.flushStreamed()
         XCTAssertEqual(session.correctedText, "Bonjour tout le monde")
     }
 
-    /// ⏎ pendant le flux ne doit pas coller un résultat à moitié écrit.
-    func testOnNeCollePasAvantLaFinDuFlux() {
+    /// ⏎ during the stream must not paste a half-written result.
+    func testNothingIsPastedBeforeTheStreamEnds() {
         let session = session()
         session.beginStreaming()
         session.appendStreamed("Bonjour")
@@ -90,14 +89,14 @@ final class StreamBufferTests: XCTestCase {
         session.finishStreaming(with: "Bonjour", truncated: false)
         XCTAssertTrue(session.canPaste)
 
-        // Un résultat vide n'a rien à coller, même « terminé ».
+        // An empty result has nothing to paste, even when "done".
         session.finishStreaming(with: "", truncated: false)
         XCTAssertFalse(session.canPaste)
     }
 
-    /// Un flux qui repart (« Réessayer + ») ne doit pas hériter du tampon du
-    /// précédent.
-    func testUnNouveauFluxNeRecolleRienDuPrecedent() {
+    /// A stream that restarts ("Retry +") must not inherit the previous
+    /// one's buffer.
+    func testANewStreamDoesNotReattachAnythingFromThePrevious() {
         let session = session()
         session.beginStreaming()
         session.appendStreamed("Premier")

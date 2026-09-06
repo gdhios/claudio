@@ -1,8 +1,8 @@
 import Foundation
 
-/// Une action Claudio = un prompt système + un budget de tokens + ses libellés.
-/// Le rawValue sert de clé de stockage pour les prompts personnalisés : ne pas le changer.
-/// L'ordre de déclaration est celui du menu, des Réglages et du sélecteur de prompts.
+/// A Claudio action = a system prompt + a token budget + its labels.
+/// The rawValue is the storage key for custom prompts: do not change it.
+/// The declaration order is that of the menu, Settings, and the prompt picker.
 enum ClaudioAction: String, CaseIterable, Sendable {
     case correct
     case makePrompt
@@ -50,8 +50,8 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Libellé dans la palette : plus court que celui du menu, qui passerait à
-    /// la ligne dans une liste (« Lapacompris : expliquer simplement »).
+    /// Label in the palette: shorter than the menu one, which would wrap to
+    /// a new line in a list ("Lapacompris: explain simply").
     var paletteTitle: String {
         switch self {
         case .correct: loc("Corriger", en: "Fix")
@@ -65,7 +65,7 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Seconde ligne dans la palette : ce que l'action fait, en un souffle.
+    /// Second line in the palette: what the action does, in one breath.
     var paletteDetail: String {
         switch self {
         case .correct: loc("Orthographe, grammaire, ponctuation", en: "Spelling, grammar, punctuation")
@@ -79,7 +79,7 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Prompt système effectif : personnalisé (Réglages) sinon défaut.
+    /// Effective system prompt: custom (Settings) otherwise the default.
     var system: String { AppSettings.customSystemPrompt(for: self) ?? defaultSystem }
 
     var defaultSystem: String {
@@ -277,7 +277,7 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Forme du budget de sortie de cette action.
+    /// Shape of this action's output budget.
     var budget: ClaudioRequest.Budget {
         switch self {
         case .correct, .translateFR, .translateEN, .professionalTone: .rewrite
@@ -287,8 +287,8 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Requête exécutable correspondant à cette entrée du catalogue, prompt
-    /// système et modèle personnalisés des Réglages compris.
+    /// Executable request matching this catalog entry, including any custom
+    /// system prompt and model from Settings.
     var request: ClaudioRequest {
         ClaudioRequest(
             origin: .catalog(self),
@@ -297,8 +297,8 @@ enum ClaudioAction: String, CaseIterable, Sendable {
             system: system,
             model: model,
             budget: budget,
-            // La correction seule envoie le texte nu : elle ne risque pas d'être
-            // lue comme un ordre, et le modèle recopierait volontiers les balises.
+            // Correction alone sends the raw text: it isn't at risk of being
+            // read as a command, and the model would happily echo back tags.
             wrapsSource: self != .correct
         )
     }

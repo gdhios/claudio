@@ -1,14 +1,14 @@
 import XCTest
 @testable import Claudio
 
-/// La palette est le seul endroit où l'utilisateur cherche une action au
-/// clavier : si le filtre rate une action ou si la ligne libre disparaît, il
-/// n'a plus aucun moyen d'arriver à ce qu'il veut.
+/// The palette is the only place a user searches for an action by keyboard:
+/// if the filter misses an action or the free row disappears, they have no
+/// way left to reach what they want.
 final class PaletteCatalogTests: XCTestCase {
 
-    /// Les libellés attendus sont français : la suite fixe la langue plutôt
-    /// que d'hériter de celle de la machine, sinon elle échoue sur un runner
-    /// anglais (la CI) et passe sur un Mac français.
+    /// The expected labels are French: the suite pins the language rather than
+    /// inheriting it from the machine, otherwise it fails on an English runner
+    /// (CI) and passes on a French Mac.
     private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
@@ -22,36 +22,36 @@ final class PaletteCatalogTests: XCTestCase {
         super.tearDown()
     }
 
-    func testSaisieVideRendToutLeCatalogue() {
+    func testEmptyInputReturnsTheWholeCatalog() {
         XCTAssertEqual(PaletteCatalog.matches("").count, ClaudioAction.allCases.count)
         XCTAssertEqual(PaletteCatalog.matches("   ").count, ClaudioAction.allCases.count)
     }
 
-    func testTousLesMotsDoiventCorrespondre() {
-        // « trad ang » : les deux mots se retrouvent dans la traduction en
-        // anglais, mais pas dans celle en français.
+    func testEveryWordMustMatch() {
+        // "trad ang": both words are found in the English translation action,
+        // but not in the French one.
         let deuxMots = PaletteCatalog.matches("trad ang")
         XCTAssertEqual(deuxMots, [.translateEN])
-        // Un seul des deux mots suffit à ramener les deux traductions.
+        // Either word alone is enough to bring back both translations.
         XCTAssertEqual(Set(PaletteCatalog.matches("trad")), Set([.translateFR, .translateEN]))
     }
 
-    func testAccentsEtCasseIgnores() {
+    func testAccentsAndCaseAreIgnored() {
         XCTAssertEqual(PaletteCatalog.matches("FRANCAIS"), [.translateFR])
         XCTAssertEqual(PaletteCatalog.matches("français"), [.translateFR])
     }
 
-    func testSaisieSansCorrespondanceNeLaissePasSansIssue() {
+    func testInputWithNoMatchDoesNotLeaveADeadEnd() {
         XCTAssertTrue(PaletteCatalog.matches("zzz").isEmpty)
     }
 
     @MainActor
-    func testLaLigneLibreEstToujoursPresente() {
-        // Catalogue complet + la ligne libre.
+    func testTheFreeRowIsAlwaysPresent() {
+        // Full catalog + the free row.
         XCTAssertEqual(PaletteCatalog.rows(matching: "").count, ClaudioAction.allCases.count + 1)
 
-        // Aucune action ne correspond : il reste la ligne libre, qui reprend la
-        // saisie comme consigne.
+        // No action matches: only the free row remains, which reuses the
+        // input as its instruction.
         let orphelines = PaletteCatalog.rows(matching: "Traduis en espagnol")
         XCTAssertEqual(orphelines.count, 1)
         XCTAssertEqual(orphelines[0].title, "Traduis en espagnol")
@@ -60,16 +60,16 @@ final class PaletteCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testLigneLibreSansConsigneResteAEnvoyerPlusTard() {
+    func testTheFreeRowWithNoInstructionStaysPendingToSendLater() {
         let libre = PaletteCatalog.rows(matching: "").last
         XCTAssertEqual(libre?.origin, .free(instruction: ""))
-        // Sans consigne, la requête n'est pas envoyable : le panneau bascule
-        // sur le champ de saisie plutôt que d'expédier une instruction vide.
+        // With no instruction, the request can't be sent: the panel switches
+        // to the input field instead of dispatching an empty instruction.
         XCTAssertEqual(libre?.request.needsInstruction, true)
     }
 
     @MainActor
-    func testLaSelectionResteDansLaListe() {
+    func testTheSelectionStaysWithinTheList() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
         session.movePaletteSelection(by: -1)
         XCTAssertEqual(session.paletteSelection, 0)
@@ -80,7 +80,7 @@ final class PaletteCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testFiltrerRemetLaSelectionEnTete() {
+    func testFilteringResetsTheSelectionToTheTop() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
         session.movePaletteSelection(by: 3)
         XCTAssertEqual(session.paletteSelection, 3)

@@ -1,10 +1,10 @@
 import Foundation
 
-/// `Claudio --selftest [texte] [instruction]` : teste le client streaming en
-/// CLI, sans UI. Avec une instruction, c'est le chemin de l'action libre qui est
-/// exercé au lieu de la correction du catalogue.
-/// Code de sortie non nul si l'appel échoue : c'est ce qui permet à
-/// `Scripts/test.sh --release` de s'en servir comme verrou de publication.
+/// `Claudio --selftest [text] [instruction]`: tests the streaming client from
+/// the CLI, without the UI. With an instruction, the free-action path runs
+/// instead of the catalog correction.
+/// Non-zero exit code if the call fails: that's what lets
+/// `Scripts/test.sh --release` use it as a release gate.
 enum SelfTest {
     static func runBlocking() {
         let arguments = CommandLine.arguments
@@ -15,13 +15,13 @@ enum SelfTest {
             ? ClaudioRequest.free(instruction: extras[1])
             : ClaudioAction.correct.request
 
-        // Le moteur de l'action décide du client, comme dans l'app. Une action
-        // réglée en local se teste sans clé API.
+        // The action's engine decides the client, just like in the app. An
+        // action set to a local model is tested without an API key.
         let client: TextStreamClient
         switch request.model {
         case .claude(let model):
             guard let apiKey = KeychainStore.currentAPIKey() else {
-                print("❌ Aucune clé API : exporte \(Constants.apiKeyEnvVar) ou enregistre une clé dans les Réglages.")
+                print("❌ No API key: export \(Constants.apiKeyEnvVar) or save a key in Settings.")
                 exit(1)
             }
             client = AnthropicClient(apiKey: apiKey,
@@ -31,13 +31,13 @@ enum SelfTest {
             client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
         }
 
-        print("→ Action : \(request.panelTitle)")
-        print("→ Modèle : \(request.model.displayName)")
-        print("→ Texte  : \(sample)")
+        print("→ Action: \(request.panelTitle)")
+        print("→ Model:  \(request.model.displayName)")
+        print("→ Text:   \(sample)")
         print("---")
 
-        // Semaphore + Task.detached : le travail reste hors du main thread
-        // (bloqué par wait()), aucun saut vers le MainActor dans ce chemin.
+        // Semaphore + Task.detached: the work stays off the main thread
+        // (blocked by wait()), no hop to the MainActor on this path.
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             do {
@@ -50,16 +50,16 @@ enum SelfTest {
                 }
                 print("\n---")
                 print(result.truncated
-                      ? "⚠️ Réponse tronquée (max_tokens atteint)"
-                      : "✅ OK (\(result.text.count) caractères)")
-                // Rend visible ce que le compteur de dépense enregistrera.
+                      ? "⚠️ Response truncated (max_tokens reached)"
+                      : "✅ OK (\(result.text.count) characters)")
+                // Makes visible what the cost counter will record.
                 let cost = request.model.cost(inputTokens: result.inputTokens,
                                               outputTokens: result.outputTokens)
-                print("→ Jetons : \(result.inputTokens) entrée / \(result.outputTokens) sortie"
+                print("→ Tokens: \(result.inputTokens) in / \(result.outputTokens) out"
                       + " → \(Money.format(cost))")
             } catch {
-                // Une CLI qui échoue doit le dire par son code de sortie,
-                // pas seulement à l'écran.
+                // A CLI that fails must say so through its exit code,
+                // not just on screen.
                 print("\n❌ \(error.localizedDescription)")
                 fflush(stdout)
                 exit(1)

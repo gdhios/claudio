@@ -1,34 +1,34 @@
 import Foundation
 
-/// Anthropic facture en dollars : Claudio affiche des dollars plutôt qu'un
-/// taux de change inventé. Virgule décimale, comme partout ailleurs dans l'app.
+/// Anthropic bills in dollars: Claudio shows dollars rather than a made-up
+/// exchange rate. Decimal comma, as everywhere else in the app.
 enum Money {
     static func format(_ dollars: Double) -> String {
-        // La ponctuation du nombre suit la langue de l'interface : virgule et
-        // dollar en fin de phrase en français, point et dollar devant en anglais.
+        // The number's punctuation follows the interface language: comma and
+        // dollar sign at the end in French, period and dollar sign in front in English.
         if dollars > 0 && dollars < 0.005 { return loc("< 0,01 $", en: "< $0.01") }
         let amount = String(format: "%.2f", dollars)
         return loc("\(amount.replacingOccurrences(of: ".", with: ",")) $", en: "$\(amount)")
     }
 
-    /// Sans centimes quand il n'y en a pas : les tarifs par million sont ronds.
+    /// Without cents when there are none: per-million rates are round numbers.
     static func formatRounded(_ dollars: Double) -> String {
         guard dollars == dollars.rounded() else { return format(dollars) }
         return loc("\(Int(dollars)) $", en: "$\(Int(dollars))")
     }
 }
 
-/// Dépense cumulée d'une journée. Type valeur sans dépendance au stockage :
-/// c'est lui que les tests exercent.
+/// A day's cumulative spend. A value type with no dependency on storage:
+/// it's what the tests exercise.
 struct DailyCost: Equatable, Sendable {
-    /// Minuit du jour couvert.
+    /// Midnight of the day covered.
     var dayStart: Date
-    /// Dollars dépensés depuis ce minuit.
+    /// Dollars spent since that midnight.
     var total: Double
-    /// Nombre d'appels facturés.
+    /// Number of billed calls.
     var actions: Int
 
-    /// Ajoute un appel, en repartant de zéro si la journée a tourné.
+    /// Adds a call, starting over from zero if the day has rolled over.
     func adding(_ dollars: Double, at date: Date, calendar: Calendar = .current) -> DailyCost {
         let start = calendar.startOfDay(for: date)
         guard start == dayStart else {
@@ -37,7 +37,7 @@ struct DailyCost: Equatable, Sendable {
         return DailyCost(dayStart: start, total: total + dollars, actions: actions + 1)
     }
 
-    /// Ce qu'on affiche : le total n'a de sens que pour la journée en cours.
+    /// What we display: the total only makes sense for the current day.
     func current(at date: Date, calendar: Calendar = .current) -> DailyCost {
         let start = calendar.startOfDay(for: date)
         return start == dayStart ? self : DailyCost(dayStart: start, total: 0, actions: 0)
@@ -46,9 +46,9 @@ struct DailyCost: Equatable, Sendable {
     var formattedTotal: String { Money.format(total) }
 }
 
-/// Compteur de dépense du jour. Le calcul se fait sur la machine, à partir des
-/// jetons que l'API facture réellement ; rien n'est envoyé nulle part. Muet
-/// tant que le réglage est désactivé.
+/// Today's cost counter. The calculation happens on the machine, from the
+/// tokens the API actually bills; nothing is sent anywhere. Silent as long
+/// as the setting is off.
 @MainActor
 final class CostLedger: ObservableObject {
     static let shared = CostLedger()
@@ -65,8 +65,8 @@ final class CostLedger: ObservableObject {
 
     init(defaults: UserDefaults = .standard, now: Date = Date()) {
         self.defaults = defaults
-        // Sans rien de stocké, `dayStart` vaut la date de référence : jamais
-        // aujourd'hui, donc `current` remet à zéro de lui-même.
+        // With nothing stored, `dayStart` is the reference date: never
+        // today, so `current` resets to zero on its own.
         let stored = DailyCost(
             dayStart: Date(timeIntervalSinceReferenceDate: defaults.double(forKey: Key.dayStart)),
             total: defaults.double(forKey: Key.total),
@@ -75,10 +75,10 @@ final class CostLedger: ObservableObject {
         day = stored.current(at: now)
     }
 
-    /// Enregistre un appel terminé. Une annulation ou une erreur n'annonce
-    /// aucun jeton : on ne compte alors rien plutôt que d'estimer.
-    /// Un appel local ne coûte rien et n'est donc pas une dépense : il ne
-    /// gonfle ni le montant, ni le nombre d'actions facturées.
+    /// Records a completed call. A cancellation or an error reports no
+    /// tokens: we then count nothing rather than estimate. A local call
+    /// costs nothing and so isn't a spend: it inflates neither the amount
+    /// nor the count of billed actions.
     func record(model: ModelChoice, inputTokens: Int, outputTokens: Int, at date: Date = Date()) {
         guard !model.isLocal else { return }
         guard AppSettings.costCounterEnabled else { return }
@@ -88,13 +88,13 @@ final class CostLedger: ObservableObject {
         persist()
     }
 
-    /// Remet le compteur du jour à zéro.
+    /// Resets the day's counter to zero.
     func reset(at date: Date = Date()) {
         day = DailyCost(dayStart: Calendar.current.startOfDay(for: date), total: 0, actions: 0)
         persist()
     }
 
-    /// Rattrape un changement de date survenu pendant que l'app tournait.
+    /// Catches up with a date change that happened while the app was running.
     func refresh(at date: Date = Date()) {
         let updated = day.current(at: date)
         guard updated != day else { return }

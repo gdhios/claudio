@@ -6,7 +6,7 @@ enum LoginItem {
         SMAppService.mainApp.status == .enabled
     }
 
-    /// ⚠️ Échoue sous `swift run` : SMAppService exige un vrai bundle .app.
+    /// ⚠️ Fails under `swift run`: SMAppService requires a real .app bundle.
     static func setEnabled(_ enabled: Bool) throws {
         if enabled {
             try SMAppService.mainApp.register()

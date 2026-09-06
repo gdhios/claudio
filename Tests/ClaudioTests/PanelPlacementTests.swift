@@ -2,38 +2,38 @@ import XCTest
 import AppKit
 @testable import Claudio
 
-/// Le panneau s'ouvre toujours au centre de l'écran actif — jamais dans un
-/// coin ni débordant — et il y reste centré quand sa hauteur suit le contenu.
+/// The panel always opens centered on the active screen (never in a corner,
+/// never overflowing), and it stays centered as its height follows the content.
 final class PanelCenteringTests: XCTestCase {
-    /// Un écran 1920×1080 avec sa barre de menus : ce que voit `visibleFrame`.
+    /// A 1920×1080 screen with its menu bar: what `visibleFrame` sees.
     private let visible = NSRect(x: 0, y: 52, width: 1920, height: 998)
 
-    func testLePanneauEstCentre() {
+    func testThePanelIsCentered() {
         let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: visible)
         XCTAssertEqual(placed.midX, visible.midX, accuracy: 0.01)
         XCTAssertEqual(placed.midY, visible.midY, accuracy: 0.01)
     }
 
-    /// Chaque hauteur possible, du panneau d'accueil à la palette pleine, reste
-    /// centrée au même milieu : il grandit sans glisser.
-    func testLeMilieuNeBougePasQuandLaHauteurChange() {
+    /// Every possible height, from the welcome panel to the full palette,
+    /// stays centered on the same midpoint: it grows without sliding.
+    func testTheMidpointDoesNotMoveWhenHeightChanges() {
         for height in stride(from: 180.0, through: 900.0, by: 30.0) {
             let placed = ResultPanel.centered(size: NSSize(width: 460, height: height), in: visible)
-            XCTAssertEqual(placed.midX, visible.midX, accuracy: 0.01, "hauteur \(height)")
-            XCTAssertEqual(placed.midY, visible.midY, accuracy: 0.01, "hauteur \(height)")
+            XCTAssertEqual(placed.midX, visible.midX, accuracy: 0.01, "height \(height)")
+            XCTAssertEqual(placed.midY, visible.midY, accuracy: 0.01, "height \(height)")
         }
     }
 
-    func testLePanneauResteDansLEcran() {
+    func testThePanelStaysOnScreen() {
         for height in [180.0, 300.0, 560.0, 900.0] {
             let placed = ResultPanel.centered(size: NSSize(width: 460, height: height), in: visible)
-            XCTAssertTrue(visible.contains(placed), "cadre hors écran pour hauteur \(height)")
+            XCTAssertTrue(visible.contains(placed), "frame off-screen for height \(height)")
         }
     }
 
-    /// Sur un second écran (origine décalée), le centre visé est bien celui de
-    /// cet écran-là, pas de l'écran principal.
-    func testCentreSurLEcranDonne() {
+    /// On a second screen (offset origin), the targeted center is that
+    /// screen's own, not the main screen's.
+    func testCenteringOnTheGivenScreen() {
         let autre = NSRect(x: 1920, y: 0, width: 1440, height: 900)
         let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: autre)
         XCTAssertEqual(placed.midX, autre.midX, accuracy: 0.01)
@@ -41,27 +41,27 @@ final class PanelCenteringTests: XCTestCase {
     }
 }
 
-/// Pendant le streaming, le texte grandit d'un cran à la fois : la fenêtre suit
-/// ces petits pas à l'instant, image par image, et glisse d'un easeOut sur les
-/// seuls grands sauts (ouverture, bascule vers la palette ou une erreur). Sans
-/// ce partage, un easeOut sur chaque cran rendrait la croissance saccadée.
+/// While streaming, the text grows one notch at a time: the window follows
+/// these small steps instantly, frame by frame, and slides with an easeOut
+/// only on the big jumps (opening, switching to the palette or to an error).
+/// Without this split, an easeOut on every notch would make the growth jerky.
 final class PanelResizeAnimationTests: XCTestCase {
-    func testUnPetitPasSuitLeTexteSansSAnimer() {
+    func testASmallStepFollowsTheTextWithoutAnimating() {
         XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 200, to: 200))
         XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 200, to: 224),
-                       "une ligne de plus se suit à l'instant, pas en animation")
+                       "one more line is followed instantly, not animated")
         XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 300, to: 260))
     }
 
-    func testUnGrandSautSAnime() {
+    func testABigJumpAnimates() {
         XCTAssertTrue(ResultPanel.shouldAnimateResize(from: 200, to: 460),
-                      "l'ouverture d'un long résultat glisse au lieu de cogner")
+                      "opening a long result slides instead of snapping")
         XCTAssertTrue(ResultPanel.shouldAnimateResize(from: 480, to: 210),
-                      "le retour à une petite taille glisse aussi")
+                      "returning to a small size also slides")
     }
 }
 
-/// Le survol de la palette ne choisit qu'une fois la main en mouvement.
+/// Hovering the palette only selects once the pointer is actually moving.
 @MainActor
 final class PaletteHoverTests: XCTestCase {
     private func palette() -> CorrectionSession {
@@ -71,22 +71,22 @@ final class PaletteHoverTests: XCTestCase {
         return session
     }
 
-    func testLeSurvolSansMouvementNeChoisitRien() {
+    func testHoverWithNoMovementSelectsNothing() {
         let session = palette()
         session.armHover(at: CGPoint(x: 500, y: 400))
         XCTAssertFalse(session.acceptsHover(at: CGPoint(x: 500, y: 400)))
-        XCTAssertFalse(session.acceptsHover(at: CGPoint(x: 501, y: 400)))  // tremblement
+        XCTAssertFalse(session.acceptsHover(at: CGPoint(x: 501, y: 400)))  // jitter
     }
 
-    func testLeSurvolCompteUneFoisLePointeurBouge() {
+    func testHoverCountsOncePointerMoves() {
         let session = palette()
         session.armHover(at: CGPoint(x: 500, y: 400))
         XCTAssertTrue(session.acceptsHover(at: CGPoint(x: 500, y: 460)))
-        // La main a bougé : la souris reprend son métier pour de bon.
+        // The pointer has moved: the mouse resumes its job for good.
         XCTAssertTrue(session.acceptsHover(at: CGPoint(x: 500, y: 460)))
     }
 
-    func testLeSurvolCompteQuandRienNArmeLaGarde() {
+    func testHoverCountsWhenNothingHasArmedTheGuard() {
         XCTAssertTrue(palette().acceptsHover(at: CGPoint(x: 0, y: 0)))
     }
 }

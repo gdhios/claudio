@@ -1,8 +1,8 @@
 import CoreGraphics
 
 enum Keystroke {
-    // Keycodes physiques : mêmes positions en QWERTY et AZERTY
-    // (limite connue : Dvorak/Bépo).
+    // Physical keycodes: same positions on QWERTY and AZERTY
+    // (known limitation: Dvorak/Bépo).
     static let keyC: CGKeyCode = 0x08   // kVK_ANSI_C
     static let keyV: CGKeyCode = 0x09   // kVK_ANSI_V
 

@@ -4,9 +4,9 @@ import SwiftUI
 final class CorrectionSession: ObservableObject {
     enum Phase: Equatable {
         case capturing
-        /// Palette : la sélection est prise, l'action se choisit dans le panneau.
+        /// Palette: the selection is captured, the action is chosen in the panel.
         case choosingAction
-        /// Action libre : la sélection est prise, la consigne se saisit dans le panneau.
+        /// Custom action: the selection is captured, the instruction is entered in the panel.
         case askingInstruction
         case streaming
         case done
@@ -16,8 +16,8 @@ final class CorrectionSession: ObservableObject {
     }
 
     @Published private(set) var request: ClaudioRequest
-    /// La palette s'ouvre entre la capture et l'appel : la requête n'est alors
-    /// qu'un garnissage, remplacé par la ligne choisie.
+    /// The palette opens between the capture and the call: the request is then
+    /// only a placeholder, replaced by the chosen row.
     let opensPalette: Bool
 
     init(request: ClaudioRequest, opensPalette: Bool = false) {
@@ -25,49 +25,49 @@ final class CorrectionSession: ObservableObject {
         self.opensPalette = opensPalette
     }
 
-    /// Confort pour les appels qui partent d'une entrée du catalogue.
+    /// Convenience for calls that start from a catalog entry.
     convenience init(action: ClaudioAction) { self.init(request: action.request) }
 
-    /// L'action libre ne connaît sa requête qu'une fois la consigne validée.
+    /// The custom action only learns its request once the instruction is confirmed.
     func adopt(_ request: ClaudioRequest) { self.request = request }
 
     @Published var phase: Phase = .capturing
     @Published var correctedText = ""
     @Published var truncated = false
     @Published var justCopied = false
-    /// Consigne en cours de saisie (action libre).
+    /// Instruction currently being typed (custom action).
     @Published var instruction = ""
-    /// Saisie de la palette : filtre le catalogue, et sert de consigne si c'est
-    /// la ligne d'action libre qu'on lance.
+    /// Palette input: filters the catalog, and serves as the instruction if it's
+    /// the custom-action row that gets launched.
     @Published var paletteQuery = "" {
-        didSet { paletteSelection = 0 }  // le filtre a changé : la liste aussi
+        didSet { paletteSelection = 0 }  // the filter changed, so does the list
     }
     @Published var paletteSelection = 0
     var originalText = ""
     var maxTokensMultiplier = 1
 
-    /// Lignes de la palette pour la saisie courante.
+    /// Palette rows for the current input.
     var paletteRows: [PaletteRow] { PaletteCatalog.rows(matching: paletteQuery) }
 
-    /// Ligne mise en avant, bornée : le filtre peut raccourcir la liste sous
-    /// l'index courant entre deux frappes.
+    /// Highlighted row, clamped: the filter can shorten the list below
+    /// the current index between two keystrokes.
     var selectedPaletteRow: PaletteRow? {
         let rows = paletteRows
         guard !rows.isEmpty else { return nil }
         return rows[min(max(paletteSelection, 0), rows.count - 1)]
     }
 
-    /// Position du pointeur à l'ouverture de la palette. Tant qu'il n'a pas
-    /// bougé, son survol ne choisit rien : le panneau s'ouvre près du curseur,
-    /// et une ligne qu'il recouvrirait s'attribuerait la sélection sans que la
-    /// main y soit pour rien.
+    /// Pointer position when the palette opens. As long as it hasn't
+    /// moved, hovering over it selects nothing: the panel opens near the cursor,
+    /// and a row it happens to cover would otherwise grab the selection with no
+    /// hand involved.
     private var hoverOrigin: CGPoint?
 
-    /// À l'apparition de la palette : le survol est en attente d'un mouvement.
+    /// When the palette appears: hovering is pending a movement.
     func armHover(at location: CGPoint) { hoverOrigin = location }
 
-    /// `true` si ce survol vient d'une main qui a bougé. Le premier vrai
-    /// mouvement rend la souris à son métier, définitivement.
+    /// `true` if this hover comes from a hand that has moved. The first real
+    /// movement hands the mouse back to its job, for good.
     func acceptsHover(at location: CGPoint) -> Bool {
         guard let origin = hoverOrigin else { return true }
         guard hypot(location.x - origin.x, location.y - origin.y) > 2 else { return false }
@@ -75,19 +75,19 @@ final class CorrectionSession: ObservableObject {
         return true
     }
 
-    /// Déplace la sélection sans sortir de la liste : arrivé en bas, on y reste.
+    /// Moves the selection without leaving the list: once at the bottom, it stays there.
     func movePaletteSelection(by delta: Int) {
         let count = paletteRows.count
         guard count > 0 else { return }
         paletteSelection = min(max(paletteSelection + delta, 0), count - 1)
     }
 
-    /// Index de la ligne que lance un chiffre, ou `nil` si la touche doit
-    /// suivre sa route. Le rang affiché devant chaque ligne se tape donc tel
-    /// quel — c'est ce qu'il promet. Sans ⌘ il ne lance toutefois que tant que
-    /// rien n'est écrit : passé la première frappe le champ dicte une consigne,
-    /// et « 3 » doit s'y écrire. Une espace en tête suffit alors pour commencer
-    /// une consigne par un chiffre.
+    /// Index of the row a digit launches, or `nil` if the key should
+    /// go its own way. The rank shown in front of each row is therefore typed as
+    /// is: that's what it promises. Without ⌘ it only launches, though, as long as
+    /// nothing has been typed yet: past the first keystroke the field is dictating an
+    /// instruction, and "3" has to be written into it. A leading space is then enough
+    /// to start an instruction with a digit.
     func paletteIndex(forRank rank: Int, withCommand: Bool) -> Int? {
         guard phase == .choosingAction else { return nil }
         guard withCommand || paletteQuery.isEmpty else { return nil }
@@ -97,27 +97,27 @@ final class CorrectionSession: ObservableObject {
 
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
 
-    /// Consigne exploitable : le bouton « Lancer » et ⏎ restent inertes sans elle.
+    /// Usable instruction: the "Run" button and ⏎ stay inert without it.
     var trimmedInstruction: String {
         instruction.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // MARK: - Flux
+    // MARK: - Stream
 
-    /// Fragments reçus depuis la dernière publication. Le flux SSE en livre
-    /// plusieurs dizaines par seconde ; republier `correctedText` à chacun
-    /// relance une mise en page complète du texte, de plus en plus coûteuse à
-    /// mesure qu'il s'allonge. C'est ce qui saturait la boucle principale et
-    /// faisait avancer la fenêtre par à-coups sur les réponses longues. On
-    /// accumule, et on publie à cadence fixe.
+    /// Fragments received since the last publish. The SSE stream delivers
+    /// several dozen a second; republishing `correctedText` on each one
+    /// triggers a full re-layout of the text, growing more costly as it
+    /// gets longer. That's what was saturating the main loop and
+    /// making the window advance in jerks on long answers. So we
+    /// accumulate, and publish at a fixed cadence.
     private var streamBuffer = ""
     private var flushScheduled = false
 
-    /// Cadence de publication : assez courte pour que le texte reste vivant,
-    /// assez longue pour laisser la mise en page se faire entre deux.
+    /// Publish cadence: short enough for the text to feel alive,
+    /// long enough to let the layout pass happen in between.
     static let streamFlushInterval: Duration = .milliseconds(60)
 
-    /// Ouvre une réponse : tampon vidé, texte remis à zéro.
+    /// Opens a response: buffer cleared, text reset.
     func beginStreaming() {
         streamBuffer = ""
         flushScheduled = false
@@ -127,8 +127,8 @@ final class CorrectionSession: ObservableObject {
         phase = .streaming
     }
 
-    /// Reçoit un fragment. Le premier part tout de suite — le panneau doit
-    /// réagir dès le premier mot ; les suivants attendent le prochain vidage.
+    /// Receives a fragment. The first one goes out immediately: the panel must
+    /// react from the very first word; the following ones wait for the next flush.
     func appendStreamed(_ piece: String) {
         streamBuffer += piece
         guard !correctedText.isEmpty else {
@@ -143,7 +143,7 @@ final class CorrectionSession: ObservableObject {
         }
     }
 
-    /// Publie ce qui attend dans le tampon.
+    /// Publishes whatever is waiting in the buffer.
     func flushStreamed() {
         flushScheduled = false
         guard !streamBuffer.isEmpty else { return }
@@ -151,8 +151,8 @@ final class CorrectionSession: ObservableObject {
         streamBuffer = ""
     }
 
-    /// Fin du flux : le texte complet remplace ce qui est passé en route, et
-    /// ce qui restait dans le tampon avec lui.
+    /// End of stream: the full text replaces whatever went out along the way, and
+    /// whatever remained in the buffer with it.
     func finishStreaming(with text: String, truncated: Bool) {
         streamBuffer = ""
         flushScheduled = false
@@ -162,14 +162,14 @@ final class CorrectionSession: ObservableObject {
     }
 }
 
-/// Hauteur idéale du panneau entier — remontée à la fenêtre pour qu'elle
-/// épouse le contenu (fini le grand rectangle à moitié vide).
+/// Ideal height of the whole panel: reported to the window so it
+/// hugs the content (no more half-empty rectangle).
 private struct PanelHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Hauteur du texte dans le ScrollView — sert à borner la zone de contenu.
+/// Height of the text in the ScrollView: used to bound the content area.
 private struct TextHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
@@ -177,9 +177,9 @@ private struct TextHeightKey: PreferenceKey {
 
 struct ResultPanelView: View {
     @ObservedObject var session: CorrectionSession
-    /// Corps du texte, lu une fois à la construction du panneau : le réglage
-    /// s'applique au panneau suivant, et le panneau courant ne change pas de
-    /// taille sous les yeux de qui le lit.
+    /// Body text size, read once when the panel is built: the setting
+    /// applies to the next panel, and the current panel doesn't change
+    /// size under the reader's eyes.
     var textSize: PanelTextSize = .normal
     let onPaste: () -> Void
     let onCopy: () -> Void
@@ -198,8 +198,8 @@ struct ResultPanelView: View {
             header
             ClaudioTheme.panelSeparator.frame(height: 1)
             content
-            // La palette porte son propre pied (champ de saisie et indices) :
-            // le pied commun ne s'affiche que pour les autres phases.
+            // The palette carries its own footer (input field and hints):
+            // the shared footer only shows for the other phases.
             if session.phase != .choosingAction {
                 ClaudioTheme.panelSeparator.frame(height: 1)
                 footer
@@ -212,11 +212,11 @@ struct ResultPanelView: View {
             }
         }
         .onPreferenceChange(PanelHeightKey.self) { [onHeightChange] height in
-            // Reporter la hauteur à la fenêtre dans la même passe que le layout,
-            // sans saut de tour de boucle : elle suit le texte image par image
-            // au lieu d'accuser une image de retard — c'est ce décalage qui
-            // rognait le bas puis le révélait, d'où les à-coups. Le report est
-            // synchrone ; c'est la fenêtre qui décide d'animer ou non le saut.
+            // Report the height to the window in the same pass as the layout,
+            // with no loop-turn delay: it follows the text frame by frame
+            // instead of lagging one frame behind. That lag is what was
+            // clipping the bottom then revealing it, hence the jerks. The report
+            // is synchronous; it's the window that decides whether to animate the jump.
             MainActor.assumeIsolated { onHeightChange?(height) }
         }
         .background(ClaudioTheme.panelBackground,
@@ -230,12 +230,12 @@ struct ResultPanelView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            // Claudio en personne, en haut de sa fenêtre. Son regard suit la
-            // phase : il écoute, il réfléchit, il a fini.
+            // Claudio himself, at the top of his window. His gaze follows the
+            // phase: he's listening, he's thinking, he's done.
             ClaudioMascot(gaze: .init(session.phase))
             Text("Claudio").font(.headline)
-            // Pendant la palette, aucune action n'est choisie : la pastille
-            // mentirait. La dépense du jour prend sa place.
+            // During the palette, no action is chosen: the pill
+            // would be lying. Today's spending takes its place.
             if session.phase == .choosingAction {
                 Spacer()
                 CostGauge()
@@ -324,17 +324,17 @@ struct ResultPanelView: View {
                 }
                 .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
                 .onPreferenceChange(TextHeightKey.self) { height in
-                    // La hauteur mesurée saute d'une ligne entière à la fois.
-                    // L'interpoler ici plutôt que de la reporter telle quelle
-                    // fait suivre la fenêtre image par image : elle glisse au
-                    // lieu de sauter, sans que rien n'anime la fenêtre elle-même.
+                    // The measured height jumps a whole line at a time.
+                    // Interpolating it here rather than reporting it as-is
+                    // makes the window follow frame by frame: it slides
+                    // instead of jumping, with nothing animating the window itself.
                     Task { @MainActor in
                         withAnimation(.easeOut(duration: 0.18)) { textHeight = height }
                     }
                 }
                 .onChange(of: session.correctedText) {
-                    // Ne suivre le bas que s'il y a de quoi défiler : tant que
-                    // le texte tient dans le panneau, il n'y a rien à rattraper.
+                    // Only follow the bottom if there's something to scroll: as long as
+                    // the text fits in the panel, there's nothing to catch up on.
                     if textHeight > textSize.maxTextHeight {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
@@ -343,8 +343,8 @@ struct ResultPanelView: View {
         }
     }
 
-    /// Saisie de la consigne (action libre), avec un extrait de la sélection
-    /// sous le champ : on transforme un texte qu'on ne voit plus à l'écran.
+    /// Instruction input (custom action), with an excerpt of the selection
+    /// under the field: it's a text no longer visible on screen that gets transformed.
     private var instructionPrompt: some View {
         VStack(alignment: .leading, spacing: 9) {
             TextField("", text: $session.instruction,
@@ -372,13 +372,13 @@ struct ResultPanelView: View {
         }
         .padding(14)
         .onAppear {
-            // Le focus posé dans le même cycle que l'apparition est perdu :
-            // un tour de boucle plus tard, le champ le garde.
+            // Focus set in the same cycle as the appearance is lost:
+            // one loop turn later, the field keeps it.
             Task { @MainActor in instructionFocused = true }
         }
     }
 
-    /// Texte en streaming avec caret clignotant ; texte simple une fois terminé.
+    /// Streaming text with a blinking caret; plain text once finished.
     @ViewBuilder private var resultText: some View {
         if session.phase == .capturing || session.phase == .streaming {
             TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
@@ -405,10 +405,10 @@ struct ResultPanelView: View {
         .padding(.vertical, 26)
     }
 
-    /// Le modèle qui a traité la sélection, discret en bas à gauche : il rend
-    /// vérifiable d'un coup d'œil ce qui a répondu, Claude ou un modèle local.
-    /// Rien à montrer tant que la requête n'est qu'un garnissage de palette,
-    /// ou qu'aucun appel n'est parti.
+    /// The model that processed the selection, discreet at the bottom left: it makes
+    /// it verifiable at a glance what answered, Claude or a local model.
+    /// Nothing to show while the request is only a palette placeholder,
+    /// or no call has gone out yet.
     private var showsModelName: Bool {
         switch session.phase {
         case .askingInstruction, .streaming, .done, .error: return true
@@ -420,7 +420,7 @@ struct ResultPanelView: View {
         HStack(spacing: 8) {
             Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
             if showsModelName {
-                // Ni le séparateur ni le nom du modèle ne se traduisent.
+                // Neither the separator nor the model name are translated.
                 Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
                 Text(session.request.model.shortName)
                     .font(.caption2)
@@ -470,7 +470,7 @@ struct ResultPanelView: View {
     }
 }
 
-/// Croix de fermeture du panneau : discrète dans le header, cercle au survol.
+/// Panel close button: discreet in the header, becomes a circle on hover.
 private struct PanelCloseButton: View {
     let action: () -> Void
     @State private var hovered = false

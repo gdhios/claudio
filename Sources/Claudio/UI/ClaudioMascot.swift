@@ -1,33 +1,33 @@
 import AppKit
 import SwiftUI
 
-/// La mascotte de Claudio, dessinée nativement.
+/// Claudio's mascot, drawn natively.
 ///
-/// Les tracés sont ceux de `icon/claudio_mascotte.svg`, châssis « buste »,
-/// cités sans retouche : c'est ce fichier-là qui fait foi. Le paquet ne
-/// déclare aucune ressource, d'où le dessin en `Path` plutôt qu'un asset.
+/// The paths are those of `icon/claudio_mascotte.svg`, "bust" framing,
+/// quoted without retouching: that file is the source of truth. The package
+/// declares no resource, hence the drawing as `Path` rather than an asset.
 ///
-/// Seuls les yeux changent d'un état à l'autre — c'est ce qui tient le
-/// personnage ensemble.
+/// Only the eyes change from one state to another: that's what holds the
+/// character together.
 struct ClaudioMascot: View {
-    /// Les quatre regards du fichier maître. Quatre et pas six : à la
-    /// taille d'une barre de menus, le globe fait deux points et demi et
-    /// seule la *silhouette* de l'œil se lit. Déplacer une pupille dedans
-    /// ne dit pas « il regarde ailleurs », ça dit « ses yeux sont de
-    /// travers ». Chaque état change donc de forme, pas de direction.
+    /// The four gazes of the master file. Four, not six: at the
+    /// size of a menu bar, the eyeball is two and a half dots and
+    /// only the *silhouette* of the eye reads. Shifting a pupil inside it
+    /// doesn't say "he's looking elsewhere," it says "his eyes are
+    /// crooked." So each state changes shape, not direction.
     enum Gaze: Equatable {
-        /// Œil ouvert, pupille centrée. Il attend, il est disponible.
+        /// Open eye, centered pupil. He's waiting, available.
         case repos
-        /// Yeux clos. Il se concentre pendant que la réponse arrive.
+        /// Closed eyes. He's focusing while the answer comes in.
         case veille
-        /// Yeux qui sourient. C'est fait.
+        /// Smiling eyes. It's done.
         case fait
-        /// Globes pleins, sans pupille. Regard vide : il ne peut rien faire.
+        /// Full eyeballs, no pupil. Blank gaze: he can't do anything.
         case vide
     }
 
     var gaze: Gaze = .repos
-    /// Hauteur du dessin ; la largeur suit le cadrage du fichier maître.
+    /// Height of the drawing; the width follows the master file's framing.
     var height: CGFloat = 26
 
     var body: some View {
@@ -39,10 +39,10 @@ struct ClaudioMascot: View {
     }
 }
 
-// MARK: - Le regard suit la phase
+// MARK: - The gaze follows the phase
 
 extension ClaudioMascot.Gaze {
-    /// Ce que fait Claudio à cet instant se lit dans ses yeux.
+    /// What Claudio is doing at this instant reads in his eyes.
     init(_ phase: CorrectionSession.Phase) {
         switch phase {
         case .capturing, .choosingAction, .askingInstruction: self = .repos
@@ -53,30 +53,30 @@ extension ClaudioMascot.Gaze {
     }
 }
 
-// MARK: - Grille et couleurs
+// MARK: - Grid and colors
 
-/// La grille du fichier maître : 512 de côté, cadrée sur le buste.
+/// The master file's grid: 512 to a side, framed on the bust.
 private enum MascotGrid {
     static let frame = CGRect(x: 52, y: 52, width: 408, height: 310)
 
-    /// Le panneau est sombre en permanence : c'est la version claire du
-    /// fichier maître, celle qui s'applique sur fond sombre.
+    /// The panel is permanently dark: this is the light version of the
+    /// master file, the one meant for a dark background.
     static let trait = Color.white
     static let creux = Color(red: 49 / 255, green: 16 / 255, blue: 79 / 255)   // #31104f
     static let oeil = Color.white
     static let pupille = creux
 
-    /// Découpe de la tête : au-delà, ce sont les jambes de l'anneau, que la
-    /// moustache recouvre.
+    /// Head crop: beyond it lie the ring's "legs," which the
+    /// mustache covers.
     static let coupeTete = CGRect(x: 120, y: 60, width: 272, height: 211)
 
-    /// Facteur d'échelle de la grille vers une zone de rendu.
+    /// Scale factor from the grid to a render area.
     static func scale(into size: CGSize) -> CGFloat {
         min(size.width / frame.width, size.height / frame.height)
     }
 
-    /// De la grille du fichier maître vers une zone de rendu, centrée et
-    /// à proportions gardées.
+    /// From the master file's grid to a render area, centered and
+    /// with proportions kept.
     static func map(into size: CGSize) -> CGAffineTransform {
         let scale = scale(into: size)
         return CGAffineTransform(translationX: -frame.minX, y: -frame.minY)
@@ -86,13 +86,13 @@ private enum MascotGrid {
                 y: (size.height - frame.height * scale) / 2))
     }
 
-    /// Largeur qu'appelle une hauteur donnée.
+    /// Width called for by a given height.
     static func width(forHeight height: CGFloat) -> CGFloat {
         height * frame.width / frame.height
     }
 }
 
-// MARK: - Tracés cités du logo
+// MARK: - Logo paths, quoted
 
 private enum MascotTrace {
     static let teteAnneau = """
@@ -116,22 +116,22 @@ private enum MascotTrace {
     """
 }
 
-// MARK: - Dessin
+// MARK: - Drawing
 
 extension ClaudioMascot {
-    /// Rend le buste puis le regard, à l'échelle de la zone donnée.
+    /// Renders the bust then the gaze, scaled to the given area.
     fileprivate static func draw(gaze: Gaze, in context: inout GraphicsContext, size: CGSize) {
         let map = MascotGrid.map(into: size)
         func place(_ path: Path) -> Path { path.applying(map) }
 
-        // ── Antenne : la tige puis la boule, géométrie du logo d'origine.
+        // ── Antenna: the shaft then the ball, geometry from the original logo.
         context.fill(place(Path(CGRect(x: 250.5, y: 114, width: 11, height: 23.613))),
                      with: .color(MascotGrid.trait))
         context.fill(place(Path(ellipseIn: CGRect(x: 256 - 21.255, y: 96.745 - 21.255,
                                                   width: 42.51, height: 42.51))),
                      with: .color(MascotGrid.trait))
 
-        // ── Tête : l'anneau et son creux, coupés à hauteur de moustache.
+        // ── Head: the ring and its hollow, cropped at mustache height.
         context.drawLayer { layer in
             layer.clip(to: place(Path(MascotGrid.coupeTete)))
             layer.fill(place(svgPath(MascotTrace.teteAnneau)),
@@ -140,10 +140,10 @@ extension ClaudioMascot {
                        with: .color(MascotGrid.creux))
         }
 
-        // ── Moustache : pleine, elle couvre d'elle-même le bas de la tête.
+        // ── Mustache: solid, it covers the bottom of the head by itself.
         context.fill(place(svgPath(MascotTrace.moustache)), with: .color(MascotGrid.trait))
 
-        // ── Regard.
+        // ── Gaze.
         drawGaze(gaze, in: &context, place: place)
     }
 
@@ -164,9 +164,9 @@ extension ClaudioMascot {
         }
     }
 
-    /// L'arc `M199,194 A21,21 0 0 1 239,194` du fichier maître, et son
-    /// symétrique : une corde de 40 pour un rayon de 21, donc un centre posé
-    /// juste sous la corde et un arc qui bombe vers le haut.
+    /// The arc `M199,194 A21,21 0 0 1 239,194` from the master file, and its
+    /// mirror: a chord of 40 for a radius of 21, so a center placed
+    /// just below the chord and an arc bowing upward.
     fileprivate static func smile(centeredOn x: CGFloat) -> Path {
         let r: CGFloat = 21, demiCorde: CGFloat = 20, y: CGFloat = 194
         let creuse = (r * r - demiCorde * demiCorde).squareRoot()
@@ -180,18 +180,18 @@ extension ClaudioMascot {
         return path
     }
 
-    /// L'échelle appliquée par `place`, pour les traits dont l'épaisseur est
-    /// exprimée dans la grille du fichier maître.
+    /// The scale applied by `place`, for strokes whose thickness is
+    /// expressed in the master file's grid.
     private static func scaleOf(_ place: (Path) -> Path) -> CGFloat {
         let repere = place(Path(CGRect(x: 0, y: 0, width: 100, height: 100)))
         return repere.boundingRect.width / 100
     }
 }
 
-/// Ce qu'un regard ajoute à la tête : des formes encrées, des pupilles
-/// creusées dedans, des arcs tracés. Le panneau les peint en deux tons ; le
-/// gabarit de la barre de menus creuse les pupilles à l'alpha. Une seule
-/// description, deux rendus.
+/// What a gaze adds to the head: inked shapes, pupils
+/// hollowed out inside them, arcs drawn. The panel paints them in two tones; the
+/// menu bar template hollows the pupils out via alpha. A single
+/// description, two renderings.
 private struct Regard {
     var pleins: [Path] = []
     var creuses: [Path] = []
@@ -200,7 +200,7 @@ private struct Regard {
     static let epaisseurArc: CGFloat = 11
 
     init(_ gaze: ClaudioMascot.Gaze) {
-        /// Un disque centré sur la ligne des yeux du fichier maître.
+        /// A disk centered on the master file's eye line.
         func disque(_ x: CGFloat, _ r: CGFloat) -> Path {
             Path(ellipseIn: CGRect(x: x - r, y: 187.481 - r, width: r * 2, height: r * 2))
         }
@@ -221,12 +221,12 @@ private struct Regard {
     }
 }
 
-// MARK: - Claudio dans la barre de menus
+// MARK: - Claudio in the menu bar
 
 extension ClaudioMascot {
-    /// Claudio en image gabarit. Le système ne lit que l'alpha et recolore
-    /// le reste : le creux de la tête et les pupilles sont donc des trous,
-    /// exactement la lecture en négatif du fichier maître.
+    /// Claudio as a template image. The system only reads the alpha and recolors
+    /// the rest: the hollow of the head and the pupils are therefore holes,
+    /// exactly the master file read in negative.
     static func menuBarImage(gaze: Gaze = .repos, height: CGFloat = 18) -> NSImage {
         let size = CGSize(width: MascotGrid.width(forHeight: height).rounded(), height: height)
         let image = NSImage(size: size, flipped: true) { rect in
@@ -237,13 +237,13 @@ extension ClaudioMascot {
             context.setFillColor(NSColor.black.cgColor)
             context.setStrokeColor(NSColor.black.cgColor)
 
-            // ── Antenne : la tige puis la boule.
+            // ── Antenna: the shaft then the ball.
             context.addPath(place(Path(CGRect(x: 250.5, y: 114, width: 11, height: 23.613))))
             context.addPath(place(Path(ellipseIn: CGRect(x: 256 - 21.255, y: 96.745 - 21.255,
                                                          width: 42.51, height: 42.51))))
             context.fillPath()
 
-            // ── Tête : l'anneau seul, coupé à hauteur de moustache.
+            // ── Head: the ring alone, cropped at mustache height.
             context.saveGState()
             context.addPath(place(Path(MascotGrid.coupeTete)))
             context.clip()
@@ -251,12 +251,12 @@ extension ClaudioMascot {
             context.fillPath(using: .evenOdd)
             context.restoreGState()
 
-            // ── Moustache.
+            // ── Mustache.
             context.addPath(place(svgPath(MascotTrace.moustache)))
             context.fillPath()
 
-            // ── Regard : globes et pupilles d'un seul tenant, remplis en
-            // pair-impair — les pupilles se creusent d'elles-mêmes.
+            // ── Gaze: eyeballs and pupils as one, filled with
+            // even-odd: the pupils hollow out on their own.
             let regard = Regard(gaze)
             var oeil = Path()
             for forme in regard.pleins + regard.creuses { oeil.addPath(forme) }
@@ -277,11 +277,11 @@ extension ClaudioMascot {
     }
 }
 
-// MARK: - Lecteur de tracé SVG
+// MARK: - SVG path reader
 
-/// Lecteur minimal de « path data » SVG : `M`, `L`, `H`, `V`, `C`, `Z`, en
-/// absolu comme en relatif. C'est tout ce qu'emploient les tracés du logo —
-/// ni arcs, ni notation exponentielle, ni décimales enchaînées.
+/// Minimal reader for SVG "path data": `M`, `L`, `H`, `V`, `C`, `Z`, in
+/// absolute as well as relative form. That's all the logo's paths use:
+/// no arcs, no exponential notation, no chained decimals.
 private func svgPath(_ data: String) -> Path {
     var path = Path()
     var point = CGPoint.zero
@@ -303,7 +303,7 @@ private func svgPath(_ data: String) -> Path {
         while i < chars.count, chars[i].isNumber || chars[i] == "." { text.append(chars[i]); i += 1 }
         return CGFloat(Double(text) ?? 0)
     }
-    /// Un point, absolu ou décalé du point courant selon la casse de la commande.
+    /// A point, absolute or offset from the current point depending on the command's case.
     func coordinate(relative: Bool) -> CGPoint {
         let x = number(), y = number()
         return relative ? CGPoint(x: point.x + x, y: point.y + y) : CGPoint(x: x, y: y)
@@ -344,7 +344,7 @@ private func svgPath(_ data: String) -> Path {
             path.closeSubpath()
             point = origin
         default:
-            // Commande non gérée : on s'arrête plutôt que de dessiner faux.
+            // Unhandled command: stop rather than draw something wrong.
             return path
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Vérificateur de mise à jour minimaliste : une lecture de version.json sur le
-/// site (aucune donnée envoyée), au lancement puis une fois par jour.
+/// Minimalist update checker: a read of version.json on the site (no data
+/// sent), at launch and then once a day.
 @MainActor
 final class UpdateChecker {
     static let shared = UpdateChecker()
@@ -11,15 +11,15 @@ final class UpdateChecker {
         let url: URL
     }
 
-    /// `failed` est distinct de `upToDate` pour que l'UI ne dise jamais
-    /// « à jour » sur une simple erreur réseau.
+    /// `failed` is distinct from `upToDate` so the UI never says "up to date"
+    /// on a plain network error.
     enum CheckOutcome {
         case upToDate(String)
         case updateAvailable(Feed)
         case failed
     }
 
-    /// Appelé quand une version plus récente est détectée (item du menu status).
+    /// Called when a newer version is detected (status menu item).
     var onUpdateFound: ((Feed) -> Void)?
     private(set) var availableUpdate: Feed?
 
@@ -29,16 +29,16 @@ final class UpdateChecker {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
-    /// La version du flux dépasse-t-elle celle installée ? Comparaison
-    /// numérique champ à champ : « 1.10.0 » dépasse « 1.9.9 », là où l'ordre
-    /// alphabétique inverserait. Égale ou plus ancienne (flux revenu en
-    /// arrière) → rien n'est proposé.
+    /// Does the feed's version exceed the installed one? Numeric,
+    /// field-by-field comparison: "1.10.0" beats "1.9.9", where alphabetical
+    /// order would reverse it. Equal or older (feed rolled back) means
+    /// nothing is offered.
     nonisolated static func isNewer(_ candidate: String, than current: String) -> Bool {
         candidate.compare(current, options: .numeric) == .orderedDescending
     }
 
-    /// Vérification au lancement, puis quotidienne (tolérance large : le moment
-    /// exact n'a aucune importance, autant laisser macOS regrouper les réveils).
+    /// Checked at launch, then daily (wide tolerance: the exact moment
+    /// doesn't matter, so let macOS batch the wakeups).
     func startPeriodicChecks() {
         Task { _ = await checkNow() }
         let timer = Timer.scheduledTimer(withTimeInterval: Constants.updateCheckInterval,

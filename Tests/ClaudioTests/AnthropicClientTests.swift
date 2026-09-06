@@ -1,16 +1,16 @@
 import XCTest
 @testable import Claudio
 
-/// Toutes les actions passent par ce client : le parsing du flux SSE décide du
-/// texte affiché puis collé, du badge « tronqué » et des jetons que le compteur
-/// de dépense enregistre ; le corps de la requête, de ce que l'API accepte.
-/// Ces tests le fixent sur des transcriptions du format /v1/messages, sans
-/// toucher au réseau.
+/// Every action goes through this client: SSE stream parsing decides the
+/// displayed and pasted text, the "truncated" badge, and the tokens the spend
+/// counter records; the request body decides what the API accepts.
+/// These tests pin it against /v1/messages-format transcripts, without
+/// touching the network.
 final class AnthropicClientTests: XCTestCase {
 
-    /// Les libellés attendus sont français : la suite fixe la langue plutôt
-    /// que d'hériter de celle de la machine, sinon elle échoue sur un runner
-    /// anglais (la CI) et passe sur un Mac français.
+    /// The expected labels are French: the suite pins the language rather than
+    /// inheriting it from the machine, otherwise it fails on an English runner
+    /// (CI) and passes on a French Mac.
     private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
@@ -24,9 +24,9 @@ final class AnthropicClientTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Passe une transcription au parseur, en vérifiant au passage que les
-    /// fragments livrés au fil de l'eau recomposent exactement le texte final :
-    /// c'est eux que le panneau affiche pendant le stream.
+    /// Feeds a transcript to the parser, checking along the way that the
+    /// fragments delivered as they stream in recompose exactly the final text:
+    /// that's what the panel displays during the stream.
     private func parse(_ lines: [String]) throws -> AnthropicClient.StreamParser {
         var parser = AnthropicClient.StreamParser()
         var pieces = ""
@@ -37,9 +37,9 @@ final class AnthropicClientTests: XCTestCase {
         return parser
     }
 
-    /// Une réponse ordinaire, telle que l'API l'envoie : événements nommés,
-    /// lignes vides entre eux, ping au milieu.
-    private let reponseOrdinaire = [
+    /// An ordinary response, as the API sends it: named events, blank lines
+    /// between them, a ping in the middle.
+    private let ordinaryResponse = [
         "event: message_start",
         #"data: {"type":"message_start","message":{"id":"msg_01X","type":"message","role":"assistant","content":[],"model":"claude-haiku-4-5","usage":{"input_tokens":58,"output_tokens":2}}}"#,
         "",
@@ -65,13 +65,12 @@ final class AnthropicClientTests: XCTestCase {
         #"data: {"type":"message_stop"}"#
     ]
 
-    func testUneReponseOrdinaireDonneTexteEtJetons() throws {
-        let parser = try parse(reponseOrdinaire)
+    func testOrdinaryResponseGivesTextAndTokens() throws {
+        let parser = try parse(ordinaryResponse)
         XCTAssertEqual(parser.text, "Bonjour tout le monde.")
         XCTAssertFalse(parser.truncated)
-        // L'entrée vient de message_start ; la sortie est cumulative et le
-        // dernier message_delta fait foi : 12 remplace le 2 initial, il ne s'y
-        // ajoute pas.
+        // Input comes from message_start; output is cumulative and the last
+        // message_delta wins: 12 replaces the initial 2, it doesn't add to it.
         XCTAssertEqual(parser.inputTokens, 58)
         XCTAssertEqual(parser.outputTokens, 12)
 
@@ -82,9 +81,9 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertFalse(result.truncated)
     }
 
-    /// `stop_reason: max_tokens` est ce qui allume le badge « Réponse
-    /// tronquée » et le bouton « Réessayer + ».
-    func testLaTroncatureEstDetectee() throws {
+    /// `stop_reason: max_tokens` is what lights up the "Truncated response"
+    /// badge and the "Retry +" button.
+    func testTruncationIsDetected() throws {
         let parser = try parse([
             #"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Début de rép"}}"#,
             #"data: {"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":400}}"#
@@ -94,9 +93,9 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertEqual(parser.outputTokens, 400)
     }
 
-    /// Une erreur signalée en plein flux (surcharge…) doit interrompre avec le
-    /// message de l'API, pas se fondre dans le texte.
-    func testUneErreurDansLeFluxInterrompt() {
+    /// An error signaled mid-stream (overload...) must interrupt with the
+    /// API's message, not blend into the text.
+    func testAnErrorMidStreamInterrupts() {
         var parser = AnthropicClient.StreamParser()
         _ = try? parser.consume(line: #"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Déb"}}"#)
         XCTAssertThrowsError(try parser.consume(
@@ -106,9 +105,9 @@ final class AnthropicClientTests: XCTestCase {
         }
     }
 
-    /// Un flux coupé avant l'annonce des jetons n'en invente pas : le compteur
-    /// de dépense n'enregistre alors rien plutôt qu'une estimation.
-    func testUnFluxCoupeNAnnonceAucunJeton() throws {
+    /// A stream cut off before tokens are announced doesn't invent any: the
+    /// spend counter then records nothing rather than an estimate.
+    func testAStreamCutOffAnnouncesNoTokens() throws {
         let parser = try parse([
             #"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Bonj"}}"#
         ])
@@ -117,9 +116,9 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertEqual(parser.outputTokens, 0)
     }
 
-    /// Le flux réel charrie des lignes qui ne portent rien (noms d'événements,
-    /// commentaires, JSON inattendu) : elles ne doivent ni planter ni écrire.
-    func testLesLignesEtrangeresSontIgnorees() throws {
+    /// The real stream carries lines that hold nothing (event names, comments,
+    /// unexpected JSON): they must neither crash nor write anything.
+    func testStrayLinesAreIgnored() throws {
         let parser = try parse([
             "event: content_block_delta",
             "",
@@ -133,22 +132,22 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertFalse(parser.truncated)
     }
 
-    // MARK: - Erreurs HTTP
+    // MARK: - HTTP Errors
 
-    /// Les erreurs HTTP arrivent en JSON classique, pas en SSE : le message de
-    /// l'API doit en ressortir pour s'afficher dans le panneau.
-    func testLeMessageDErreurHTTPEstExtrait() {
+    /// HTTP errors arrive as plain JSON, not SSE: the API's message must come
+    /// out of it to display in the panel.
+    func testTheHTTPErrorMessageIsExtracted() {
         let json = Data(#"{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"#.utf8)
         XCTAssertEqual(AnthropicClient.apiErrorMessage(from: json), "invalid x-api-key")
 
-        // Réponse illisible : on montre ce qu'on a reçu plutôt que rien.
+        // Unreadable response: show what was received rather than nothing.
         let brut = Data("mauvaise passerelle".utf8)
         XCTAssertEqual(AnthropicClient.apiErrorMessage(from: brut), "mauvaise passerelle")
     }
 
-    /// Les statuts que l'utilisateur rencontre vraiment portent un message qui
-    /// dit quoi faire, pas un code brut.
-    func testLesErreursHTTPCourantesParlentClair() {
+    /// The statuses a user actually encounters carry a message that says what
+    /// to do, not a raw code.
+    func testCommonHTTPErrorsSpeakPlainly() {
         XCTAssertEqual(AnthropicError.http(status: 401, message: "x").localizedDescription,
                        "Clé API invalide ou révoquée (401). Vérifie-la dans les Réglages.")
         XCTAssertTrue(AnthropicError.http(status: 429, message: "x").localizedDescription.contains("429"))
@@ -156,9 +155,9 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertTrue(AnthropicError.http(status: 500, message: "boom").localizedDescription.contains("boom"))
     }
 
-    // MARK: - Corps de requête
+    // MARK: - Request Body
 
-    func testLeCorpsDeRequeteEstCeluiQueLAPIAttend() throws {
+    func testTheRequestBodyIsWhatTheAPIExpects() throws {
         let body = AnthropicClient.makeBody(text: "Bonjour", system: "Corrige.",
                                             model: .haiku45, maxTokens: 512)
         XCTAssertEqual(body["model"] as? String, "claude-haiku-4-5")
@@ -169,13 +168,13 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertEqual(messages?.count, 1)
         XCTAssertEqual(messages?.first?["role"], "user")
         XCTAssertEqual(messages?.first?["content"], "Bonjour")
-        // Et il doit partir tel quel sur le réseau.
+        // And it must go out over the network exactly as it is.
         XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: body))
     }
 
-    /// `temperature` est accepté par Haiku 4.5 mais rejeté (400) par les
-    /// modèles 5 : l'envoyer au mauvais modèle casserait toutes ses actions.
-    func testLaTemperatureNePartQueVersHaiku() {
+    /// `temperature` is accepted by Haiku 4.5 but rejected (400) by the 5
+    /// models: sending it to the wrong model would break all of its actions.
+    func testTemperatureOnlyGoesToHaiku() {
         for model in ClaudioModel.allCases {
             let body = AnthropicClient.makeBody(text: "t", system: "s", model: model, maxTokens: 64)
             if model.supportsTemperature {
@@ -184,7 +183,7 @@ final class AnthropicClientTests: XCTestCase {
                 XCTAssertNil(body["temperature"], model.rawValue)
             }
         }
-        // Le garde-fou lui-même : seul Haiku 4.5 la supporte aujourd'hui.
+        // The guard itself: only Haiku 4.5 supports it today.
         XCTAssertEqual(ClaudioModel.allCases.filter(\.supportsTemperature), [.haiku45])
     }
 }

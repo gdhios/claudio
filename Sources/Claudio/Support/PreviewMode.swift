@@ -1,17 +1,18 @@
 import AppKit
 import SwiftUI
 
-/// Mode aperçu UI pour le développement : `Claudio --preview <mode>`
-/// avec mode ∈ panel, panel-streaming, panel-long, panel-error,
+/// UI preview mode for development: `Claudio --preview <mode>`
+/// with mode ∈ panel, panel-streaming, panel-long, panel-error,
 /// panel-noselection, panel-free, panel-free-filled, palette,
 /// palette-filtre, palette-libre, settings.
-/// `--size small|normal|large|extraLarge` force la taille du texte du panneau.
-/// Affiche l'élément à une position fixe et
-/// imprime la région à capturer (top-left, pour `screencapture -R`).
-/// Aucun raccourci global ni item de barre de menus n'est installé.
-/// Vrai quand l'app tourne en aperçu (`--preview`). Une vue s'en sert pour ne
-/// rien demander au réseau : un aperçu doit rendre le même écran sur toutes les
-/// machines, y compris sur un runner de CI où rien n'écoute (TESTING.md, niveau 2).
+/// `--size small|normal|large|extraLarge` forces the panel's text size.
+/// Shows the element at a fixed position and
+/// prints the region to capture (top-left, for `screencapture -R`).
+/// No global shortcut or menu bar item is installed.
+/// True when the app is running in preview (`--preview`). A view uses it to
+/// avoid asking the network for anything: a preview must render the same
+/// screen on every machine, including a CI runner where nothing is listening
+/// (TESTING.md, level 2).
 enum PreviewRun {
     static let isActive = CommandLine.arguments.contains("--preview")
 }
@@ -24,20 +25,20 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
     init(mode: String) { self.mode = mode }
 
-    /// Texte d'exemple des aperçus : un courriel écrit vite, avec les fautes
-    /// qui vont avec. Il suit la langue de l'interface — une capture anglaise
-    /// dont la sélection est en français ne montrerait pas ce qu'elle annonce.
+    /// Sample text for previews: an email written quickly, with the typos
+    /// that come with it. It follows the interface's language: an English
+    /// capture whose selection is in French wouldn't show what it advertises.
     private var sampleText: String {
         loc("Bonjour, je voulait savoir si tu pouvait m'envoyer les document avant demain matin. merci d'avance",
             en: "Hi, i wanted to know if you could send me the document before tomorow morning. thanks in advance")
     }
 
-    /// Consigne d'exemple pour les aperçus d'action libre.
+    /// Sample instruction for the custom-action previews.
     private var sampleInstruction: String {
         loc("Traduis en espagnol", en: "Translate to Spanish")
     }
 
-    /// Taille du texte de l'aperçu : `--size large`, sinon le réglage courant.
+    /// Preview's text size: `--size large`, otherwise the current setting.
     private var textSize: PanelTextSize {
         guard let index = CommandLine.arguments.firstIndex(of: "--size"),
               CommandLine.arguments.count > index + 1,
@@ -76,13 +77,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rend la fenêtre d'aperçu dans un PNG.
+    /// Renders the preview window to a PNG.
     ///
-    /// Rendu direct de la vue d'abord : c'est le seul chemin qui ne dépende
-    /// d'aucune permission. La capture par le compositeur (qui rendrait les
-    /// matériaux et l'ombre) demande l'autorisation d'enregistrement d'écran
-    /// et, sans elle, renvoie une image blanche sans le dire — un aperçu faux
-    /// est pire que pas d'aperçu.
+    /// Direct view rendering first: it's the only path that depends on no
+    /// permission. Capture by the compositor (which would render materials
+    /// and the shadow) requires screen-recording authorization and, without
+    /// it, silently returns a blank image: a fake preview is worse than no preview.
     private func writeShot(to path: String) {
         guard let window: NSWindow = panel ?? NSApp.windows.first(where: { $0.isVisible }) else {
             print("PREVIEW_SHOT=échec")
@@ -152,7 +152,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         panel.present()
     }
 
-    /// Palette : le vrai panneau, arrêté sur la phase de choix.
+    /// Palette: the real panel, stopped at the choosing phase.
     private func showPalettePreview() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
         session.originalText = sampleText
@@ -171,8 +171,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         panel.present()
     }
 
-    /// Claudio dans la barre de menus, à sa taille réelle puis grossi, sur
-    /// fond clair et sur fond sombre : c'est là que se juge la lisibilité.
+    /// Claudio in the menu bar, at his real size then enlarged, on a light
+    /// background and on a dark one: that's where readability gets judged.
     private func showMenuBarPreview() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 232),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -183,7 +183,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
-    /// Coordonnées pour `screencapture -R x,y,w,h` : origine top-left de l'écran principal.
+    /// Coordinates for `screencapture -R x,y,w,h`: top-left origin of the main screen.
     private func printCaptureRect() {
         let frame: NSRect
         if let panel {
@@ -201,14 +201,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         let w = Int(frame.width + margin * 2)
         let h = Int(frame.height + margin * 2)
         print("PREVIEW_RECT=\(x),\(y),\(w),\(h)")
-        fflush(stdout)  // stdout redirigé vers un fichier = bufferisé
+        fflush(stdout)  // stdout redirected to a file = buffered
     }
 }
 
 
-/// Les quatre regards sur les deux fonds de la barre de menus : à leur taille
-/// réelle, puis grossis sans lissage. C'est là que se juge la lisibilité — un
-/// regard qui ne se distingue pas ici ne sert à rien dans l'application.
+/// The four gazes on the menu bar's two backgrounds: at their real size,
+/// then enlarged without smoothing. That's where readability gets judged: a
+/// gaze that can't be told apart here is useless in the app.
 private final class MenuBarPreviewView: NSView {
     private let regards: [(String, ClaudioMascot.Gaze)] = [
         ("repos", .repos), ("veille", .veille), ("fait", .fait), ("vide", .vide),
@@ -218,8 +218,8 @@ private final class MenuBarPreviewView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let fonds: [(NSColor, NSColor)] = [
-            (NSColor(white: 0.96, alpha: 1), .black),   // barre claire
-            (NSColor(white: 0.11, alpha: 1), .white),   // barre sombre
+            (NSColor(white: 0.96, alpha: 1), .black),   // light bar
+            (NSColor(white: 0.11, alpha: 1), .white),   // dark bar
         ]
         let colonne: CGFloat = 104, bande: CGFloat = 116
 
@@ -238,11 +238,11 @@ private final class MenuBarPreviewView: NSView {
                     .foregroundColor: encre.withAlphaComponent(0.55),
                 ]).draw(at: NSPoint(x: x, y: haut + 10))
 
-                // Taille réelle, celle de la barre de menus.
+                // Real size, that of the menu bar.
                 image.draw(in: NSRect(x: x, y: haut + 28,
                                       width: taille.width, height: taille.height))
 
-                // Grossi trois fois, pixels apparents.
+                // Enlarged threefold, visible pixels.
                 NSGraphicsContext.current?.imageInterpolation = .none
                 image.draw(in: NSRect(x: x, y: haut + 54,
                                       width: taille.width * 3, height: taille.height * 3))
@@ -253,7 +253,7 @@ private final class MenuBarPreviewView: NSView {
 }
 
 private extension NSImage {
-    /// Une image gabarit ne porte que son alpha : voici sa version encrée.
+    /// A template image only carries its alpha: here is its inked version.
     func teinte(_ couleur: NSColor) -> NSImage {
         let copie = NSImage(size: size)
         copie.lockFocus()

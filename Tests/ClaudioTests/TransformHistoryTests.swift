@@ -1,87 +1,87 @@
 import XCTest
 @testable import Claudio
 
-/// L'historique des consignes libres : la plus récente en tête, sans doublon,
-/// plafonné. C'est le cœur type-valeur que les tests exercent — le magasin, lui,
-/// ne fait que le persister.
+/// The history of free-form instructions: most recent first, no duplicates,
+/// capped. This is the value-type core the tests exercise; the store itself
+/// only persists it.
 final class TransformHistoryTests: XCTestCase {
 
-    private let midi = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    private let noon = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    func testLaPlusRecenteEstEnTete() {
+    func testTheMostRecentIsFirst() {
         var recents = RecentTransforms()
-        recents = recents.adding("Traduis en espagnol", at: midi)
-        recents = recents.adding("Résume en trois points", at: midi.addingTimeInterval(60))
+        recents = recents.adding("Traduis en espagnol", at: noon)
+        recents = recents.adding("Résume en trois points", at: noon.addingTimeInterval(60))
         XCTAssertEqual(recents.entries.map(\.instruction),
                        ["Résume en trois points", "Traduis en espagnol"])
     }
 
-    /// Relancer deux fois la même consigne ne la dédouble pas : elle remonte en
-    /// tête, avec sa nouvelle date.
-    func testUneConsigneRepeteeRemonteSansSeDedoubler() {
+    /// Running the same instruction twice doesn't duplicate it: it moves back
+    /// to the top, with its new date.
+    func testARepeatedInstructionMovesUpWithoutDuplicating() {
         var recents = RecentTransforms()
-        recents = recents.adding("Traduis en espagnol", at: midi)
-        recents = recents.adding("Passe au passé", at: midi.addingTimeInterval(60))
-        recents = recents.adding("Traduis en espagnol", at: midi.addingTimeInterval(120))
+        recents = recents.adding("Traduis en espagnol", at: noon)
+        recents = recents.adding("Passe au passé", at: noon.addingTimeInterval(60))
+        recents = recents.adding("Traduis en espagnol", at: noon.addingTimeInterval(120))
         XCTAssertEqual(recents.entries.map(\.instruction),
                        ["Traduis en espagnol", "Passe au passé"])
-        XCTAssertEqual(recents.entries.first?.date, midi.addingTimeInterval(120))
+        XCTAssertEqual(recents.entries.first?.date, noon.addingTimeInterval(120))
     }
 
-    /// Au-delà du plafond, la plus ancienne tombe.
-    func testLePlafondFaitTomberLaPlusAncienne() {
+    /// Beyond the cap, the oldest entry falls off.
+    func testTheCapDropsTheOldestEntry() {
         var recents = RecentTransforms()
         for i in 1...5 {
-            recents = recents.adding("Consigne \(i)", at: midi.addingTimeInterval(Double(i)), limit: 3)
+            recents = recents.adding("Consigne \(i)", at: noon.addingTimeInterval(Double(i)), limit: 3)
         }
         XCTAssertEqual(recents.entries.map(\.instruction),
                        ["Consigne 5", "Consigne 4", "Consigne 3"])
     }
 
-    /// Une consigne vide ou blanche n'entre pas dans l'historique, et un texte
-    /// entouré d'espaces y entre nettoyé.
-    func testUneConsigneVideEstIgnoreeEtLesBlancsSontRognes() {
+    /// An empty or blank instruction doesn't enter the history, and text
+    /// surrounded by spaces enters it trimmed.
+    func testAnEmptyInstructionIsIgnoredAndWhitespaceIsTrimmed() {
         var recents = RecentTransforms()
-        recents = recents.adding("   ", at: midi)
+        recents = recents.adding("   ", at: noon)
         XCTAssertTrue(recents.entries.isEmpty)
-        recents = recents.adding("  Traduis en espagnol  ", at: midi)
+        recents = recents.adding("  Traduis en espagnol  ", at: noon)
         XCTAssertEqual(recents.entries.map(\.instruction), ["Traduis en espagnol"])
-        // La même consigne, avec d'autres espaces, reste un doublon rogné.
-        recents = recents.adding("Traduis en espagnol", at: midi.addingTimeInterval(60))
+        // The same instruction, with different spacing, is still a trimmed duplicate.
+        recents = recents.adding("Traduis en espagnol", at: noon.addingTimeInterval(60))
         XCTAssertEqual(recents.entries.count, 1)
     }
 
-    func testVider() {
+    func testClearing() {
         var recents = RecentTransforms()
-        recents = recents.adding("Traduis en espagnol", at: midi)
+        recents = recents.adding("Traduis en espagnol", at: noon)
         recents = recents.cleared()
         XCTAssertTrue(recents.entries.isEmpty)
     }
 
-    // MARK: - Magasin persistant
+    // MARK: - Persistent store
 
     @MainActor
-    func testLeMagasinSurvitAuRedemarrage() {
+    func testTheStoreSurvivesARestart() {
         let suite = "ClaudioTests.history.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
 
         let magasin = TransformHistory(defaults: defaults, limit: 20)
-        magasin.record("Traduis en espagnol", at: midi)
-        magasin.record("Résume en trois points", at: midi.addingTimeInterval(60))
+        magasin.record("Traduis en espagnol", at: noon)
+        magasin.record("Résume en trois points", at: noon.addingTimeInterval(60))
 
-        // Une nouvelle instance, comme au lancement suivant, relit le même stock.
+        // A new instance, as at the next launch, reads back the same storage.
         let relu = TransformHistory(defaults: defaults, limit: 20)
         XCTAssertEqual(relu.recents.entries.map(\.instruction),
                        ["Résume en trois points", "Traduis en espagnol"])
     }
 
     @MainActor
-    func testLeMagasinVideEffaceLeStock() {
+    func testClearingTheStoreErasesStorage() {
         let suite = "ClaudioTests.history.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
 
         let magasin = TransformHistory(defaults: defaults, limit: 20)
-        magasin.record("Traduis en espagnol", at: midi)
+        magasin.record("Traduis en espagnol", at: noon)
         magasin.clear()
 
         XCTAssertTrue(magasin.recents.entries.isEmpty)
@@ -89,7 +89,7 @@ final class TransformHistoryTests: XCTestCase {
     }
 
     @MainActor
-    func testUnStockVideDemarreVide() {
+    func testEmptyStorageStartsEmpty() {
         let defaults = UserDefaults(suiteName: "ClaudioTests.history.\(UUID().uuidString)")!
         XCTAssertTrue(TransformHistory(defaults: defaults, limit: 20).recents.entries.isEmpty)
     }

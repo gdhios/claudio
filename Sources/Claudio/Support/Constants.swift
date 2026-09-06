@@ -3,20 +3,20 @@ import AppKit
 enum Constants {
     static let appName = "Claudio"
 
-    // Le modèle se choisit par action (ClaudioModel + Réglages → Prompts).
+    // The model is chosen per action (ClaudioModel + Settings → Prompts).
     static let temperature = 0.2
 
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
     static let anthropicVersion = "2023-06-01"
 
-    // Moteur local : Ollama sur la machine. L'URL est éditable dans les
-    // Réglages pour viser un autre Mac du réseau local.
+    // Local engine: Ollama on this machine. The URL is editable in Settings
+    // to target another Mac on the local network.
     static let ollamaDefaultURL = URL(string: "http://localhost:11434")!
-    /// Le modèle reste chargé entre deux actions : sans cela Ollama le décharge
-    /// au bout de cinq minutes et l'action suivante paie un rechargement.
+    /// The model stays loaded between actions: otherwise Ollama unloads it
+    /// after five minutes and the next action pays for a reload.
     static let ollamaKeepAlive = "1h"
-    /// Fenêtre de contexte demandée à chaque requête. Fixe exprès : Ollama
-    /// recharge le modèle dès qu'elle change d'une requête à l'autre.
+    /// Context window requested on every request. Fixed on purpose: Ollama
+    /// reloads the model as soon as it changes from one request to the next.
     static let ollamaContextLength = 8192
 
     static let keychainService = "com.guillaumedhios.claudio"
@@ -24,26 +24,26 @@ enum Constants {
     static let apiKeyEnvVar = "ANTHROPIC_API_KEY"
     static let workspaceIDEnvVar = "ANTHROPIC_WORKSPACE_ID"
 
-    // Capture de sélection via ⌘C simulé
-    static let copyPollIntervalNs: UInt64 = 20_000_000        // 20 ms entre deux sondages du pasteboard
-    static let copyTimeout: TimeInterval = 0.3                // abandon si rien n'est copié
+    // Selection capture via simulated ⌘C
+    static let copyPollIntervalNs: UInt64 = 20_000_000        // 20 ms between two pasteboard polls
+    static let copyTimeout: TimeInterval = 0.3                // give up if nothing was copied
 
-    // Collage automatique
-    static let activationDelayNs: UInt64 = 150_000_000        // délai après réactivation de l'app cible
-    static let clipboardRestoreDelayNs: UInt64 = 500_000_000  // délai avant restauration du presse-papiers
-                                                              // (augmenter si une app lit le pasteboard lentement)
+    // Automatic paste
+    static let activationDelayNs: UInt64 = 150_000_000        // delay after reactivating the target app
+    static let clipboardRestoreDelayNs: UInt64 = 500_000_000  // delay before restoring the clipboard
+                                                              // (increase if an app reads the pasteboard slowly)
     static let restoreClipboardAfterPaste = true
 
-    // Mise à jour : simple lecture de version.json sur le site (aucune donnée envoyée).
+    // Update: a plain read of version.json on the site (no data sent).
     static let updateFeedURL = URL(string: "https://claudio.okonoma.com/version.json")!
     static let updateCheckInterval: TimeInterval = 24 * 3600
 
-    // Panneau : largeur fixe, hauteur adaptée au contenu (zone de texte bornée).
+    // Panel: fixed width, height adapted to content (bounded text area).
     static let panelWidth: CGFloat = 460
-    // Zone de texte : un plancher assez haut pour que la plupart des phrases
-    // s'affichent sans faire grandir la fenêtre (≈ 8 lignes au corps normal), et
-    // un plafond au-delà duquel on défile plutôt que d'agrandir encore. Le
-    // plancher fixe aussi la taille d'accueil du panneau, volontairement posée.
+    // Text area: a floor high enough that most sentences show without
+    // growing the window (about 8 lines at normal body size), and a ceiling
+    // beyond which it scrolls instead of growing further. The floor also
+    // sets the panel's home size, chosen deliberately.
     static let panelMinTextHeight: CGFloat = 160
     static let panelMaxTextHeight: CGFloat = 380
 }

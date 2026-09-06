@@ -1,8 +1,8 @@
 import SwiftUI
 import KeyboardShortcuts
 
-/// Réglages façon Réglages Système : barre latérale à pastilles colorées,
-/// sections en cartes (`.formStyle(.grouped)`).
+/// Settings styled after System Settings: sidebar with colored dots,
+/// sections as cards (`.formStyle(.grouped)`).
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
@@ -80,7 +80,7 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Général
+// MARK: - General
 
 @MainActor
 private struct GeneralPane: View {
@@ -174,7 +174,7 @@ private struct GeneralPane: View {
     }
 }
 
-// MARK: - Clé API
+// MARK: - API key
 
 private struct APIKeyPane: View {
     @State private var apiKeyField = ""
@@ -238,7 +238,7 @@ private struct OllamaPane: View {
     @State private var addressField = AppSettings.ollamaBaseURL.absoluteString
     @State private var testing = false
     @State private var models: [String] = []
-    /// Résultat du dernier test : le message et s'il annonce un échec.
+    /// Result of the last test: the message, and whether it reports a failure.
     @State private var report: String?
     @State private var failed = false
 
@@ -289,7 +289,7 @@ private struct OllamaPane: View {
         }
     }
 
-    /// Aperçu : l'écran peuplé, sans appeler le serveur.
+    /// Preview: the screen populated with data, without calling the server.
     private func showFixedState() {
         models = ["qwen2.5:14b", "llama3.2:3b"]
         failed = false
@@ -297,8 +297,8 @@ private struct OllamaPane: View {
                      en: "Connected — \(models.count) models found.")
     }
 
-    /// Une adresse illisible n'écrase pas celle qui marchait : le champ revient
-    /// à la valeur retenue.
+    /// An unreadable address doesn't overwrite the one that worked: the field
+    /// falls back to the value kept.
     @discardableResult
     private func save() -> URL? {
         guard let url = AppSettings.normalizedOllamaURL(addressField) else {
@@ -322,8 +322,8 @@ private struct OllamaPane: View {
         defer { testing = false }
 
         do {
-            // La découverte ne dépend pas d'un modèle : n'importe lequel ferait
-            // l'affaire, aucun n'est encore choisi ici.
+            // Discovery doesn't depend on a model: any one would do,
+            // none is chosen here yet.
             let found = try await OllamaClient(baseURL: url, model: "").reachableModels()
             models = found
             failed = false
@@ -340,13 +340,13 @@ private struct OllamaPane: View {
     }
 }
 
-// MARK: - Raccourcis
+// MARK: - Shortcuts
 
 private struct ShortcutsPane: View {
     var body: some View {
         Form {
             Section {
-                // En tête : la palette, qui donne accès à tout le reste.
+                // At the top: the palette, which gives access to everything else.
                 HStack(spacing: 10) {
                     IconBadge(systemName: PaletteCatalog.symbolName,
                               color: PaletteCatalog.tint, size: 22)
@@ -362,7 +362,7 @@ private struct ShortcutsPane: View {
                         KeyboardShortcuts.Recorder("", name: action.shortcutName)
                     }
                 }
-                // Hors catalogue : sa consigne se saisit dans le panneau.
+                // Outside the catalog: its instruction is entered in the panel.
                 HStack(spacing: 10) {
                     IconBadge(systemName: ClaudioRequest.awaitingInstruction.origin.symbolName,
                               color: ClaudioRequest.awaitingInstruction.origin.tint, size: 22)
@@ -389,13 +389,13 @@ private struct PromptsPane: View {
     @State private var selectedAction: ClaudioAction = .correct
     @State private var promptText: String = ClaudioAction.correct.system
     @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
-    /// Modèles tirés sur le serveur Ollama, relevés à l'ouverture du volet.
+    /// Models pulled on the Ollama server, read when the pane opens.
     @State private var localModels: [String] = []
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
 
-    /// Le modèle déjà réglé reste proposé même si le serveur ne répond pas :
-    /// sans lui, le sélecteur afficherait une ligne vide sur un réglage valide.
+    /// The already-set model stays offered even if the server doesn't respond:
+    /// without it, the picker would show a blank line for a valid setting.
     private var offeredLocalModels: [String] {
         guard case .ollama(let current) = selectedModel, !localModels.contains(current) else {
             return localModels
@@ -449,7 +449,7 @@ private struct PromptsPane: View {
                     .font(.callout)
                     .frame(minHeight: 260)
                     .onChange(of: promptText) {
-                        // Identique au défaut → on retire l'override (suit les mises à jour de l'app).
+                        // Same as the default: remove the override (follows app updates).
                         AppSettings.setCustomSystemPrompt(isCustomized ? promptText : nil,
                                                           for: selectedAction)
                     }
@@ -483,8 +483,8 @@ private struct PromptsPane: View {
                 return
             }
             Task {
-                // La découverte ne dépend pas d'un modèle : n'importe lequel
-                // ferait l'affaire, il s'agit seulement de peupler le menu.
+                // Discovery doesn't depend on a model: any one would do,
+                // this is only meant to populate the menu.
                 localModels = await OllamaClient(baseURL: AppSettings.ollamaBaseURL,
                                                  model: "").availableModels()
             }
@@ -492,7 +492,7 @@ private struct PromptsPane: View {
     }
 }
 
-// MARK: - À propos
+// MARK: - About
 
 private struct AboutPane: View {
     @State private var checking = false
@@ -588,8 +588,8 @@ private struct AboutPane: View {
         .formStyle(.grouped)
     }
 
-    /// Télécharge, vérifie et installe : en cas de succès l'app se termine et
-    /// la nouvelle version se relance seule.
+    /// Downloads, verifies and installs: on success, the app quits and
+    /// the new version relaunches itself.
     private func install(_ feed: UpdateChecker.Feed) {
         installing = true
         updateMessage = loc("Téléchargement de la version \(feed.version)…",

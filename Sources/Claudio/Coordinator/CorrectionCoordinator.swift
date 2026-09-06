@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Orchestre le cycle complet : capture → stream → panneau → collage.
+/// Orchestrates the full cycle: capture, stream, panel, paste.
 @MainActor
 final class CorrectionCoordinator {
     var openSettings: (() -> Void)?
@@ -12,34 +12,34 @@ final class CorrectionCoordinator {
     private var previousApp: NSRunningApplication?
     private var clipboardSnapshot: PasteboardSnapshot?
 
-    // MARK: - Déclenchement
+    // MARK: - Triggering
 
-    /// Entrée du catalogue : raccourci global ou item de menu.
+    /// Catalog entry: global shortcut or menu item.
     func trigger(action: ClaudioAction) {
         trigger(action.request)
     }
 
-    /// Action libre : même cycle, avec une escale de saisie de la consigne
-    /// entre la capture de la sélection et l'appel à l'API.
+    /// Custom action: same cycle, with a stop to type the instruction between
+    /// capturing the selection and calling the API.
     func triggerFreeAction() {
         trigger(.awaitingInstruction)
     }
 
-    /// Palette : la sélection est capturée d'abord, l'action se choisit ensuite
-    /// dans le panneau. La requête de départ n'est qu'un garnissage.
+    /// Palette: the selection is captured first, the action is chosen
+    /// afterward in the panel. The starting request is just filler.
     func triggerPalette() {
         trigger(.awaitingChoice, opensPalette: true)
     }
 
-    /// Consigne relancée depuis l'historique : même cycle qu'une action libre,
-    /// mais la consigne est déjà connue, donc pas d'escale de saisie — la
-    /// capture vise la sélection courante et le stream part aussitôt.
+    /// Instruction relaunched from history: same cycle as a custom action,
+    /// but the instruction is already known, so no stop to type it: the
+    /// capture targets the current selection and the stream starts right away.
     func triggerRecent(instruction: String) {
         trigger(.free(instruction: instruction))
     }
 
     func trigger(_ request: ClaudioRequest, opensPalette: Bool = false) {
-        dismiss()  // idempotent : un raccourci pendant qu'un panneau est ouvert repart de zéro
+        dismiss()  // idempotent: a shortcut while a panel is open starts fresh
 
         guard AccessibilityPermission.isGranted else {
             AccessibilityPermission.request()
@@ -47,7 +47,7 @@ final class CorrectionCoordinator {
             return
         }
 
-        // Capturés AVANT d'afficher quoi que ce soit.
+        // Captured BEFORE showing anything.
         let frontmost = NSWorkspace.shared.frontmostApplication
         previousApp = (frontmost?.bundleIdentifier == Bundle.main.bundleIdentifier) ? nil : frontmost
         clipboardSnapshot = PasteboardSnapshot.capture()
@@ -61,10 +61,10 @@ final class CorrectionCoordinator {
     }
 
     private func runCorrection(session: CorrectionSession) async {
-        // Capture AVANT d'afficher le panneau : une fois key, le panneau
-        // intercepterait le ⌘C simulé destiné à l'app source.
+        // Capture BEFORE showing the panel: once key, the panel would
+        // intercept the simulated ⌘C meant for the source app.
         let text = await SelectionCapture.capture()
-        guard self.session === session else { return }  // re-déclenché/fermé entre-temps
+        guard self.session === session else { return }  // re-triggered/closed in the meantime
         showPanel(for: session)
 
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -73,15 +73,15 @@ final class CorrectionCoordinator {
         }
         session.originalText = text
 
-        // Palette : rien à envoyer tant qu'une ligne n'est pas retenue.
-        // La suite repart de `launchPaletteRow(at:)`.
+        // Palette: nothing to send until a row is picked.
+        // The rest resumes from `launchPaletteRow(at:)`.
         guard !session.opensPalette else {
             session.phase = .choosingAction
             return
         }
 
-        // Action libre : rien à envoyer tant que la consigne n'est pas saisie.
-        // La suite repart de `submitInstruction()`.
+        // Custom action: nothing to send until the instruction is typed.
+        // The rest resumes from `submitInstruction()`.
         guard !session.request.needsInstruction else {
             session.phase = .askingInstruction
             return
@@ -89,8 +89,8 @@ final class CorrectionCoordinator {
         await stream(session: session)
     }
 
-    /// Consigne validée dans le panneau : la requête libre se construit ici,
-    /// puis emprunte le chemin commun.
+    /// Instruction validated in the panel: the custom request is built here,
+    /// then follows the common path.
     func submitInstruction() {
         guard let session, session.phase == .askingInstruction else { return }
         let instruction = session.trimmedInstruction
@@ -105,9 +105,9 @@ final class CorrectionCoordinator {
 
     // MARK: - Palette
 
-    /// Ligne retenue dans la palette : sa requête devient celle de la session.
-    /// L'action libre sans consigne fait escale par le champ de saisie plutôt
-    /// que de partir avec une instruction vide.
+    /// Row picked in the palette: its request becomes the session's own.
+    /// A custom action with no instruction stops at the text field instead
+    /// of launching with an empty instruction.
     private func choose(_ request: ClaudioRequest) {
         guard let session, session.phase == .choosingAction else { return }
         session.adopt(request)
@@ -130,15 +130,15 @@ final class CorrectionCoordinator {
         choose(rows[index].request)
     }
 
-    /// Flèches : ne consomme la touche que si la palette est ouverte, sinon
-    /// elle continue sa route et fait défiler un résultat long.
+    /// Arrows: only consumes the key when the palette is open, otherwise
+    /// it keeps going and scrolls a long result.
     private func movePaletteSelection(by delta: Int) -> Bool {
         guard let session, session.phase == .choosingAction else { return false }
         session.movePaletteSelection(by: delta)
         return true
     }
 
-    /// Chiffres : lance la ligne de ce rang quand la frappe la désigne bien.
+    /// Digits: launches the row at that rank when the keystroke actually names it.
     private func launchPaletteRank(_ rank: Int, withCommand: Bool) -> Bool {
         guard let session,
               let index = session.paletteIndex(forRank: rank, withCommand: withCommand)
@@ -150,8 +150,8 @@ final class CorrectionCoordinator {
     private func stream(session: CorrectionSession) async {
         let request = session.request
 
-        // Le moteur de l'action décide du client. La clé API ne manque qu'à
-        // Claude : une action réglée en local marche sans clé.
+        // The action's engine decides the client. The API key is only
+        // missing for Claude: an action set to local works without a key.
         let client: TextStreamClient
         switch request.model {
         case .claude(let model):
@@ -178,8 +178,8 @@ final class CorrectionCoordinator {
             }
             guard !Task.isCancelled else { return }
             session.finishStreaming(with: result.text, truncated: result.truncated)
-            // Une action libre qui aboutit entre dans l'historique : sa consigne
-            // pourra être relancée d'un geste depuis la barre de menus.
+            // A custom action that succeeds enters the history: its
+            // instruction can be relaunched with one gesture from the menu bar.
             if case .free(let instruction) = request.origin {
                 TransformHistory.shared.record(instruction)
             }
@@ -187,19 +187,19 @@ final class CorrectionCoordinator {
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)
         } catch is CancellationError {
-            // Esc pendant le stream : rien à faire
+            // Esc during the stream: nothing to do
         } catch let error as URLError where error.code == .cancelled {
-            // idem, URLSession signale l'annulation ainsi
+            // same thing, URLSession reports cancellation this way
         } catch {
             guard !Task.isCancelled else { return }
             session.phase = .error(error.localizedDescription)
         }
     }
 
-    // MARK: - Actions du panneau
+    // MARK: - Panel actions
 
-    /// Entrée : lance la ligne retenue dans la palette, valide la consigne
-    /// pendant la saisie, colle le résultat ensuite.
+    /// Enter: launches the row picked in the palette, validates the
+    /// instruction while it's being typed, pastes the result otherwise.
     func confirm() {
         switch session?.phase {
         case .choosingAction:
@@ -233,7 +233,7 @@ final class CorrectionCoordinator {
         pasteboard.clearContents()
         pasteboard.setString(session.correctedText, forType: .string)
         session.justCopied = true
-        clipboardSnapshot = nil  // l'utilisateur veut ce contenu : ne pas le restaurer
+        clipboardSnapshot = nil  // the user wants this content: don't restore over it
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 900_000_000)
             if self?.session === session, session.justCopied {
@@ -265,7 +265,7 @@ final class CorrectionCoordinator {
         }
     }
 
-    // MARK: - Panneau
+    // MARK: - Panel
 
     private func showPanel(for session: CorrectionSession) {
         let panel = ResultPanel.make(

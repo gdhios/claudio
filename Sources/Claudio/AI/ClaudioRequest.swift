@@ -1,27 +1,27 @@
 import Foundation
 
-/// Ce qu'on envoie réellement à l'API : prompt système, modèle, budget de sortie.
-/// Distinct de `ClaudioAction`, qui est le catalogue (identité, clé de stockage,
-/// raccourci, menu). La séparation existe pour l'action libre : son instruction
-/// est saisie à l'exécution, donc elle ne peut être ni un `case`, ni
-/// `RawRepresentable`, ni `CaseIterable` — mais elle emprunte ici exactement le
-/// même chemin qu'une action du catalogue.
+/// What is actually sent to the API: system prompt, model, output budget.
+/// Distinct from `ClaudioAction`, which is the catalog (identity, storage key,
+/// shortcut, menu). The separation exists for the custom action: its instruction
+/// is entered at runtime, so it can be neither a `case`, nor
+/// `RawRepresentable`, nor `CaseIterable` — but here it follows exactly the
+/// same path as a catalog action.
 struct ClaudioRequest: Sendable {
-    /// D'où vient la requête : une entrée du catalogue, ou une instruction libre.
+    /// Where the request comes from: a catalog entry, or a custom instruction.
     enum Origin: Sendable, Equatable {
         case catalog(ClaudioAction)
         case free(instruction: String)
     }
 
-    /// Forme du budget de sortie, indépendante de l'action qui la demande.
+    /// Shape of the output budget, independent of the action requesting it.
     enum Budget: Sendable {
-        /// Réécriture : ~même longueur que l'entrée.
+        /// Rewrite: ~same length as the input.
         case rewrite
-        /// Structuration : marge d'expansion.
+        /// Structuring: room to expand.
         case expand
-        /// Conception d'un prompt complet : forte marge.
+        /// Designing a full prompt: generous room.
         case design
-        /// Résumé : marge réduite.
+        /// Summary: reduced room.
         case condense
     }
 
@@ -31,12 +31,12 @@ struct ClaudioRequest: Sendable {
     let system: String
     let model: ModelChoice
     let budget: Budget
-    /// `false` pour la seule correction : elle envoie le texte nu.
+    /// `false` only for correction: it sends the raw text.
     let wrapsSource: Bool
 
-    /// Message utilisateur envoyé à l'API. Hors correction, le texte est balisé :
-    /// envoyé nu, une sélection comme « résume mes mails » se lit comme un ordre
-    /// adressé au modèle, qui y répond au lieu de la transformer.
+    /// User message sent to the API. Outside of correction, the text is tagged:
+    /// sent raw, a selection like "summarize my emails" reads as a command
+    /// addressed to the model, which would answer it instead of transforming it.
     func userMessage(forText text: String) -> String {
         guard wrapsSource else { return text }
         return """
@@ -47,15 +47,15 @@ struct ClaudioRequest: Sendable {
         """
     }
 
-    /// L'instruction manque encore : la requête n'est pas envoyable telle quelle.
-    /// Vrai uniquement pour l'action libre en attente de sa consigne.
+    /// The instruction is still missing: the request isn't sendable as is.
+    /// True only for the custom action waiting on its instruction.
     var needsInstruction: Bool {
         if case .free(let instruction) = origin { return instruction.isEmpty }
         return false
     }
 
-    /// Budget de sortie calculé sur la longueur de l'entrée.
-    /// `multiplier` sert au « Réessayer + » après troncature.
+    /// Output budget computed from the length of the input.
+    /// `multiplier` is used by "Retry +" after truncation.
     func maxTokens(forText text: String, multiplier: Int = 1) -> Int {
         let approxInputTokens = max(text.count / 4, 1)
         let base: Int
@@ -74,27 +74,27 @@ struct ClaudioRequest: Sendable {
 }
 
 extension ClaudioRequest {
-    /// Libellé de l'action libre dans le menu et les Réglages. Les points de
-    /// suspension annoncent la saisie, comme « Réglages… ».
+    /// Label for the custom action in the menu and Settings. The ellipsis
+    /// signals text entry ahead, as in "Settings…".
     static var freeMenuTitle: String { loc("Action libre…", en: "Custom action…") }
 
-    /// Action libre encore sans consigne : habille le panneau (titre, icône,
-    /// teinte) pendant la saisie. Jamais envoyée telle quelle — la validation
-    /// la remplace par `free(instruction:)`.
+    /// Custom action still without an instruction: dresses the panel (title,
+    /// icon, tint) while it's being typed. Never sent as is: validation
+    /// replaces it with `free(instruction:)`.
     static let awaitingInstruction = ClaudioRequest.free(instruction: "")
 
-    /// Palette ouverte : aucune action n'est encore choisie. Sert de garnissage
-    /// le temps du choix — le panneau masque la pastille d'action dans cette
-    /// phase — et la ligne retenue la remplace par la vraie requête. Son titre
-    /// est « Palette » et non « Action libre » : sans sélection, le panneau
-    /// affiche cet en-tête, et la palette n'est pas (encore) une action libre.
+    /// Palette open: no action chosen yet. Serves as filler while choosing
+    /// (the panel hides the action badge in this phase), and the picked row
+    /// replaces it with the real request. Its title is "Palette", not "Custom
+    /// action": with nothing selected, the panel shows this header, and the
+    /// palette isn't (yet) a custom action.
     static let awaitingChoice = ClaudioRequest.free(instruction: "",
                                                     panelTitle: loc("Palette", en: "Palette"))
 
-    /// Action libre : l'instruction de l'utilisateur devient la tâche, insérée
-    /// dans le gabarit des prompts du catalogue (sortie nue, texte balisé, langue
-    /// et mise en forme préservées) pour que le résultat reste collable tel quel.
-    /// `panelTitle` n'est surchargé que pour le garnissage de la palette.
+    /// Custom action: the user's instruction becomes the task, inserted into
+    /// the catalog prompts' template (bare output, tagged text, language and
+    /// formatting preserved) so the result stays pasteable as is.
+    /// `panelTitle` is only overridden for the palette's filler.
     static func free(instruction: String,
                      model: ModelChoice = .claude(.haiku45),
                      panelTitle: String = loc("Action libre", en: "Custom action")) -> ClaudioRequest {

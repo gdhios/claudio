@@ -3,8 +3,9 @@ import ApplicationServices
 
 @MainActor
 enum SelectionCapture {
-    /// Essaie l'API Accessibilité (instantané, sans toucher au presse-papiers),
-    /// puis se replie sur un ⌘C simulé (fiable partout, y compris Chrome/Electron).
+    /// Tries the Accessibility API first (instant, doesn't touch the
+    /// clipboard), then falls back to a simulated ⌘C (reliable everywhere,
+    /// Chrome/Electron included).
     static func capture() async -> String? {
         if let text = viaAccessibility(), !text.isEmpty {
             return text
@@ -40,6 +41,6 @@ enum SelectionCapture {
             }
             try? await Task.sleep(nanoseconds: Constants.copyPollIntervalNs)
         }
-        return nil  // rien n'a été copié : probablement aucune sélection
+        return nil  // nothing was copied: probably no selection
     }
 }

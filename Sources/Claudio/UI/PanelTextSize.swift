@@ -1,11 +1,11 @@
 import CoreGraphics
 
-/// Taille du texte dans le panneau flottant. Le corps par défaut de macOS est
-/// petit pour qui lit mal : ce réglage l'agrandit là où l'on lit et où l'on
-/// écrit, sans toucher au décor (badges, raccourcis, indices), qui n'a pas à
-/// grossir pour rester lisible.
+/// Text size in the floating panel. macOS's default body size is
+/// small for anyone who reads poorly: this setting enlarges it wherever one reads
+/// and writes, without touching the decor (badges, shortcuts, hints), which
+/// doesn't need to grow to stay legible.
 ///
-/// Le `rawValue` est la clé de stockage dans UserDefaults : il ne change plus.
+/// The `rawValue` is the storage key in UserDefaults: it no longer changes.
 enum PanelTextSize: String, CaseIterable, Identifiable, Sendable {
     case small
     case normal
@@ -23,8 +23,8 @@ enum PanelTextSize: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Corps du texte lu et écrit dans le panneau. `normal` vaut le corps de
-    /// `.body` sur macOS : le réglage par défaut ne change rien à l'existant.
+    /// Body size for text read and written in the panel. `normal` equals the size of
+    /// `.body` on macOS: the default setting changes nothing about the existing behavior.
     var bodyPoints: CGFloat {
         switch self {
         case .small: 12
@@ -34,28 +34,28 @@ enum PanelTextSize: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Facteur par rapport au réglage normal.
+    /// Factor relative to the normal setting.
     var scale: CGFloat { bodyPoints / PanelTextSize.normal.bodyPoints }
 
-    /// Taille dérivée d'un corps exprimé au réglage normal.
+    /// Size derived from a body expressed at the normal setting.
     func points(_ base: CGFloat) -> CGFloat { base * scale }
 
-    /// Largeur du panneau : elle suit le texte vers le haut. Un corps de 18
-    /// dans 460 points de large ne donnerait plus que des lignes de quelques
-    /// mots, et la lecture y perdrait ce que le corps lui fait gagner.
+    /// Panel width: it grows with the text. A size of 18
+    /// in 460 points of width would leave only lines of a few
+    /// words, and reading would lose what the larger size gains it.
     var panelWidth: CGFloat {
         max((Constants.panelWidth * (1 + (scale - 1) * 0.7)).rounded(), Constants.panelWidth)
     }
 
-    /// Hauteur minimale de la zone de texte : le panneau s'ouvre à cette taille
-    /// d'accueil et une phrase courte s'y pose sans faire bouger la fenêtre.
-    /// Elle suit le corps du texte, sans jamais dépasser le plafond.
+    /// Minimum height of the text area: the panel opens at this welcoming
+    /// size, and a short sentence settles in it without moving the window.
+    /// It follows the text size, never exceeding the ceiling.
     var minTextHeight: CGFloat {
         min((Constants.panelMinTextHeight * scale).rounded(), maxTextHeight)
     }
 
-    /// Hauteur maximale de la zone de texte : elle suit aussi, mais plafonnée
-    /// pour que le panneau reste un panneau. Au-delà, on défile.
+    /// Maximum height of the text area: it also follows, but capped
+    /// so the panel stays a panel. Beyond it, one scrolls.
     var maxTextHeight: CGFloat {
         min(max((Constants.panelMaxTextHeight * scale).rounded(), Constants.panelMaxTextHeight), 520)
     }

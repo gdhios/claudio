@@ -1,15 +1,15 @@
 import XCTest
 @testable import Claudio
 
-/// Le moteur local passe par ce client : le parsing du NDJSON décide du texte
-/// affiché puis collé, du badge « tronqué » et des jetons lus ; le corps de la
-/// requête, de ce qu'Ollama accepte. Ces tests le fixent sur des transcriptions
-/// du format /api/chat, sans toucher au réseau.
+/// The local engine goes through this client: NDJSON parsing decides the
+/// displayed and pasted text, the "truncated" badge, and the tokens read;
+/// the request body decides what Ollama accepts. These tests pin it against
+/// /api/chat-format transcripts, without touching the network.
 final class OllamaClientTests: XCTestCase {
 
-    /// Passe une transcription au parseur, en vérifiant au passage que les
-    /// fragments livrés au fil de l'eau recomposent exactement le texte final :
-    /// c'est eux que le panneau affiche pendant le stream.
+    /// Feeds a transcript to the parser, checking along the way that the
+    /// fragments delivered as they stream in recompose exactly the final text:
+    /// that's what the panel displays during the stream.
     private func parse(_ lines: [String]) throws -> OllamaStreamParser {
         var parser = OllamaStreamParser()
         var pieces = ""
@@ -20,27 +20,27 @@ final class OllamaClientTests: XCTestCase {
         return parser
     }
 
-    /// Une réponse ordinaire : un objet JSON complet par ligne, la dernière
-    /// portant les comptes.
-    private let reponseOrdinaire = [
+    /// An ordinary response: one complete JSON object per line, the last one
+    /// carrying the counts.
+    private let ordinaryResponse = [
         #"{"model":"qwen2.5:14b","message":{"role":"assistant","content":"Bon"},"done":false}"#,
         #"{"model":"qwen2.5:14b","message":{"role":"assistant","content":"jour"},"done":false}"#,
         #"{"model":"qwen2.5:14b","message":{"role":"assistant","content":" tout le monde."},"done":false}"#,
         #"{"model":"qwen2.5:14b","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":26,"eval_count":298}"#
     ]
 
-    func testUneReponseOrdinaireDonneTexteEtJetons() throws {
-        let parser = try parse(reponseOrdinaire)
+    func testOrdinaryResponseGivesTextAndTokens() throws {
+        let parser = try parse(ordinaryResponse)
         XCTAssertEqual(parser.text, "Bonjour tout le monde.")
         XCTAssertFalse(parser.truncated)
-        // Les deux comptes ne sont annoncés que sur la ligne finale.
+        // Both counts are announced only on the final line.
         XCTAssertEqual(parser.inputTokens, 26)
         XCTAssertEqual(parser.outputTokens, 298)
         XCTAssertEqual(parser.result.text, "Bonjour tout le monde.")
     }
 
-    /// Le budget de sortie atteint : c'est ce qui allume « Réessayer + ».
-    func testDoneReasonLengthMarqueLaTroncature() throws {
+    /// The output budget reached: that's what lights up "Retry +".
+    func testDoneReasonLengthMarksTruncation() throws {
         let parser = try parse([
             #"{"message":{"role":"assistant","content":"Un début de phrase qui"},"done":false}"#,
             #"{"message":{"role":"assistant","content":""},"done":true,"done_reason":"length","prompt_eval_count":12,"eval_count":512}"#
@@ -50,9 +50,9 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(parser.outputTokens, 512)
     }
 
-    /// Un flux interrompu avant sa ligne finale n'annonce aucun jeton : on
-    /// n'en invente pas, le texte déjà reçu reste affichable.
-    func testUnFluxInterrompuGardeSonTexteEtAucunJeton() throws {
+    /// A stream interrupted before its final line announces no tokens: none
+    /// are invented, and the text already received stays displayable.
+    func testAnInterruptedStreamKeepsItsTextAndNoTokens() throws {
         let parser = try parse([
             #"{"message":{"role":"assistant","content":"Moitié"},"done":false}"#
         ])
@@ -62,23 +62,23 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(parser.outputTokens, 0)
     }
 
-    /// Ollama peut glisser une erreur au milieu du flux : elle doit remonter,
-    /// pas se perdre dans un texte tronqué qu'on collerait quand même.
-    func testUneErreurEnFluxRemonte() {
+    /// Ollama can slip an error in mid-stream: it must propagate, not get
+    /// lost in truncated text that would get pasted anyway.
+    func testAnErrorMidStreamPropagates() {
         XCTAssertThrowsError(try parse([
             #"{"message":{"role":"assistant","content":"Déb"},"done":false}"#,
             #"{"error":"model runner has unexpectedly stopped"}"#
         ])) { error in
             guard case OllamaError.stream(let message) = error else {
-                return XCTFail("erreur inattendue : \(error)")
+                return XCTFail("unexpected error: \(error)")
             }
             XCTAssertEqual(message, "model runner has unexpectedly stopped")
         }
     }
 
-    /// Une ligne vide ou illisible se saute : elle ne doit ni casser le flux,
-    /// ni salir le texte.
-    func testUneLigneIllisibleEstIgnoree() throws {
+    /// A blank or unreadable line is skipped: it must neither break the
+    /// stream nor pollute the text.
+    func testAnUnreadableLineIsIgnored() throws {
         let parser = try parse([
             "",
             "{ ceci n'est pas du JSON",
@@ -87,9 +87,9 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(parser.text, "Intact")
     }
 
-    // MARK: - Corps de requête
+    // MARK: - Request Body
 
-    func testLeCorpsDeRequeteEstCeluiQuOllamaAttend() throws {
+    func testTheRequestBodyIsWhatOllamaExpects() throws {
         let body = OllamaClient.makeBody(text: "Bonjour", system: "Corrige.",
                                          model: "qwen2.5:14b", maxTokens: 512)
         XCTAssertEqual(body["model"] as? String, "qwen2.5:14b")
@@ -102,23 +102,23 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(messages?.last?["role"], "user")
         XCTAssertEqual(messages?.last?["content"], "Bonjour")
 
-        // Le budget de sortie et la température vivent sous `options` : posés
-        // à la racine, Ollama les ignore en silence.
+        // The output budget and temperature live under `options`: set at the
+        // root, Ollama silently ignores them.
         let options = body["options"] as? [String: Any]
         XCTAssertEqual(options?["num_predict"] as? Int, 512)
         XCTAssertEqual(options?["temperature"] as? Double, Constants.temperature)
-        XCTAssertNil(body["max_tokens"], "num_predict est le nom qu'Ollama attend")
+        XCTAssertNil(body["max_tokens"], "num_predict is the name Ollama expects")
 
-        // Et il doit partir tel quel sur le réseau.
+        // And it must go out over the network exactly as it is.
         XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: body))
     }
 
-    /// Les modèles hybrides (qwen3.5, qwen3…) réfléchissent avant de répondre
-    /// si on ne le leur interdit pas : la réflexion dévore tout `num_predict`
-    /// et la réponse n'arrive jamais. Le corps la coupe toujours — un modèle
-    /// sans mode réflexion ignore le champ sans broncher — et pose lui-même
-    /// ce qui garde le modèle chaud, pour ne pas dépendre du serveur.
-    func testLeCorpsCoupeLaReflexionEtGardeLeModeleChaud() {
+    /// Hybrid models (qwen3.5, qwen3...) think before answering unless told
+    /// not to: thinking devours the whole `num_predict` budget and the answer
+    /// never arrives. The body always disables it (a model with no thinking
+    /// mode just ignores the field without complaint) and sets what keeps the
+    /// model warm itself, so it doesn't depend on the server.
+    func testTheBodyDisablesThinkingAndKeepsTheModelWarm() {
         let body = OllamaClient.makeBody(text: "Bonjour", system: "Corrige.",
                                          model: "qwen3.5:4b", maxTokens: 512)
         XCTAssertEqual(body["think"] as? Bool, false)
@@ -128,26 +128,26 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: body))
     }
 
-    /// La fenêtre de contexte est fixe : la changer d'une requête à l'autre
-    /// force Ollama à recharger le modèle. Elle ne grandit, par paliers, que
-    /// pour une entrée qui n'y tiendrait pas — sinon Ollama tronque l'entrée
-    /// en silence et l'action travaille sur un texte amputé.
-    func testLaFenetreDeContexteNeGranditQuePourLesTextesLongs() {
+    /// The context window is fixed: changing it from one request to the next
+    /// forces Ollama to reload the model. It only grows, in steps, for an
+    /// input that wouldn't fit otherwise, since Ollama would silently
+    /// truncate the input and the action would work on a mutilated text.
+    func testTheContextWindowOnlyGrowsForLongTexts() {
         XCTAssertEqual(OllamaClient.contextLength(text: "Bonjour", system: "Corrige.", maxTokens: 512),
                        Constants.ollamaContextLength)
 
-        let long = String(repeating: "a", count: 40_000)  // ~10 000 jetons
+        let long = String(repeating: "a", count: 40_000)  // ~10,000 tokens
         let fenetre = OllamaClient.contextLength(text: long, system: "Corrige.", maxTokens: 8192)
         XCTAssertGreaterThanOrEqual(fenetre, 10_000 + 8192)
-        XCTAssertEqual(fenetre % 4096, 0, "des paliers, pas une valeur par texte")
+        XCTAssertEqual(fenetre % 4096, 0, "steps, not one value per text")
         let options = OllamaClient.makeBody(text: long, system: "Corrige.",
                                             model: "qwen3.5:4b", maxTokens: 8192)["options"] as? [String: Any]
         XCTAssertEqual(options?["num_ctx"] as? Int, fenetre)
     }
 
-    // MARK: - Modèles installés
+    // MARK: - Installed Models
 
-    func testLaListeDesModelesLitLesNoms() throws {
+    func testTheModelListReadsNames() throws {
         let data = Data(#"""
         {"models":[
           {"name":"qwen2.5:14b","model":"qwen2.5:14b","size":9000000000,"details":{}},
@@ -159,11 +159,12 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertEqual(OllamaClient.modelNames(from: Data("pas du JSON".utf8)), [])
     }
 
-    // MARK: - Erreurs
+    // MARK: - Errors
 
-    /// La panne la plus banale du moteur local : le serveur n'est pas lancé.
-    /// Le message doit nommer l'URL visée, pas un code d'URLSession.
-    func testLeServeurEteintSeDitAvecSonURL() {
+    /// The most common failure of the local engine: the server isn't
+    /// running. The message must name the targeted URL, not a URLSession
+    /// code.
+    func testTheDeadServerNamesItsURL() {
         let previous = AppSettings.language
         AppSettings.language = .french
         defer { AppSettings.language = previous }
@@ -171,18 +172,18 @@ final class OllamaClientTests: XCTestCase {
         let message = OllamaError.notReachable(url: Constants.ollamaDefaultURL).localizedDescription
         XCTAssertEqual(message, "Ollama ne répond pas sur http://localhost:11434 — est-il lancé ?")
 
-        // Modèle absent du disque : la réparation tient en une commande.
+        // Model missing from disk: the fix is a single command.
         let absent = OllamaError.http(status: 404, message: "model 'qwen2.5:14b' not found")
             .localizedDescription
         XCTAssertTrue(absent.contains("ollama pull"), absent)
     }
 
-    // MARK: - Adresse du serveur
+    // MARK: - Server Address
 
-    /// L'adresse se saisit à la main dans les Réglages : elle doit tolérer la
-    /// forme courte, et refuser ce qui n'est pas joignable plutôt que de casser
-    /// toutes les actions locales.
-    func testLAdresseDuServeurTolereLaFormeCourte() {
+    /// The address is typed by hand in Settings: it must tolerate the short
+    /// form, and reject what's not reachable rather than break every local
+    /// action.
+    func testTheServerAddressToleratesTheShortForm() {
         XCTAssertEqual(AppSettings.normalizedOllamaURL("192.168.1.20:11434")?.absoluteString,
                        "http://192.168.1.20:11434")
         XCTAssertEqual(AppSettings.normalizedOllamaURL("  http://localhost:11434  ")?.absoluteString,
@@ -194,7 +195,7 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertNil(AppSettings.normalizedOllamaURL("ftp://ailleurs:21"))
     }
 
-    func testLeMessageDErreurHTTPVientDuChampError() {
+    func testTheHTTPErrorMessageComesFromTheErrorField() {
         XCTAssertEqual(
             OllamaClient.apiErrorMessage(from: Data(#"{"error":"model 'x' not found"}"#.utf8)),
             "model 'x' not found")

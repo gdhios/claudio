@@ -1,19 +1,19 @@
 import XCTest
 @testable import Claudio
 
-/// Le réglage de taille touche à deux choses irréversibles : les clés écrites
-/// dans UserDefaults, et l'aspect du panneau pour qui n'y touche jamais.
+/// The size setting touches two irreversible things: the keys written to
+/// UserDefaults, and the panel's look for whoever never touches it.
 final class PanelTextSizeTests: XCTestCase {
 
-    /// Les rawValue sont des clés de stockage : les renommer perdrait le
-    /// réglage de tous ceux qui en ont choisi un.
-    func testLesIdentifiantsStockesNeChangentPas() {
+    /// The rawValues are storage keys: renaming them would lose the setting
+    /// of everyone who chose one.
+    func testTheStoredIdentifiersDontChange() {
         XCTAssertEqual(PanelTextSize.allCases.map(\.rawValue),
                        ["small", "normal", "large", "extraLarge"])
     }
 
-    /// Le réglage par défaut doit laisser le panneau exactement comme avant.
-    func testLeReglageNormalNeChangeRien() {
+    /// The default setting must leave the panel exactly as it was before.
+    func testTheNormalSettingChangesNothing() {
         let normal = PanelTextSize.normal
         XCTAssertEqual(normal.scale, 1)
         XCTAssertEqual(normal.points(12.2), 12.2)
@@ -21,8 +21,8 @@ final class PanelTextSizeTests: XCTestCase {
         XCTAssertEqual(normal.maxTextHeight, Constants.panelMaxTextHeight)
     }
 
-    /// Corps, largeur et hauteur croissent ensemble, du petit au très grand.
-    func testToutGranditDansLeMemeSens() {
+    /// Body size, width, and height grow together, from small to extra large.
+    func testEverythingGrowsInTheSameDirection() {
         let ordered = PanelTextSize.allCases
         for (petit, grand) in zip(ordered, ordered.dropFirst()) {
             XCTAssertLessThan(petit.bodyPoints, grand.bodyPoints, "\(petit) → \(grand)")
@@ -31,24 +31,24 @@ final class PanelTextSizeTests: XCTestCase {
         }
     }
 
-    /// Un petit corps ne doit pas rétrécir le panneau : le texte y gagnerait
-    /// des lignes plus longues sans que personne l'ait demandé.
-    func testLePetitCorpsNeRetrecitPasLePanneau() {
+    /// A small body size must not shrink the panel: the text would gain
+    /// longer lines without anyone asking for it.
+    func testASmallBodySizeDoesNotShrinkThePanel() {
         XCTAssertEqual(PanelTextSize.small.panelWidth, Constants.panelWidth)
         XCTAssertEqual(PanelTextSize.small.maxTextHeight, Constants.panelMaxTextHeight)
     }
 
-    /// Le panneau reste un panneau : la zone de texte est plafonnée même au
-    /// plus grand corps, sinon elle sortirait des petits écrans.
-    func testLaZoneDeTexteResteBornee() {
+    /// The panel stays a panel: the text area is capped even at the largest
+    /// body size, otherwise it would spill off small screens.
+    func testTheTextAreaStaysBounded() {
         for size in PanelTextSize.allCases {
             XCTAssertLessThanOrEqual(size.maxTextHeight, 520, size.rawValue)
         }
     }
 
-    /// Réglage absent ou écrit par une version qu'on ne connaît pas : on
-    /// retombe sur le corps normal plutôt que sur un panneau vide.
-    func testUnReglageInconnuRetombeSurNormal() {
+    /// A missing setting, or one written by a version we don't know: fall
+    /// back to the normal body size rather than an empty panel.
+    func testAnUnknownSettingFallsBackToNormal() {
         let key = "panelTextSize"
         let defaults = UserDefaults.standard
         let previous = defaults.string(forKey: key)

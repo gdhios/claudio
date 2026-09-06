@@ -1,20 +1,20 @@
 import XCTest
 @testable import Claudio
 
-/// Le moteur d'une action se stocke en texte dans les réglages : ce qui est
-/// verrouillé ici, c'est qu'un réglage écrit hier se relise demain, et qu'un
-/// appel local ne coûte rien.
+/// An action's engine is stored as text in settings: what's locked down here
+/// is that a setting written yesterday reads back correctly tomorrow, and
+/// that a local call costs nothing.
 final class ModelChoiceTests: XCTestCase {
 
-    // MARK: - Coût
+    // MARK: - Cost
 
-    func testUnAppelLocalNeCouteRien() {
+    func testALocalCallCostsNothing() {
         XCTAssertEqual(ModelChoice.ollama(model: "qwen2.5:14b")
             .cost(inputTokens: 100_000, outputTokens: 100_000), 0)
         XCTAssertTrue(ModelChoice.ollama(model: "qwen2.5:14b").isLocal)
     }
 
-    func testLeCoutClaudeResteCeluiDuModele() {
+    func testClaudeCostStaysTheModels() {
         for model in ClaudioModel.allCases {
             XCTAssertEqual(ModelChoice.claude(model).cost(inputTokens: 200, outputTokens: 200),
                            model.cost(inputTokens: 200, outputTokens: 200),
@@ -23,9 +23,9 @@ final class ModelChoiceTests: XCTestCase {
         }
     }
 
-    /// Le repère affiché à côté du sélecteur : le tarif pour Claude, la gratuité
-    /// pour le local.
-    func testLeRepereDeCoutAnnonceLaGratuiteDuLocal() {
+    /// The marker shown next to the selector: the price for Claude, "free"
+    /// for local.
+    func testTheCostHintAnnouncesLocalIsFree() {
         let previous = AppSettings.language
         AppSettings.language = .french
         defer { AppSettings.language = previous }
@@ -34,9 +34,9 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertEqual(ModelChoice.claude(.haiku45).costHint, ClaudioModel.haiku45.costHint)
     }
 
-    // MARK: - Encodage des réglages
+    // MARK: - Settings encoding
 
-    func testUnChoixClaudeSeRelitApresEcriture() {
+    func testAClaudeChoiceReadsBackAfterWriting() {
         for model in ClaudioModel.allCases {
             let choice = ModelChoice.claude(model)
             XCTAssertEqual(choice.storageValue, "claude:\(model.rawValue)")
@@ -44,36 +44,36 @@ final class ModelChoiceTests: XCTestCase {
         }
     }
 
-    /// Le nom d'un modèle Ollama porte sa balise de version après un « : » :
-    /// le découpage ne doit se faire que sur le premier.
-    func testUnChoixOllamaGardeLesDeuxPointsDeSaVersion() {
+    /// An Ollama model's name carries its version tag after a ":": splitting
+    /// must happen only on the first one.
+    func testAnOllamaChoiceKeepsTheColonsInItsVersion() {
         let choice = ModelChoice.ollama(model: "qwen2.5:14b")
         XCTAssertEqual(choice.storageValue, "ollama:qwen2.5:14b")
         XCTAssertEqual(ModelChoice(storageValue: choice.storageValue), choice)
         XCTAssertEqual(ModelChoice(storageValue: "ollama:llama3.2"), .ollama(model: "llama3.2"))
     }
 
-    /// Cas hérité : les réglages écrits avant Ollama ne stockaient que le
-    /// rawValue du modèle Claude, sans préfixe. Ils doivent se relire tels quels.
-    func testUnReglageHeriteSeRelitEnClaude() {
+    /// Legacy case: settings written before Ollama stored only the Claude
+    /// model's rawValue, with no prefix. They must read back unchanged.
+    func testALegacySettingReadsBackAsClaude() {
         XCTAssertEqual(ModelChoice(storageValue: "claude-haiku-4-5"), .claude(.haiku45))
         XCTAssertEqual(ModelChoice(storageValue: "claude-sonnet-5"), .claude(.sonnet5))
         XCTAssertEqual(ModelChoice(storageValue: "claude-opus-5"), .claude(.opus5))
     }
 
-    /// Le pied du panneau n'a pas la place du qualificatif : le nom nu suffit,
-    /// et un modèle local se nomme déjà court.
-    func testLeNomCourtLaisseTomberLeQualificatif() {
+    /// The panel's footer has no room for the qualifier: the bare name is
+    /// enough, and a local model's name is already short.
+    func testTheShortNameDropsTheQualifier() {
         XCTAssertEqual(ModelChoice.claude(.haiku45).shortName, "Haiku 4.5")
         XCTAssertEqual(ModelChoice.ollama(model: "qwen2.5:14b").shortName, "qwen2.5:14b")
     }
 
-    // MARK: - Réglage d'une action
+    // MARK: - An action's setting
 
-    /// Le chemin réel des réglages, clé de stockage comprise : un réglage écrit
-    /// avant Ollama doit encore se charger, un moteur local doit se relire, et
-    /// revenir au défaut doit retirer la clé pour suivre les mises à jour.
-    func testLeReglageDUneActionSeRelitEtTolereLHerite() {
+    /// The real settings path, storage key included: a setting written before
+    /// Ollama must still load, a local engine must read back, and reverting
+    /// to the default must remove the key so it follows app updates.
+    func testAnActionsSettingReadsBackAndToleratesLegacyValues() {
         let key = "model.\(ClaudioAction.correct.rawValue)"
         let defaults = UserDefaults.standard
         let previous = defaults.string(forKey: key)
@@ -82,25 +82,26 @@ final class ModelChoiceTests: XCTestCase {
             else { defaults.removeObject(forKey: key) }
         }
 
-        // Cas hérité : la valeur nue que stockaient les versions d'avant Ollama.
+        // Legacy case: the bare value that pre-Ollama versions stored.
         defaults.set("claude-sonnet-5", forKey: key)
         XCTAssertEqual(AppSettings.customModel(for: .correct), .claude(.sonnet5))
         XCTAssertEqual(ClaudioAction.correct.model, .claude(.sonnet5))
 
-        // Aller-retour d'un moteur local.
+        // Round trip through a local engine.
         AppSettings.setCustomModel(.ollama(model: "qwen2.5:14b"), for: .correct)
         XCTAssertEqual(defaults.string(forKey: key), "ollama:qwen2.5:14b")
         XCTAssertEqual(ClaudioAction.correct.model, .ollama(model: "qwen2.5:14b"))
 
-        // Le défaut ne se stocke pas : l'action suit les mises à jour de l'app.
+        // The default isn't stored: the action follows the app's updates.
         AppSettings.setCustomModel(.claude(ClaudioAction.correct.defaultModel), for: .correct)
         XCTAssertNil(defaults.string(forKey: key))
         XCTAssertEqual(ClaudioAction.correct.model, .claude(ClaudioAction.correct.defaultModel))
     }
 
-    /// Une valeur qu'on ne sait pas lire (réglage écrit par une version future,
-    /// stock corrompu) rend nil : l'action repart alors sur son défaut.
-    func testUneValeurIllisibleNeDonneAucunChoix() {
+    /// A value that can't be read (a setting written by a future version,
+    /// corrupted storage) yields nil: the action then falls back to its
+    /// default.
+    func testAnUnreadableValueYieldsNoChoice() {
         XCTAssertNil(ModelChoice(storageValue: ""))
         XCTAssertNil(ModelChoice(storageValue: "ollama:"))
         XCTAssertNil(ModelChoice(storageValue: "claude:claude-inconnu-9"))
