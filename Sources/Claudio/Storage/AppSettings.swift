@@ -34,6 +34,18 @@ enum AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: costCounterKey) }
     }
 
+    // MARK: - Window shortcuts
+
+    private static let windowShortcutsEnabledKey = "windowShortcutsEnabled"
+
+    /// Master switch for the window-snapping shortcuts, on by default. When
+    /// off, the shortcuts are unregistered so their keys fall back to whatever
+    /// other tool the user runs on them.
+    static var windowShortcutsEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: windowShortcutsEnabledKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: windowShortcutsEnabledKey) }
+    }
+
     // MARK: - Interface language
 
     private static let languageKey = "language"

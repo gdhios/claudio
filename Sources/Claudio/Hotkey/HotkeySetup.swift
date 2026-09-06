@@ -48,6 +48,52 @@ extension KeyboardShortcuts.Name {
         "actionPalette",
         initial: .init(.k, modifiers: [.control, .option, .command])
     )
+
+    // Window snapping, all on ⌃⌥⌘ so they don't collide with the actions
+    // above (which use ⌃⌥⌘ + a letter). Arrows for halves, ↩ to maximize,
+    // digits 7/9/1/3 for the four corners and 5 to center — the numeric-keypad
+    // arrangement. Digits and arrows keep the same physical position on AZERTY
+    // and QWERTY, so the key pressed is the one shown.
+    static let windowLeftHalf = Self(
+        "windowLeftHalf",
+        initial: .init(.leftArrow, modifiers: [.control, .option, .command])
+    )
+    static let windowRightHalf = Self(
+        "windowRightHalf",
+        initial: .init(.rightArrow, modifiers: [.control, .option, .command])
+    )
+    static let windowTopHalf = Self(
+        "windowTopHalf",
+        initial: .init(.upArrow, modifiers: [.control, .option, .command])
+    )
+    static let windowBottomHalf = Self(
+        "windowBottomHalf",
+        initial: .init(.downArrow, modifiers: [.control, .option, .command])
+    )
+    static let windowTopLeft = Self(
+        "windowTopLeft",
+        initial: .init(.seven, modifiers: [.control, .option, .command])
+    )
+    static let windowTopRight = Self(
+        "windowTopRight",
+        initial: .init(.nine, modifiers: [.control, .option, .command])
+    )
+    static let windowBottomLeft = Self(
+        "windowBottomLeft",
+        initial: .init(.one, modifiers: [.control, .option, .command])
+    )
+    static let windowBottomRight = Self(
+        "windowBottomRight",
+        initial: .init(.three, modifiers: [.control, .option, .command])
+    )
+    static let windowMaximize = Self(
+        "windowMaximize",
+        initial: .init(.return, modifiers: [.control, .option, .command])
+    )
+    static let windowCenter = Self(
+        "windowCenter",
+        initial: .init(.five, modifiers: [.control, .option, .command])
+    )
 }
 
 extension ClaudioAction {
@@ -82,6 +128,24 @@ extension ClaudioRequest {
     }
 }
 
+extension WindowLayout {
+    /// Global shortcut that snaps the frontmost window to this layout.
+    var shortcutName: KeyboardShortcuts.Name {
+        switch self {
+        case .leftHalf: .windowLeftHalf
+        case .rightHalf: .windowRightHalf
+        case .topHalf: .windowTopHalf
+        case .bottomHalf: .windowBottomHalf
+        case .topLeft: .windowTopLeft
+        case .topRight: .windowTopRight
+        case .bottomLeft: .windowBottomLeft
+        case .bottomRight: .windowBottomRight
+        case .maximize: .windowMaximize
+        case .center: .windowCenter
+        }
+    }
+}
+
 @MainActor
 enum HotkeySetup {
     static func install(coordinator: CorrectionCoordinator) {
@@ -95,6 +159,28 @@ enum HotkeySetup {
         }
         KeyboardShortcuts.onKeyUp(for: .actionPalette) { [weak coordinator] in
             coordinator?.triggerPalette()
+        }
+        for layout in WindowLayout.allCases {
+            KeyboardShortcuts.onKeyUp(for: layout.shortcutName) {
+                WindowMover.apply(layout)
+            }
+        }
+        // Apply the stored on/off state: the handlers above are live by
+        // default, so a window feature turned off in a past session must be
+        // unregistered now.
+        setWindowShortcutsEnabled(AppSettings.windowShortcutsEnabled)
+    }
+
+    /// Registers or unregisters the window shortcuts as a group and persists
+    /// the choice. Disabling truly releases the keys, so another tool can take
+    /// them back; enabling re-registers them with their configured shortcut.
+    static func setWindowShortcutsEnabled(_ enabled: Bool) {
+        AppSettings.windowShortcutsEnabled = enabled
+        let names = WindowLayout.allCases.map(\.shortcutName)
+        if enabled {
+            KeyboardShortcuts.enable(names)
+        } else {
+            KeyboardShortcuts.disable(names)
         }
     }
 }

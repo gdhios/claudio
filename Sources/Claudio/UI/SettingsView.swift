@@ -342,7 +342,10 @@ private struct OllamaPane: View {
 
 // MARK: - Shortcuts
 
+@MainActor
 private struct ShortcutsPane: View {
+    @State private var windowShortcutsEnabled = AppSettings.windowShortcutsEnabled
+
     var body: some View {
         Form {
             Section {
@@ -375,6 +378,30 @@ private struct ShortcutsPane: View {
             } footer: {
                 Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.",
                          en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle(loc("Placer les fenêtres au clavier", en: "Move windows from the keyboard"),
+                       isOn: $windowShortcutsEnabled)
+                    .onChange(of: windowShortcutsEnabled) {
+                        HotkeySetup.setWindowShortcutsEnabled(windowShortcutsEnabled)
+                    }
+                ForEach(WindowLayout.allCases, id: \.self) { layout in
+                    HStack(spacing: 10) {
+                        IconBadge(systemName: layout.symbolName, color: .indigo, size: 22)
+                        Text(layout.title)
+                        Spacer()
+                        KeyboardShortcuts.Recorder("", name: layout.shortcutName)
+                    }
+                    .disabled(!windowShortcutsEnabled)
+                }
+            } header: {
+                Text(loc("Fenêtres", en: "Windows"))
+            } footer: {
+                Text(loc("Cale la fenêtre du premier plan sur ⌃⌥⌘ : flèches pour les moitiés, ↩ pour maximiser, 7/9/1/3 pour les coins et 5 pour centrer. Si un autre outil (Raycast, Rectangle…) tient déjà ces touches, coupe-le sur celles-ci ou change les raccourcis ici.",
+                         en: "Snaps the frontmost window on ⌃⌥⌘: arrows for halves, ↩ to maximize, 7/9/1/3 for the corners and 5 to center. If another tool (Raycast, Rectangle…) already owns these keys, disable it on them or change the shortcuts here."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
