@@ -94,6 +94,31 @@ extension KeyboardShortcuts.Name {
         "windowCenter",
         initial: .init(.five, modifiers: [.control, .option, .command])
     )
+
+    // The numeric keypad sends different key codes from the top-row digits,
+    // so the corner and center shortcuts above miss it. These fixed duplicates
+    // on ⌃⌥⌘ + keypad 7/9/1/3/5 trigger the same layouts. They aren't shown in
+    // Settings and follow the same on/off master switch as the rest.
+    static let windowTopLeftKeypad = Self(
+        "windowTopLeftKeypad",
+        initial: .init(.keypad7, modifiers: [.control, .option, .command])
+    )
+    static let windowTopRightKeypad = Self(
+        "windowTopRightKeypad",
+        initial: .init(.keypad9, modifiers: [.control, .option, .command])
+    )
+    static let windowBottomLeftKeypad = Self(
+        "windowBottomLeftKeypad",
+        initial: .init(.keypad1, modifiers: [.control, .option, .command])
+    )
+    static let windowBottomRightKeypad = Self(
+        "windowBottomRightKeypad",
+        initial: .init(.keypad3, modifiers: [.control, .option, .command])
+    )
+    static let windowCenterKeypad = Self(
+        "windowCenterKeypad",
+        initial: .init(.keypad5, modifiers: [.control, .option, .command])
+    )
 }
 
 extension ClaudioAction {
@@ -148,6 +173,23 @@ extension WindowLayout {
 
 @MainActor
 enum HotkeySetup {
+    /// Fixed numeric-keypad duplicates of the corner and center shortcuts. The
+    /// keypad sends different key codes from the top-row digits, so these bind
+    /// ⌃⌥⌘ + keypad keys to the same layouts. Not shown in Settings.
+    private static let keypadLayouts: [(KeyboardShortcuts.Name, WindowLayout)] = [
+        (.windowTopLeftKeypad, .topLeft),
+        (.windowTopRightKeypad, .topRight),
+        (.windowBottomLeftKeypad, .bottomLeft),
+        (.windowBottomRightKeypad, .bottomRight),
+        (.windowCenterKeypad, .center),
+    ]
+
+    /// Every window shortcut the master switch turns on or off: the ten
+    /// configurable ones plus the fixed keypad duplicates.
+    private static var windowShortcutNames: [KeyboardShortcuts.Name] {
+        WindowLayout.allCases.map(\.shortcutName) + keypadLayouts.map(\.0)
+    }
+
     static func install(coordinator: CorrectionCoordinator) {
         for action in ClaudioAction.allCases {
             KeyboardShortcuts.onKeyUp(for: action.shortcutName) { [weak coordinator] in
@@ -165,6 +207,11 @@ enum HotkeySetup {
                 WindowMover.apply(layout)
             }
         }
+        for (name, layout) in keypadLayouts {
+            KeyboardShortcuts.onKeyUp(for: name) {
+                WindowMover.apply(layout)
+            }
+        }
         // Apply the stored on/off state: the handlers above are live by
         // default, so a window feature turned off in a past session must be
         // unregistered now.
@@ -176,11 +223,10 @@ enum HotkeySetup {
     /// them back; enabling re-registers them with their configured shortcut.
     static func setWindowShortcutsEnabled(_ enabled: Bool) {
         AppSettings.windowShortcutsEnabled = enabled
-        let names = WindowLayout.allCases.map(\.shortcutName)
         if enabled {
-            KeyboardShortcuts.enable(names)
+            KeyboardShortcuts.enable(windowShortcutNames)
         } else {
-            KeyboardShortcuts.disable(names)
+            KeyboardShortcuts.disable(windowShortcutNames)
         }
     }
 }
