@@ -1,6 +1,12 @@
-# Claudio
+<p align="center">
+  <img src="docs/img/icon.png" width="128" alt="Claudio icon">
+</p>
 
-[![CI](https://github.com/gdhios/claudio/actions/workflows/ci.yml/badge.svg)](https://github.com/gdhios/claudio/actions/workflows/ci.yml)
+<h1 align="center">Claudio</h1>
+
+<p align="center">
+  <a href="https://github.com/gdhios/claudio/actions/workflows/ci.yml"><img src="https://github.com/gdhios/claudio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 macOS menu-bar app. Select text in any application, press a shortcut, and Claudio rewrites it through Claude (or a local Ollama model), streams the result in a floating panel, then pastes it back in place of the selection.
 
@@ -9,6 +15,10 @@ Bring your own API key. Nothing goes through a third-party server: the app talks
 **Download**: [claudio.okonoma.com](https://claudio.okonoma.com) or the [latest release](https://github.com/gdhios/claudio/releases/latest). Signed and notarized, macOS 14+, Apple Silicon. Unzip into /Applications.
 
 ## Usage
+
+<p align="center">
+  <img src="docs/img/palette-en.png" width="560" alt="The action palette, opened with ⌃⌥⌘K over a selection">
+</p>
 
 | Shortcut | Action |
 |---|---|
