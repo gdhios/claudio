@@ -44,6 +44,7 @@ On the local build of the committed work (`Scripts/build_app.sh`):
 3. Copy an **image**, run an action, paste the result: the image is back in the clipboard right after (multi-type restore).
 4. ⌃⌥⌘K then a digit: that row runs; Esc leaves no trace.
 5. Settings → About → "Check now" answers (up to date, or update offered).
+6. Window snapping (Accessibility): with another app's window frontmost, ⌃⌥⌘ + arrows (halves), ↩ (maximize), 7/9/1/3 (corners), 5 (center). Toggling "Move windows from the keyboard" off in Settings → Shortcuts stops the snapping and frees the keys.
 
 ## Adding a feature means extending the net
 
