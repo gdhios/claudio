@@ -1,91 +1,56 @@
-# Protocole de test
+# Testing
 
-Ce que Claudio ne doit jamais casser : le texte capturé part dans une requête
-bien formée, le flux revient entier, le résultat se colle à la place de la
-sélection, le presse-papiers ressort intact, la dépense est comptée juste et la
-mise à jour arrive. Le protocole étage les vérifications en trois niveaux, du
-moins cher au plus complet : chaque niveau attrape ce que le précédent ne peut
-pas voir, et ne se paie qu'à la fréquence qui le justifie. Une petite
-modification ne coûte que le niveau 1 ; la publication paie les trois.
+What Claudio must never break: the captured text leaves in a well-formed request, the stream comes back whole, the result replaces the selection, the clipboard survives, the cost is counted right, and updates arrive. Three levels, cheapest first. Each catches what the previous one cannot see, and each runs only as often as it earns.
 
-## Les trois niveaux
+## Levels
 
-| Niveau | Commande | Durée | Quand |
+| Level | Command | Duration | When |
 |---|---|---|---|
-| 1 · Unitaires | `swift test` (ou `Scripts/test.sh`) | secondes | à chaque modification, et en CI sur chaque push et PR |
-| 2 · Aperçus UI | `Scripts/test.sh --smoke` | ~2 min | en CI sur chaque push et PR, avec les PNG en artefacts |
-| 3 · Bout en bout | `Scripts/test.sh --release` | + ~30 s et quelques millièmes de $ | à la publication, par la chaîne de release du mainteneur |
+| 1 · Unit | `swift test` | seconds | every change; CI on every push and PR |
+| 2 · UI smoke | `Scripts/test.sh --smoke` | ~2 min | CI on every push and PR, PNGs published as artifacts |
+| 3 · End to end | `Scripts/test.sh --release` | +30 s, a few cents | at release time only |
 
-- **Niveau 1** : toute la logique critique, sans réseau, sans permission, sans
-  UI. Le flux SSE se teste sur des transcriptions, le temps s'injecte, les
-  UserDefaults de test sont des suites jetables.
-- **Niveau 2** : l'app compilée démarre et rend chaque écran critique en PNG
-  (`--preview … --shot`, aucun réseau ni clé requis) : panneau en résultat, en
-  flux, en erreur et en saisie de consigne ; palette nue et filtrée ; Réglages
-  (clé API) et onglet Raccourcis. Un écran qui ne se construit plus — le genre
-  de casse que les tests unitaires ne voient pas — sort en code d'erreur ou en
-  PNG vide.
-- **Niveau 3** : `--selftest` appelle la vraie API avec la vraie clé, sur les
-  deux chemins de requête (action du catalogue, puis action libre avec
-  consigne). C'est le seul niveau qui vérifie le contrat réel : authentification,
-  en-têtes, IDs de modèles acceptés, flux SSE de production, jetons facturés.
-  Il échoue par son code de sortie, donc il bloque la release.
+- **Level 1**: all critical logic, no network, no permissions, no UI. The SSE stream is replayed from recorded transcripts, time is injected, UserDefaults are throwaway suites. Tests that compare displayed strings pin the app language rather than inherit the machine's.
+- **Level 2**: the compiled app starts and renders every critical screen to PNG (`--preview <mode> --shot file.png`, no key, no network). A screen that no longer builds fails with an exit code or an empty PNG, the kind of breakage unit tests never see. Modes: `panel`, `panel-streaming`, `panel-long`, `panel-error`, `panel-noselection`, `panel-free`, `panel-free-filled`, `palette`, `palette-filtre`, `palette-libre`, `settings`, `settings-prompts`, `settings-ollama`, `settings-shortcuts`, `settings-about`; `--size small|normal|large|extraLarge` forces the panel text size.
+- **Level 3**: `--selftest` calls the real API with the real key, on both request paths (catalog action, then free instruction). It is the only level that checks the live contract: auth, headers, accepted model IDs, production SSE, billed tokens. It fails through its exit code, so it blocks a release.
 
-## Ce qui protège chaque action critique
+```bash
+ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "a text with some mistake"
+ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "Translate to Spanish"
+```
 
-| Action critique | Risque si ça casse | Filet |
+## What protects each critical path
+
+| Critical path | If it breaks | Net |
 |---|---|---|
-| Construction de la requête (prompt système, balisage `<texte_source>`, budget de tokens, modèle, température) | le modèle « répond » à la sélection au lieu de la transformer, ou l'API refuse (400) | `ClaudioRequestTests`, `ClaudioCatalogTests`, `AnthropicClientTests` (corps de requête) — niveau 1 |
-| Lecture du flux SSE (texte, jetons facturés, troncature, erreurs en flux) | texte incomplet, dépense fausse, erreur muette | `AnthropicClientTests` sur transcriptions — niveau 1 ; conditions réelles au niveau 3 |
-| Affichage en streaming (tampon de fragments) | texte perdu à l'écran, panneau saccadé | `StreamBufferTests` — niveau 1 |
-| Collage : jamais un résultat partiel ou vide | on écrase la sélection avec un demi-résultat | `StreamBufferTests` (`canPaste`) — niveau 1 |
-| Palette (filtrage, rangs 1–9, ligne libre toujours présente) | une action devient introuvable au clavier | `PaletteCatalogTests`, `PaletteDigitTests`, `ClaudioCatalogTests` — niveau 1 |
-| Compteur de dépense (tarifs, cumul, remise à zéro quotidienne) | dépense affichée fausse | `CostLedgerTests` — niveau 1 |
-| Clés de stockage et IDs (rawValue des actions, modèles, tailles de texte) | réglages perdus à la mise à jour, appels API en erreur | `ClaudioCatalogTests`, `PanelTextSizeTests` — niveau 1 |
-| Mise à jour automatique (comparaison de versions, format de `version.json`) | mise à jour proposée en boucle, ou plus jamais | `UpdateCheckerTests` — niveau 1 ; la chaîne de release vérifie en ligne ce qui est réellement servi |
-| Les écrans se construisent (panneau, palette, Réglages) | l'app plante à l'ouverture d'un écran | niveau 2 (aperçus rendus et vérifiés) |
-| Contrat vivant avec l'API Anthropic | tout ce qui précède, mais en production | niveau 3 (`--selftest`, deux chemins) |
-| Capture de la sélection, collage simulé, restauration du presse-papiers, raccourcis globaux | le cœur du geste | non automatisable (permission Accessibilité + vraie session) → checklist ci-dessous |
+| Request building (system prompt, `<texte_source>` tag, token budget, model, temperature) | the model answers the selection instead of transforming it, or the API returns 400 | `ClaudioRequestTests`, `ClaudioCatalogTests`, `AnthropicClientTests` — level 1 |
+| SSE parsing (text, billed tokens, truncation, in-stream errors) | incomplete text, wrong cost, silent error | `AnthropicClientTests` on transcripts — level 1; live at level 3 |
+| Streaming display (fragment buffer) | text lost on screen, stuttering panel | `StreamBufferTests` — level 1 |
+| Paste: never a partial or empty result | the selection is overwritten with half a result | `StreamBufferTests` (`canPaste`) — level 1 |
+| Palette (filtering, ranks 1–9, free line always present) | an action becomes unreachable from the keyboard | `PaletteCatalogTests`, `PaletteDigitTests`, `ClaudioCatalogTests` — level 1 |
+| Cost counter (rates, totals, daily reset) | wrong figure displayed | `CostLedgerTests` — level 1 |
+| Storage keys and IDs (raw values of actions, models, text sizes) | settings lost on update, API errors | `ClaudioCatalogTests`, `PanelTextSizeTests` — level 1 |
+| Auto-update (version comparison, `version.json` format) | update offered in a loop, or never again | `UpdateCheckerTests` — level 1 |
+| Screens build (panel, palette, Settings) | crash on opening a screen | level 2 |
+| Live contract with the Anthropic API | all of the above, in production | level 3 |
+| Selection capture, simulated paste, clipboard restore, global shortcuts | the core gesture | not automatable (Accessibility permission, real session): checklist below |
 
-## Ce que la machine ne peut pas tester — checklist de publication (2 min)
+## Manual checklist before a release (2 minutes)
 
-À dérouler à la main avant de publier, sur le build local du travail
-commité (`Scripts/build_app.sh`) :
+On the local build of the committed work (`Scripts/build_app.sh`):
 
-1. Sélection dans une app native (Notes) + ⌃⌥⌘I : le résultat colle **à la
-   place** de la sélection.
-2. La même chose dans Chrome ou une app Electron : c'est le chemin du ⌘C
-   simulé, pas celui de l'Accessibilité.
-3. Copier une **image**, lancer une action, coller le résultat : l'image est
-   revenue dans le presse-papiers juste après (restauration multi-types).
-4. ⌃⌥⌘K puis un chiffre : la ligne de ce rang se lance ; Échap ne laisse
-   aucune trace.
-5. Réglages → À propos → « Vérifier maintenant » répond (à jour ou mise à
-   jour proposée).
+1. Select text in a native app (Notes), ⌃⌥⌘I: the result pastes **over** the selection.
+2. Same in Chrome or an Electron app: this is the simulated ⌘C path, not Accessibility.
+3. Copy an **image**, run an action, paste the result: the image is back in the clipboard right after (multi-type restore).
+4. ⌃⌥⌘K then a digit: that row runs; Esc leaves no trace.
+5. Settings → About → "Check now" answers (up to date, or update offered).
 
-## En CI
+## Adding a feature means extending the net
 
-`.github/workflows/ci.yml` déroule `Scripts/test.sh --smoke` (niveaux 1+2) sur
-un runner macOS à chaque push sur `main` et à chaque pull request, avec cache
-SwiftPM. Les PNG rendus sont publiés en artefacts : une régression visuelle se
-juge d'un œil depuis la page du run. Le niveau 3 n'est volontairement pas en
-CI : il exige une clé et facture des jetons ; il vit dans la chaîne de release,
-là où il gate réellement quelque chose.
+- **New logic** (parsing, computation, filtering, state): a unit test in `Tests/ClaudioTests`, no network.
+- **New screen or panel phase**: a `--preview` mode in `Support/PreviewMode.swift`, added to the list in `Scripts/test.sh`.
+- **New field in the API contract or `version.json`**: lock it in `AnthropicClientTests` / `UpdateCheckerTests`.
+- **New raw value** (action, model, setting): add it to the list fixed by `ClaudioCatalogTests`. It is a storage key and will not change.
+- **Anything that needs Accessibility**: a line in the manual checklist.
 
-## Ajouter une fonctionnalité, c'est étendre le filet
-
-- **De la logique nouvelle** (parsing, calcul, filtrage, état) → un test
-  unitaire dans `Tests/ClaudioTests`. Sans réseau : le flux se rejoue en
-  transcription, la date et les UserDefaults s'injectent.
-- **Un nouvel écran ou une nouvelle phase du panneau** → un mode `--preview`
-  dans `PreviewMode.swift`, ajouté à la liste de `Scripts/test.sh`.
-- **Un champ de plus dans le contrat API ou `version.json`** → le verrouiller
-  dans `AnthropicClientTests` / `UpdateCheckerTests`.
-- **Un nouveau rawValue** (action, modèle, réglage) → l'ajouter à la liste
-  fixée par `ClaudioCatalogTests` : c'est une clé de stockage, il ne changera
-  plus.
-- **Ce qui exige l'Accessibilité** → une ligne dans la checklist manuelle.
-
-Conventions : XCTest, noms de tests en français qui énoncent le comportement
-(« testLaTroncatureEstDetectee »), un commentaire de tête qui dit l'enjeu —
-pourquoi ce test existe, pas ce qu'il fait.
+Conventions: XCTest, test names state the behaviour, a header comment says what is at stake, not what the test does. The code base keeps French comments and strings; test names follow.
