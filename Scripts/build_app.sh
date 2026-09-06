@@ -65,7 +65,7 @@ fi
 echo "→ Compiling (release)…"
 swift build -c release
 
-echo "→ Assembling $APP…"
+echo "→ Assembling ${APP}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/release/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
