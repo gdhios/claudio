@@ -7,26 +7,49 @@ import ApplicationServices
 /// the app already needs to read selections and paste.
 @MainActor
 enum WindowMover {
+    /// Snap the frontmost window to `layout`, on the display it already sits on.
     static func apply(_ layout: WindowLayout) {
+        guard let target = frontmostWindow() else { return }
+        setFrame(layout.frame(in: target.visible, current: target.frame), on: target.window)
+    }
+
+    /// Send the frontmost window to the next display, keeping the placement it
+    /// had on the current one: a half stays a half, a maximized window stays
+    /// maximized. Does nothing with a single display.
+    static func moveToNextScreen() {
+        guard let target = frontmostWindow() else { return }
+        let height = primaryDisplayHeight()
+        let areas = NSScreen.screens.map {
+            ScreenGeometry.axRect(fromCocoa: $0.visibleFrame, primaryHeight: height)
+        }
+        guard let next = ScreenGeometry.next(after: target.visible, in: areas) else { return }
+        setFrame(ScreenGeometry.reproject(target.frame, from: target.visible, to: next),
+                 on: target.window)
+    }
+
+    // MARK: - Frontmost window
+
+    /// What both commands act on: the frontmost app's focused window, its frame
+    /// and the usable area of the display it sits on, all in AX coordinates.
+    /// Nil when the permission is missing — it is then asked for — when Claudio
+    /// itself is in front, or when the window can't be read.
+    private static func frontmostWindow() -> (window: AXUIElement, frame: CGRect, visible: CGRect)? {
         guard AccessibilityPermission.isGranted else {
             AccessibilityPermission.request()
             AccessibilityPermission.showExplanation()
-            return
+            return nil
         }
         // Skip Claudio's own windows: nothing to snap, and the frontmost app is
         // whoever was in front when the shortcut fired.
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.bundleIdentifier != Bundle.main.bundleIdentifier,
               let window = focusedWindow(of: app),
-              let current = frame(of: window) else { return }
-
-        guard let screen = screenContaining(current) ?? NSScreen.main else { return }
+              let current = frame(of: window),
+              let screen = screenContaining(current) ?? NSScreen.main else { return nil }
         let visible = ScreenGeometry.axRect(fromCocoa: screen.visibleFrame,
                                             primaryHeight: primaryDisplayHeight())
-        setFrame(layout.frame(in: visible, current: current), on: window)
+        return (window, current, visible)
     }
-
-    // MARK: - Frontmost window
 
     private static func focusedWindow(of app: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)

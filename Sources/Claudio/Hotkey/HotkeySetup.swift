@@ -52,8 +52,9 @@ extension KeyboardShortcuts.Name {
     // Window snapping, all on ⌃⌥⌘ so they don't collide with the actions
     // above (which use ⌃⌥⌘ + a letter). Arrows for halves, ↩ to maximize,
     // digits 7/9/1/3 for the four corners and 5 to center — the numeric-keypad
-    // arrangement. Digits and arrows keep the same physical position on AZERTY
-    // and QWERTY, so the key pressed is the one shown.
+    // arrangement — and ⇟ to send the window to the next display. Digits,
+    // arrows and ⇟ keep the same physical position on AZERTY and QWERTY, so
+    // the key pressed is the one shown.
     static let windowLeftHalf = Self(
         "windowLeftHalf",
         initial: .init(.leftArrow, modifiers: [.control, .option, .command])
@@ -93,6 +94,14 @@ extension KeyboardShortcuts.Name {
     static let windowCenter = Self(
         "windowCenter",
         initial: .init(.five, modifiers: [.control, .option, .command])
+    )
+
+    /// Not a layout: moves the window to the next display, keeping its
+    /// placement. ⇟ sits right next to the arrows on a full keyboard, and is
+    /// fn + ↓ on a MacBook, which has no such key.
+    static let windowNextScreen = Self(
+        "windowNextScreen",
+        initial: .init(.pageDown, modifiers: [.control, .option, .command])
     )
 
     // The numeric keypad sends different key codes from the top-row digits,
@@ -185,9 +194,9 @@ enum HotkeySetup {
     ]
 
     /// Every window shortcut the master switch turns on or off: the ten
-    /// configurable ones plus the fixed keypad duplicates.
+    /// layouts, the next-display one, and the fixed keypad duplicates.
     private static var windowShortcutNames: [KeyboardShortcuts.Name] {
-        WindowLayout.allCases.map(\.shortcutName) + keypadLayouts.map(\.0)
+        WindowLayout.allCases.map(\.shortcutName) + keypadLayouts.map(\.0) + [.windowNextScreen]
     }
 
     static func install(coordinator: CorrectionCoordinator) {
@@ -211,6 +220,9 @@ enum HotkeySetup {
             KeyboardShortcuts.onKeyUp(for: name) {
                 WindowMover.apply(layout)
             }
+        }
+        KeyboardShortcuts.onKeyUp(for: .windowNextScreen) {
+            WindowMover.moveToNextScreen()
         }
         // Apply the stored on/off state: the handlers above are live by
         // default, so a window feature turned off in a past session must be

@@ -397,11 +397,19 @@ private struct ShortcutsPane: View {
                     }
                     .disabled(!windowShortcutsEnabled)
                 }
+                // Not a layout: this one keeps the placement and changes display.
+                HStack(spacing: 10) {
+                    IconBadge(systemName: "display.2", color: .indigo, size: 22)
+                    Text(loc("Écran suivant", en: "Next display"))
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .windowNextScreen)
+                }
+                .disabled(!windowShortcutsEnabled)
             } header: {
                 Text(loc("Fenêtres", en: "Windows"))
             } footer: {
-                Text(loc("Cale la fenêtre du premier plan sur ⌃⌥⌘ : flèches pour les moitiés, ↩ pour maximiser, 7/9/1/3 pour les coins et 5 pour centrer. Si un autre outil (Raycast, Rectangle…) tient déjà ces touches, coupe-le sur celles-ci ou change les raccourcis ici.",
-                         en: "Snaps the frontmost window on ⌃⌥⌘: arrows for halves, ↩ to maximize, 7/9/1/3 for the corners and 5 to center. If another tool (Raycast, Rectangle…) already owns these keys, disable it on them or change the shortcuts here."))
+                Text(loc("Cale la fenêtre du premier plan sur ⌃⌥⌘ : flèches pour les moitiés, ↩ pour maximiser, 7/9/1/3 pour les coins, 5 pour centrer et ⇟ pour l'envoyer sur l'écran suivant en gardant sa place. Si un autre outil (Raycast, Rectangle…) tient déjà ces touches, coupe-le sur celles-ci ou change les raccourcis ici.",
+                         en: "Snaps the frontmost window on ⌃⌥⌘: arrows for halves, ↩ to maximize, 7/9/1/3 for the corners, 5 to center and ⇟ to send it to the next display, keeping its placement. If another tool (Raycast, Rectangle…) already owns these keys, disable it on them or change the shortcuts here."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

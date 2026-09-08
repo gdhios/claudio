@@ -76,18 +76,3 @@ extension WindowLayout {
         }
     }
 }
-
-/// The one impure detail the mover needs, kept as a value so it can be tested:
-/// the flip between Cocoa coordinates (bottom-left origin, y up) and the
-/// Accessibility API (top-left origin, y down).
-enum ScreenGeometry {
-    /// Convert a Cocoa rect to AX coordinates, given the primary display's full
-    /// height. Works for secondary displays too, whose Cocoa y falls outside
-    /// `[0, primaryHeight]`.
-    static func axRect(fromCocoa cocoa: CGRect, primaryHeight: CGFloat) -> CGRect {
-        CGRect(x: cocoa.minX,
-               y: primaryHeight - cocoa.maxY,
-               width: cocoa.width,
-               height: cocoa.height)
-    }
-}

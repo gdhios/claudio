@@ -84,22 +84,3 @@ final class WindowLayoutTests: XCTestCase {
         XCTAssertEqual(got.height, 1000, accuracy: 0.01)
     }
 }
-
-/// The one impure detail the mover needs, isolated as a value: converting a
-/// Cocoa rect (bottom-left origin, y up) to Accessibility coordinates
-/// (top-left origin, y down), across displays, using the primary display height.
-final class ScreenGeometryTests: XCTestCase {
-    func testAMainScreenVisibleFrameFlipsToTheMenuBarInset() {
-        // 1440×900 primary, 24 pt menu bar: Cocoa visibleFrame sits at y = 0.
-        let cocoa = CGRect(x: 0, y: 0, width: 1440, height: 876)
-        let ax = ScreenGeometry.axRect(fromCocoa: cocoa, primaryHeight: 900)
-        XCTAssertEqual(ax, CGRect(x: 0, y: 24, width: 1440, height: 876))
-    }
-
-    func testAnOffsetRectFlipsAroundThePrimaryHeight() {
-        let cocoa = CGRect(x: 100, y: 200, width: 300, height: 400)
-        let ax = ScreenGeometry.axRect(fromCocoa: cocoa, primaryHeight: 900)
-        // axY = 900 - (200 + 400) = 300.
-        XCTAssertEqual(ax, CGRect(x: 100, y: 300, width: 300, height: 400))
-    }
-}
