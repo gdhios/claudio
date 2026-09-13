@@ -471,7 +471,8 @@ struct ResultPanelView: View {
 }
 
 /// Panel close button: discreet in the header, becomes a circle on hover.
-private struct PanelCloseButton: View {
+/// Shared with the dictation panel, which has the same one.
+struct PanelCloseButton: View {
     let action: () -> Void
     @State private var hovered = false
 

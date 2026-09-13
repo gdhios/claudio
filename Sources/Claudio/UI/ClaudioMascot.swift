@@ -53,6 +53,20 @@ extension ClaudioMascot.Gaze {
     }
 }
 
+extension ClaudioMascot.Gaze {
+    /// The same reading for a dictation: he's available while he listens,
+    /// eyes closed while the words are being worked on, done once the text
+    /// is out, blank when there was nothing to hear.
+    init(_ phase: DictationSession.Phase) {
+        switch phase {
+        case .listening:                        self = .repos
+        case .finishing, .cleaning, .pasting:   self = .veille
+        case .done:                             self = .fait
+        case .empty, .error:                    self = .vide
+        }
+    }
+}
+
 // MARK: - Grid and colors
 
 /// The master file's grid: 512 to a side, framed on the bust.

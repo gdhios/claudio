@@ -15,6 +15,15 @@ enum AccessibilityPermission {
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    /// Granted, or asked for and explained. `false` means the cycle has to
+    /// stop right there: without this permission nothing can be pasted.
+    static func ensureGranted() -> Bool {
+        guard !isGranted else { return true }
+        request()
+        showExplanation()
+        return false
+    }
+
     static func showExplanation() {
         let alert = NSAlert()
         alert.messageText = loc("Autorisation Accessibilité requise",

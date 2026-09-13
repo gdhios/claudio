@@ -48,8 +48,7 @@ final class CorrectionCoordinator {
         }
 
         // Captured BEFORE showing anything.
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        previousApp = (frontmost?.bundleIdentifier == Bundle.main.bundleIdentifier) ? nil : frontmost
+        previousApp = PasteBack.frontmostApp()
         clipboardSnapshot = PasteboardSnapshot.capture()
 
         let session = CorrectionSession(request: request, opensPalette: opensPalette)
@@ -154,16 +153,12 @@ final class CorrectionCoordinator {
         // missing for Claude: an action set to local works without a key.
         let client: TextStreamClient
         switch request.model {
-        case .claude(let model):
-            guard let apiKey = KeychainStore.currentAPIKey() else {
+        case .claude, .ollama:
+            guard let made = TextStreamClientFactory.make(for: request.model) else {
                 session.phase = .missingKey
                 return
             }
-            client = AnthropicClient(apiKey: apiKey,
-                                     workspaceID: AppSettings.currentWorkspaceID(),
-                                     model: model)
-        case .ollama(let name):
-            client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
+            client = made
         case .raw:
             // "Raw" means "no cleanup pass" and only dictation offers it: a
             // transform has nothing to answer with. Only a hand-edited
@@ -257,18 +252,7 @@ final class CorrectionCoordinator {
         dismiss()
 
         Task { @MainActor in
-            target?.activate()
-            try? await Task.sleep(nanoseconds: Constants.activationDelayNs)
-
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(text, forType: .string)
-            Keystroke.simulate(virtualKey: Keystroke.keyV, flags: .maskCommand)
-
-            if let snapshot {
-                try? await Task.sleep(nanoseconds: Constants.clipboardRestoreDelayNs)
-                snapshot.restore()
-            }
+            await PasteBack.paste(text, into: PasteTarget(app: target, clipboard: snapshot))
         }
     }
 

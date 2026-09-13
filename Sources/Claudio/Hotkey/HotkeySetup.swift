@@ -49,6 +49,21 @@ extension KeyboardShortcuts.Name {
         initial: .init(.k, modifiers: [.control, .option, .command])
     )
 
+    /// Dictation, held down: D as in "dicter", at the same physical position
+    /// on AZERTY as on QWERTY like the other letters here.
+    ///
+    /// ⌃⌥⌘D is also `freeAction`'s default today: the two can't both keep it,
+    /// and which one moves is Guillaume's call — to settle before dictation
+    /// is wired into the app.
+    static let dictate = Self(
+        "dictate",
+        initial: .init(.d, modifiers: [.control, .option, .command])
+    )
+    /// Same gesture in the other language. No default: a second dictation
+    /// shortcut is worth a key only to whoever actually speaks two languages,
+    /// and they pick it themselves in Settings.
+    static let dictateOtherLanguage = Self("dictateOtherLanguage")
+
     // Window snapping, all on ⌃⌥⌘ so they don't collide with the actions
     // above (which use ⌃⌥⌘ + a letter). Arrows for halves, ↩ to maximize,
     // digits 7/9/1/3 for the four corners and 5 to center — the numeric-keypad
@@ -228,6 +243,26 @@ enum HotkeySetup {
         // default, so a window feature turned off in a past session must be
         // unregistered now.
         setWindowShortcutsEnabled(AppSettings.windowShortcutsEnabled)
+    }
+
+    /// Dictation: the only shortcuts that act on the key going down as well
+    /// as coming up — pressed is "listen", released is "paste what I said".
+    /// Installed apart from the actions above because it drives its own
+    /// coordinator, and because the two shortcuts differ only by the language
+    /// they start listening in.
+    static func installDictation(coordinator: DictationCoordinator) {
+        let languages: [(KeyboardShortcuts.Name, @MainActor () -> DictationLanguage)] = [
+            (.dictate, { AppSettings.dictationPrimaryLanguage }),
+            (.dictateOtherLanguage, { AppSettings.dictationSecondaryLanguage }),
+        ]
+        for (name, language) in languages {
+            KeyboardShortcuts.onKeyDown(for: name) { [weak coordinator] in
+                coordinator?.keyDown(language: language())
+            }
+            KeyboardShortcuts.onKeyUp(for: name) { [weak coordinator] in
+                coordinator?.keyUp()
+            }
+        }
     }
 
     /// Registers or unregisters the window shortcuts as a group and persists

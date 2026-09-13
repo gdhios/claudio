@@ -3,8 +3,8 @@ import SwiftUI
 
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
-/// panel-noselection, panel-free, panel-free-filled, palette,
-/// palette-filtre, palette-libre, settings.
+/// panel-noselection, panel-free, panel-free-filled, panel-listening,
+/// panel-dictation-cleaning, palette, palette-filtre, palette-libre, settings.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -61,6 +61,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .about)
         } else if mode == "barre-de-menus" {
             showMenuBarPreview()
+        } else if mode == "panel-listening" || mode.hasPrefix("panel-dictation") {
+            showDictationPreview()
         } else if mode.hasPrefix("palette") {
             showPalettePreview()
         } else {
@@ -150,6 +152,40 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         panel.present()
+    }
+
+    /// Dictation: the panel while listening, then while the cleanup streams.
+    /// No engine is ever built here and the microphone is never opened — a
+    /// preview renders the same screen on every machine, including one where
+    /// nothing is listening.
+    private func showDictationPreview() {
+        let session = DictationSession(language: AppSettings.dictationPrimaryLanguage,
+                                       model: AppSettings.dictationModel)
+        switch mode {
+        case "panel-dictation-cleaning":
+            session.transcript = spokenText
+            session.cleanedText = tidiedText
+            session.phase = .cleaning
+        default:  // "panel-listening"
+            session.transcript = tidiedText
+            session.phase = .listening
+        }
+        let panel = ResultPanel.make(session: session, textSize: textSize)
+        self.panel = panel
+        panel.present()
+    }
+
+    /// A dictation as it comes out of speech recognition: no punctuation, a
+    /// hesitation, and the speaker correcting themselves.
+    private var spokenText: String {
+        loc("euh bonjour je voulais te dire que la réunion de mardi non mercredi est décalée à quatorze heures",
+            en: "uh hi i wanted to tell you that tuesday's no wednesday's meeting is pushed to two pm")
+    }
+
+    /// The same dictation being tidied up, caught mid-sentence.
+    private var tidiedText: String {
+        loc("Bonjour, je voulais te dire que la réunion de ",
+            en: "Hi, I wanted to tell you that Wednesday's meeting ")
     }
 
     /// Palette: the real panel, stopped at the choosing phase.

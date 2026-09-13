@@ -80,12 +80,38 @@ final class ResultPanel: NSPanel {
             onClose: onClose,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         )
+        panel.host(view)
+        return panel
+    }
+
+    /// Same panel, hosting a dictation instead of a correction: it has no
+    /// action to relaunch and nothing to paste on demand, only a text to
+    /// copy when it couldn't be pasted.
+    @MainActor
+    static func make(session: DictationSession,
+                     textSize: PanelTextSize = AppSettings.panelTextSize,
+                     onCopy: @escaping () -> Void = {},
+                     onClose: @escaping () -> Void = {}) -> ResultPanel {
+        let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
+        panel.host(DictationPanelView(
+            session: session,
+            textSize: textSize,
+            onCopy: onCopy,
+            onClose: onClose,
+            onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
+        ))
+        return panel
+    }
+
+    /// Puts a SwiftUI view into the panel: forced dark appearance (the panel
+    /// keeps its theme whatever the system does) and a size that follows the
+    /// window.
+    private func host(_ view: some View) {
         let hosting = NSHostingView(rootView: view)
         hosting.appearance = NSAppearance(named: .darkAqua)
-        hosting.frame = NSRect(origin: .zero, size: panel.frame.size)
+        hosting.frame = NSRect(origin: .zero, size: frame.size)
         hosting.autoresizingMask = [.width, .height]
-        panel.contentView = hosting
-        return panel
+        contentView = hosting
     }
 
     /// Adjusts the window height to the content while keeping it centered on its
