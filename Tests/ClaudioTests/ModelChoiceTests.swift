@@ -23,6 +23,13 @@ final class ModelChoiceTests: XCTestCase {
         }
     }
 
+    /// "Raw" isn't a model: it's the dictation setting that skips the
+    /// cleanup pass. Nothing leaves the machine, nothing is billed.
+    func testRawCostsNothingAndStaysLocal() {
+        XCTAssertEqual(ModelChoice.raw.cost(inputTokens: 100_000, outputTokens: 100_000), 0)
+        XCTAssertTrue(ModelChoice.raw.isLocal)
+    }
+
     /// The marker shown next to the selector: the price for Claude, "free"
     /// for local.
     func testTheCostHintAnnouncesLocalIsFree() {
@@ -32,6 +39,9 @@ final class ModelChoiceTests: XCTestCase {
 
         XCTAssertEqual(ModelChoice.ollama(model: "llama3.2").costHint, "Gratuit (local)")
         XCTAssertEqual(ModelChoice.claude(.haiku45).costHint, ClaudioModel.haiku45.costHint)
+        XCTAssertEqual(ModelChoice.raw.costHint, "Aucun modèle")
+        XCTAssertEqual(ModelChoice.raw.displayName, "Brut")
+        XCTAssertEqual(ModelChoice.raw.shortName, "Brut")
     }
 
     // MARK: - Settings encoding
@@ -59,6 +69,13 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertEqual(ModelChoice(storageValue: "claude-haiku-4-5"), .claude(.haiku45))
         XCTAssertEqual(ModelChoice(storageValue: "claude-sonnet-5"), .claude(.sonnet5))
         XCTAssertEqual(ModelChoice(storageValue: "claude-opus-5"), .claude(.opus5))
+    }
+
+    /// "Raw" is stored as a bare word: no provider prefix, since no provider
+    /// answers. Reading it back must not go looking for a Claude model.
+    func testRawReadsBackAfterWriting() {
+        XCTAssertEqual(ModelChoice.raw.storageValue, "raw")
+        XCTAssertEqual(ModelChoice(storageValue: "raw"), .raw)
     }
 
     /// The panel's footer has no room for the qualifier: the bare name is
@@ -107,5 +124,7 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertNil(ModelChoice(storageValue: "claude:claude-inconnu-9"))
         XCTAssertNil(ModelChoice(storageValue: "openrouter:mixtral"))
         XCTAssertNil(ModelChoice(storageValue: "gpt-4"))
+        XCTAssertNil(ModelChoice(storageValue: "raw:"))
+        XCTAssertNil(ModelChoice(storageValue: "claude:raw"))
     }
 }

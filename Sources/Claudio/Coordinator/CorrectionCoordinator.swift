@@ -164,6 +164,13 @@ final class CorrectionCoordinator {
                                      model: model)
         case .ollama(let name):
             client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
+        case .raw:
+            // "Raw" means "no cleanup pass" and only dictation offers it: a
+            // transform has nothing to answer with. Only a hand-edited
+            // setting can land here.
+            session.phase = .error(loc("« Brut » ne s'applique qu'à la dictée : choisis un modèle pour cette action.",
+                                       en: "“Raw” only applies to dictation: pick a model for this action."))
+            return
         }
         session.beginStreaming()
 

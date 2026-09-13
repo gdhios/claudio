@@ -9,13 +9,17 @@ enum ModelChoice: Sendable, Hashable {
     case claude(ClaudioModel)
     /// Model name as Ollama knows it, e.g. "qwen2.5:14b".
     case ollama(model: String)
+    /// No model at all: the text is used as it comes. Only dictation offers
+    /// it, to paste the transcript without the cleanup pass; the other
+    /// actions have nothing to do without a model, so their picker skips it.
+    case raw
 
     /// Cost of a call in dollars. A local call costs nothing: the machine
     /// runs anyway.
     func cost(inputTokens: Int, outputTokens: Int) -> Double {
         switch self {
         case .claude(let model): model.cost(inputTokens: inputTokens, outputTokens: outputTokens)
-        case .ollama: 0
+        case .ollama, .raw: 0
         }
     }
 
@@ -23,6 +27,7 @@ enum ModelChoice: Sendable, Hashable {
         switch self {
         case .claude(let model): model.displayName
         case .ollama(let name): name
+        case .raw: loc("Brut", en: "Raw")
         }
     }
 
@@ -31,6 +36,7 @@ enum ModelChoice: Sendable, Hashable {
         switch self {
         case .claude(let model): model.shortName
         case .ollama(let name): name
+        case .raw: loc("Brut", en: "Raw")
         }
     }
 
@@ -39,13 +45,16 @@ enum ModelChoice: Sendable, Hashable {
         switch self {
         case .claude(let model): model.costHint
         case .ollama: loc("Gratuit (local)", en: "Free (local)")
+        case .raw: loc("Aucun modèle", en: "No model")
         }
     }
 
     /// True when nothing leaves the machine (or the local network).
     var isLocal: Bool {
-        if case .ollama = self { return true }
-        return false
+        switch self {
+        case .ollama, .raw: true
+        case .claude: false
+        }
     }
 
     // MARK: - Settings encoding
@@ -56,6 +65,7 @@ enum ModelChoice: Sendable, Hashable {
         switch self {
         case .claude(let model): "claude:\(model.rawValue)"
         case .ollama(let name): "ollama:\(name)"
+        case .raw: "raw"
         }
     }
 
@@ -65,6 +75,12 @@ enum ModelChoice: Sendable, Hashable {
     /// arrived: it only ever contained a Claude model's rawValue. Claude IDs
     /// never contain ":", so there's no ambiguity with the prefixed scheme.
     init?(storageValue: String) {
+        // "Raw" names no provider: it is its own whole value, checked before
+        // the prefix split so it never reads as a Claude model ID.
+        if storageValue == "raw" {
+            self = .raw
+            return
+        }
         guard let separator = storageValue.firstIndex(of: ":") else {
             guard let model = ClaudioModel(rawValue: storageValue) else { return nil }
             self = .claude(model)

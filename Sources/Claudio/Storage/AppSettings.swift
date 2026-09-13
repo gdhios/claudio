@@ -146,4 +146,63 @@ enum AppSettings {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }
+
+    // MARK: - Dictation
+
+    private static let dictationPrimaryLanguageKey = "dictationPrimaryLanguage"
+    private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
+    private static let dictationModelKey = "dictationModel"
+    private static let dictationSystemPromptKey = "dictationSystemPrompt"
+
+    /// Language of the "Dictate" shortcut. Missing or unknown value (a
+    /// setting written by a future version) falls back to French.
+    static var dictationPrimaryLanguage: DictationLanguage {
+        get {
+            UserDefaults.standard.string(forKey: dictationPrimaryLanguageKey)
+                .flatMap(DictationLanguage.init(rawValue:)) ?? .frFR
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationPrimaryLanguageKey) }
+    }
+
+    /// Language of the "Dictate in the other language" shortcut.
+    static var dictationSecondaryLanguage: DictationLanguage {
+        get {
+            UserDefaults.standard.string(forKey: dictationSecondaryLanguageKey)
+                .flatMap(DictationLanguage.init(rawValue:)) ?? .enUS
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationSecondaryLanguageKey) }
+    }
+
+    /// Model doing the cleanup pass, `.raw` to paste the transcript as is.
+    /// The default is static: probing Ollama to prefer a local model would
+    /// mean talking to the network to read a setting. The choice is made in
+    /// the Dictation tab.
+    static let defaultDictationModel = ModelChoice.claude(.haiku45)
+
+    /// Stored like an action's model, same encoding, so the two settings read
+    /// the same way. Unreadable value: back to the default.
+    static var dictationModel: ModelChoice {
+        get {
+            UserDefaults.standard.string(forKey: dictationModelKey)
+                .flatMap(ModelChoice.init(storageValue:)) ?? defaultDictationModel
+        }
+        set { UserDefaults.standard.set(newValue.storageValue, forKey: dictationModelKey) }
+    }
+
+    /// Custom cleanup prompt (nil = the code's default). Same contract as the
+    /// actions' prompts: blank removes the key, so the prompt follows app
+    /// updates.
+    static var dictationSystemPrompt: String? {
+        get {
+            let value = UserDefaults.standard.string(forKey: dictationSystemPromptKey)
+            return (value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? value : nil
+        }
+        set {
+            if let newValue, !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                UserDefaults.standard.set(newValue, forKey: dictationSystemPromptKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: dictationSystemPromptKey)
+            }
+        }
+    }
 }

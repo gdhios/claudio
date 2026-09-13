@@ -29,6 +29,10 @@ enum SelfTest {
                                      model: model)
         case .ollama(let name):
             client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
+        case .raw:
+            // "Raw" only exists for dictation: nothing to send here.
+            print("❌ “Raw” only applies to dictation: pick a model for this action in Settings.")
+            exit(1)
         }
 
         print("→ Action: \(request.panelTitle)")
