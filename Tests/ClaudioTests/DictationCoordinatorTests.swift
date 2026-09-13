@@ -24,6 +24,7 @@ final class DictationCoordinatorTests: XCTestCase {
         let log = bench.watch(session)
         await bench.settle { session.transcript == "bonjour" }
         XCTAssertEqual(session.phase, .listening)
+        XCTAssertEqual(bench.panels, 1)
 
         bench.hold(for: 1)
         coordinator.keyUp()
@@ -127,6 +128,35 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertNotNil(bench.coordinator.session)
     }
 
+    // MARK: - Permissions
+
+    /// Without the microphone and speech recognition, the press asks for
+    /// them and explains itself — it doesn't listen. No panel opens, the
+    /// engine is never started, and the next press is the one that dictates.
+    func testARefusedMicrophoneListensToNothing() async {
+        let bench = Bench(microphoneGranted: false)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.coordinator.permission?.value
+
+        XCTAssertEqual(bench.permissionRequests, 1)
+        XCTAssertEqual(bench.explanations, 1)
+        XCTAssertEqual(bench.engine.starts, 0)
+        XCTAssertEqual(bench.panels, 0)
+        XCTAssertNil(bench.coordinator.session)
+    }
+
+    /// A permission already granted costs nothing: no prompt, no
+    /// explanation, and the microphone opens on the press itself.
+    func testAGrantedMicrophoneAsksForNothing() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+
+        XCTAssertEqual(bench.permissionRequests, 0)
+        XCTAssertEqual(bench.explanations, 0)
+        XCTAssertNil(bench.coordinator.permission)
+    }
+
     // MARK: - The cleanup, and what happens without it
 
     /// "Raw" names no model: the transcript is pasted as it was heard and
@@ -228,13 +258,23 @@ private final class Bench {
     var pasteSucceeds = true
     /// Every model a client was asked for: empty proves nothing was asked.
     var clientRequests: [ModelChoice] = []
+    /// Whether the microphone and speech recognition are already granted.
+    let microphoneGranted: Bool
+    /// How many times the system prompts were asked for, and how many times
+    /// the explanation replaced them.
+    var permissionRequests = 0
+    var explanations = 0
+    /// How many panels were put on screen: nothing is heard without one.
+    var panels = 0
 
     private var clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
     init(events: [TranscriptEvent] = [.partial("bon"), .partial("bonjour"), .final("bonjour")],
          model: ModelChoice = .claude(.haiku45),
          answer: Result<String, Error> = .success("Bonjour."),
-         hasClient: Bool = true) {
+         hasClient: Bool = true,
+         microphoneGranted: Bool = true) {
+        self.microphoneGranted = microphoneGranted
         engine = FakeSpeechEngine(events)
         client = FakeStreamClient(answer)
         history = DictationHistory(
@@ -256,7 +296,18 @@ private final class Bench {
                     return self?.pasteSucceeds ?? false
                 }
             ),
-            panel: { _, _ in nil },
+            microphone: MicrophoneGate(
+                isGranted: { [weak self] in self?.microphoneGranted ?? false },
+                request: { [weak self] in
+                    self?.permissionRequests += 1
+                    return self?.microphoneGranted ?? false
+                },
+                showExplanation: { [weak self] in self?.explanations += 1 }
+            ),
+            panel: { [weak self] _, _ in
+                self?.panels += 1
+                return nil
+            },
             history: history,
             now: { [weak self] in self?.clock ?? .distantPast }
         )

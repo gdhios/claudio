@@ -49,15 +49,17 @@ extension KeyboardShortcuts.Name {
         initial: .init(.k, modifiers: [.control, .option, .command])
     )
 
-    /// Dictation, held down: D as in "dicter", at the same physical position
-    /// on AZERTY as on QWERTY like the other letters here.
+    /// Dictation, held down: M as in "micro". D would have been the mnemonic,
+    /// but `freeAction` has held it since long before dictation existed, and
+    /// a default that steals a working shortcut is a regression.
     ///
-    /// ⌃⌥⌘D is also `freeAction`'s default today: the two can't both keep it,
-    /// and which one moves is Guillaume's call — to settle before dictation
-    /// is wired into the app.
+    /// M is one of the keys that moves between layouts (see `freeAction`):
+    /// on AZERTY the physical key at this position is the one labelled ",".
+    /// Settings shows the key really bound, translated for the current
+    /// layout, and it is reconfigurable there.
     static let dictate = Self(
         "dictate",
-        initial: .init(.d, modifiers: [.control, .option, .command])
+        initial: .init(.m, modifiers: [.control, .option, .command])
     )
     /// Same gesture in the other language. No default: a second dictation
     /// shortcut is worth a key only to whoever actually speaks two languages,

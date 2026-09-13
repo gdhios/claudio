@@ -69,8 +69,9 @@ preview_shot() {
 
 # The screens everything passes through: panel (result, streaming, error,
 # free instruction, dictation listening and cleaning up), palette (plain and
-# filtered), Settings (API key, engine per action, local server, shortcuts).
-for mode in panel panel-streaming panel-error panel-free panel-listening panel-dictation-cleaning palette palette-filtre settings settings-prompts settings-ollama settings-shortcuts; do
+# filtered), Settings (API key, engine per action, local server, shortcuts,
+# dictation).
+for mode in panel panel-streaming panel-error panel-free panel-listening panel-dictation-cleaning palette palette-filtre settings settings-prompts settings-ollama settings-shortcuts settings-dictation; do
     preview_shot "$mode"
 done
 echo "✅ Critical screens build and render ($SHOTS/)."

@@ -6,6 +6,20 @@ import Speech
 /// recognition. Modelled on `AccessibilityPermission` — read the state, ask
 /// for it, explain it — so the coordinator treats all three permissions the
 /// same way.
+/// The two permissions as the dictation cycle needs them: read, ask,
+/// explain. Injected as one value, like `PasteService`, so a test can run a
+/// whole cycle without TCC — and so a preview never asks anything.
+@MainActor
+struct MicrophoneGate {
+    var isGranted: @MainActor () -> Bool
+    var request: @MainActor () async -> Bool
+    var showExplanation: @MainActor () -> Void
+
+    static let system = MicrophoneGate(isGranted: { MicrophonePermission.isGranted },
+                                       request: MicrophonePermission.request,
+                                       showExplanation: MicrophonePermission.showExplanation)
+}
+
 @MainActor
 enum MicrophonePermission {
     static var isGranted: Bool { missingAccess() == nil }

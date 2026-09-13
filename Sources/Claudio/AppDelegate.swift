@@ -10,6 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var recentsMenu: NSMenu?
     private let updateMenuItemTag = 777
     private let coordinator = CorrectionCoordinator()
+    /// Dictation's own coordinator, on Apple's engine. Built here and kept
+    /// for the life of the app: the hold shortcuts hold a weak reference to
+    /// it, and the microphone only opens on a press.
+    private let dictation = DictationCoordinator(engine: AppleSpeechEngine())
     private let settingsController = SettingsWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupMainMenu()
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)
+        HotkeySetup.installDictation(coordinator: dictation)
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.showUpdateMenuItem(feed)
@@ -82,6 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                               action: #selector(freeActionFromMenu), keyEquivalent: "")
         free.target = self
         menu.addItem(free)
+
+        // No dictation entry: this menu lists titles without their
+        // shortcuts, and dictation is a key held down — a click could only
+        // ever open the microphone without a way to close it. Its shortcuts
+        // and its history live in Settings ▸ Dictation.
 
         // The custom instructions already launched, to relaunch with one
         // gesture on the current selection. Its content is rebuilt on open.

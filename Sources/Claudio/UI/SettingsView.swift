@@ -8,6 +8,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case apiKey
     case ollama
     case shortcuts
+    case dictation
     case prompts
     case about
 
@@ -19,6 +20,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .apiKey: loc("Clé API", en: "API key")
         case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
+        case .dictation: loc("Dictée", en: "Dictation")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
         }
@@ -30,6 +32,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .apiKey: "key.fill"
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
+        case .dictation: "mic.fill"
         case .prompts: "text.quote"
         case .about: "info"
         }
@@ -41,6 +44,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .apiKey: ClaudioTheme.accent
         case .ollama: .green
         case .shortcuts: .indigo
+        case .dictation: .pink
         case .prompts: .orange
         case .about: .blue
         }
@@ -72,6 +76,7 @@ struct SettingsView: View {
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
+            case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
             case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
             case .about: AboutPane().navigationTitle(SettingsSection.about.title)
             }
@@ -378,6 +383,30 @@ private struct ShortcutsPane: View {
             } footer: {
                 Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.",
                          en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                HStack(spacing: 10) {
+                    IconBadge(systemName: SettingsSection.dictation.symbolName,
+                              color: SettingsSection.dictation.color, size: 22)
+                    Text(loc("Dicter (maintenir)", en: "Dictate (hold)"))
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .dictate)
+                }
+                HStack(spacing: 10) {
+                    IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
+                    Text(loc("Dicter dans l'autre langue (maintenir)",
+                             en: "Dictate in the other language (hold)"))
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .dictateOtherLanguage)
+                }
+            } header: {
+                Text(SettingsSection.dictation.title)
+            } footer: {
+                Text(loc("Ces deux-là se maintiennent : la touche enfoncée écoute, relâchée colle ce qui a été dit. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
+                         en: "These two are held down: pressed listens, released pastes what was said. The languages and the cleanup model are set in the Dictation tab."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

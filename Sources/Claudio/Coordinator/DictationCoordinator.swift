@@ -28,6 +28,7 @@ final class DictationCoordinator {
     private let model: @MainActor () -> ModelChoice
     private let client: ClientFactory
     private let pasting: PasteService
+    private let microphone: MicrophoneGate
     private let makePanel: PanelMaker
     private let history: DictationHistory
     private let now: @MainActor () -> Date
@@ -41,11 +42,15 @@ final class DictationCoordinator {
     /// The task that listens then finishes: cancelled by Esc and by the next
     /// press.
     private(set) var cycle: Task<Void, Never>?
+    /// The task asking for the microphone, on the first press only. `nil`
+    /// whenever the permissions are already there.
+    private(set) var permission: Task<Void, Never>?
 
     init(engine: SpeechEngine,
          model: @escaping @MainActor () -> ModelChoice = { AppSettings.dictationModel },
          client: @escaping ClientFactory = TextStreamClientFactory.make(for:),
          pasting: PasteService = .system,
+         microphone: MicrophoneGate = .system,
          panel: @escaping PanelMaker = DictationCoordinator.systemPanel,
          history: DictationHistory = .shared,
          now: @escaping @MainActor () -> Date = Date.init) {
@@ -53,6 +58,7 @@ final class DictationCoordinator {
         self.model = model
         self.client = client
         self.pasting = pasting
+        self.microphone = microphone
         self.makePanel = panel
         self.history = history
         self.now = now
@@ -68,6 +74,29 @@ final class DictationCoordinator {
         // pasted, so there is no point listening.
         guard pasting.isAllowed() else { return }
 
+        // Then the microphone and speech recognition. Granted, this costs
+        // nothing and the dictation starts on the press itself.
+        guard microphone.isGranted() else {
+            askForTheMicrophone()
+            return
+        }
+        beginListening(language: language)
+    }
+
+    /// The first press, on a machine that hasn't been asked yet: the two
+    /// system prompts, then the explanation if either is refused. Nothing is
+    /// listened to here — the prompts are modal and the key is long released
+    /// by the time they are answered, so this press asks and the next one
+    /// dictates. Same bargain as the Accessibility gate.
+    private func askForTheMicrophone() {
+        permission = Task { [weak self] in
+            guard let self, await !microphone.request() else { return }
+            microphone.showExplanation()
+        }
+    }
+
+    /// Opens the microphone and puts the panel on screen.
+    private func beginListening(language: DictationLanguage) {
         pressedAt = now()
         // Captured BEFORE showing anything, while the app being dictated
         // into is still the frontmost one.

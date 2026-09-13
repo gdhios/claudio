@@ -4,7 +4,8 @@ import SwiftUI
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
 /// panel-noselection, panel-free, panel-free-filled, panel-listening,
-/// panel-dictation-cleaning, palette, palette-filtre, palette-libre, settings.
+/// panel-dictation-cleaning, palette, palette-filtre, palette-libre,
+/// settings, settings-dictation.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -57,6 +58,11 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .ollama)
         } else if mode == "settings-shortcuts" {
             settingsController.show(initialSection: .shortcuts)
+        } else if mode == "settings-dictation" {
+            // The pane freezes its own history and its model list behind
+            // `PreviewRun.isActive`: nothing is read from, or written to,
+            // this machine's preferences.
+            settingsController.show(initialSection: .dictation)
         } else if mode == "settings-about" {
             settingsController.show(initialSection: .about)
         } else if mode == "barre-de-menus" {
