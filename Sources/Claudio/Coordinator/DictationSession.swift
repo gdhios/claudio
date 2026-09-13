@@ -38,6 +38,11 @@ final class DictationSession: ObservableObject {
     /// to the model's name. A dictation is never lost: this says what was
     /// pasted instead.
     @Published var note: String?
+    /// What stopped the dictation, when one did. The phase carries the
+    /// sentence to read; this carries what it was, because a panel that only
+    /// knows a sentence can't offer the way out of a missing language.
+    /// Written by `fail(with:)` alone, so the two never disagree.
+    @Published private(set) var failure: SpeechEngineError?
     @Published var justCopied = false
 
     init(language: DictationLanguage, model: ModelChoice) {
@@ -64,6 +69,13 @@ final class DictationSession: ObservableObject {
         case .done, .error: !finalText.isEmpty
         case .listening, .finishing, .cleaning, .pasting, .empty: false
         }
+    }
+
+    /// The dictation stopped: the message goes on screen, the error itself
+    /// stays here for whoever can do something about it.
+    func fail(with error: SpeechEngineError) {
+        failure = error
+        phase = .error(error.localizedDescription)
     }
 
     /// A fragment of the cleanup, as it streams. Unlike a correction, a

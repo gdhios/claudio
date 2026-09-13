@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import XCTest
 @testable import Claudio
@@ -115,7 +116,7 @@ final class DictationCoordinatorTests: XCTestCase {
     }
 
     /// The engine gives up (no microphone, language not installed): its own
-    /// message is shown, and the panel stays open on it.
+    /// message is shown, and the panel stays on it — long enough to be read.
     func testAnEngineFailureShowsItsMessage() async throws {
         let bench = Bench(events: [.failed(.microphoneDenied)])
         bench.coordinator.keyDown(language: .frFR)
@@ -126,6 +127,37 @@ final class DictationCoordinatorTests: XCTestCase {
                        .error(SpeechEngineError.microphoneDenied.localizedDescription))
         XCTAssertTrue(bench.pasted.isEmpty)
         XCTAssertNotNil(bench.coordinator.session)
+    }
+
+    /// A failure isn't a panel that stays forever: the message is shown, then
+    /// the panel takes itself off the screen, as "Nothing heard" does. Before
+    /// that it was Esc or nothing, and `keyUp()` doesn't answer in that phase.
+    func testAFailureClosesThePanelOnItsOwn() async {
+        let bench = Bench(events: [.failed(.microphoneDenied)],
+                          durations: .init(empty: .milliseconds(5), failure: .milliseconds(5)))
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.coordinator.cycle?.value
+        XCTAssertNotNil(bench.coordinator.session)
+
+        await bench.wait { bench.coordinator.session == nil }
+        XCTAssertNil(bench.coordinator.session)
+    }
+
+    /// The panel is handed the error itself, not only its sentence: a missing
+    /// language is the one failure it can offer a way out of, and offering it
+    /// takes knowing which failure it was.
+    func testAFailureKeepsTheErrorItselfNotJustItsMessage() async throws {
+        let missing = SpeechEngineError.languageUnavailable(DictationLanguage.frFR.locale)
+        let bench = Bench(events: [.failed(missing)])
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.coordinator.cycle?.value
+
+        XCTAssertEqual(session.phase, .error(missing.localizedDescription))
+        guard case .languageUnavailable? = session.failure else {
+            return XCTFail("no way out without the error: \(String(describing: session.failure))")
+        }
+        XCTAssertNotNil(session.failure?.settingsURL)
     }
 
     // MARK: - Permissions
@@ -143,6 +175,26 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.engine.starts, 0)
         XCTAssertEqual(bench.panels, 0)
         XCTAssertNil(bench.coordinator.session)
+    }
+
+    /// Pressed again while the system prompts are still up: the first chain
+    /// is dropped, so a single explanation is shown. Two stacked alerts is
+    /// what a shortcut pressed twice would otherwise cost, on the very
+    /// machine where nothing works yet.
+    func testASecondPressDoesNotStackTwoExplanations() async {
+        let bench = Bench(microphoneGranted: false, promptsWait: true)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.permissionRequests == 1 }
+        let first = bench.coordinator.permission
+
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.permissionRequests == 2 }
+        bench.answerPrompts(granted: false)
+        await first?.value
+        await bench.coordinator.permission?.value
+
+        XCTAssertEqual(first?.isCancelled, true)
+        XCTAssertEqual(bench.explanations, 1)
     }
 
     /// A permission already granted costs nothing: no prompt, no
@@ -204,20 +256,36 @@ final class DictationCoordinatorTests: XCTestCase {
 
     // MARK: - The panel
 
-    /// Nowhere to paste (Claudio itself was frontmost, or the app refused
-    /// the keystroke): the panel stays open with the text, which Copy can
-    /// still save. The history has it either way.
-    func testAPasteWithNowhereToGoKeepsThePanelOpen() async throws {
+    /// Nowhere to paste: Claudio itself was frontmost when the key went down
+    /// — the cursor in its own prompt editor, say. Nothing is pasted at all,
+    /// because a ⌘V would land in whatever has focus now, Claudio included.
+    /// The panel stays open with the text, which Copy can still save, and the
+    /// history has it either way.
+    func testAPasteWithNowhereToGoIsNotSentAnyway() async throws {
         let bench = Bench()
-        bench.pasteSucceeds = false
+        bench.targetApp = nil
         bench.coordinator.keyDown(language: .frFR)
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.finish()
 
+        XCTAssertTrue(bench.pasted.isEmpty)
         XCTAssertEqual(session.phase, .done)
         XCTAssertTrue(session.canCopy)
         XCTAssertNotNil(bench.coordinator.session)
         XCTAssertEqual(bench.history.recents.entries.count, 1)
+    }
+
+    /// The panel leaves the screen before the keystroke, as the correction
+    /// panel does and for the same reason: it is a key window while it is up,
+    /// and a ⌘V sent to it pastes the dictation into Claudio. Read through
+    /// the session, which `dismiss()` clears: it is already gone when the
+    /// paste runs.
+    func testThePanelIsGoneBeforeTheKeystroke() async {
+        let bench = Bench()
+        await bench.dictate()
+
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+        XCTAssertEqual(bench.panelOpenAtPaste, [false])
     }
 
     /// A shortcut pressed while a dictation is running starts a fresh one:
@@ -254,8 +322,12 @@ private final class Bench {
 
     /// Every text the paste was handed, in order.
     var pasted: [String] = []
-    /// Whether the paste finds an app to land in.
-    var pasteSucceeds = true
+    /// Whether a dictation was still on screen each time the paste ran: the
+    /// panel has to be gone before the keystroke.
+    var panelOpenAtPaste: [Bool] = []
+    /// The app that had focus when the key went down, `nil` when Claudio
+    /// itself did and there is nowhere to paste.
+    var targetApp: NSRunningApplication? = .current
     /// Every model a client was asked for: empty proves nothing was asked.
     var clientRequests: [ModelChoice] = []
     /// Whether the microphone and speech recognition are already granted.
@@ -268,12 +340,17 @@ private final class Bench {
     var panels = 0
 
     private var clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    /// The prompts still waiting for an answer, when the bench holds them
+    /// open: that's a press landing while macOS asks for the microphone.
+    private var pendingPrompts: [CheckedContinuation<Bool, Never>] = []
 
     init(events: [TranscriptEvent] = [.partial("bon"), .partial("bonjour"), .final("bonjour")],
          model: ModelChoice = .claude(.haiku45),
          answer: Result<String, Error> = .success("Bonjour."),
          hasClient: Bool = true,
-         microphoneGranted: Bool = true) {
+         microphoneGranted: Bool = true,
+         promptsWait: Bool = false,
+         durations: DictationCoordinator.MessageDurations = .standard) {
         self.microphoneGranted = microphoneGranted
         engine = FakeSpeechEngine(events)
         client = FakeStreamClient(answer)
@@ -290,17 +367,21 @@ private final class Bench {
             },
             pasting: PasteService(
                 isAllowed: { true },
-                capture: { PasteTarget(app: nil, clipboard: nil) },
+                capture: { [weak self] in PasteTarget(app: self?.targetApp, clipboard: nil) },
                 paste: { [weak self] text, _ in
-                    self?.pasted.append(text)
-                    return self?.pasteSucceeds ?? false
+                    guard let self else { return false }
+                    pasted.append(text)
+                    panelOpenAtPaste.append(coordinator.session != nil)
+                    return targetApp != nil
                 }
             ),
             microphone: MicrophoneGate(
                 isGranted: { [weak self] in self?.microphoneGranted ?? false },
                 request: { [weak self] in
-                    self?.permissionRequests += 1
-                    return self?.microphoneGranted ?? false
+                    guard let self else { return false }
+                    permissionRequests += 1
+                    guard promptsWait else { return microphoneGranted }
+                    return await withCheckedContinuation { pendingPrompts.append($0) }
                 },
                 showExplanation: { [weak self] in self?.explanations += 1 }
             ),
@@ -309,8 +390,17 @@ private final class Bench {
                 return nil
             },
             history: history,
+            durations: durations,
             now: { [weak self] in self?.clock ?? .distantPast }
         )
+    }
+
+    /// Answers every system prompt still open, as macOS does when the user
+    /// finally clicks.
+    func answerPrompts(granted: Bool) {
+        let waiting = pendingPrompts
+        pendingPrompts = []
+        for prompt in waiting { prompt.resume(returning: granted) }
     }
 
     /// Moves the clock forward: that's how long the key stayed down.
@@ -338,6 +428,16 @@ private final class Bench {
         while !reached(), turns < 500 {
             await Task.yield()
             turns += 1
+        }
+    }
+
+    /// Waits for something a timer decides rather than a turn of the loop: a
+    /// panel closing itself is the only thing here that takes real time. The
+    /// ceiling keeps a panel that never closes from hanging the suite.
+    func wait(seconds: TimeInterval = 2, until reached: () -> Bool) async {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !reached(), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(2))
         }
     }
 

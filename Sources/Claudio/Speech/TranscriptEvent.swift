@@ -42,4 +42,20 @@ enum SpeechEngineError: LocalizedError {
                        en: "Speech recognition failed: \(message)")
         }
     }
+
+    /// Where the panel can send someone to fix it, when it can. Only the
+    /// missing language: Claudio downloads no model by itself, and that pane
+    /// is where one is added. The two refusals already come with their own
+    /// alert, which opens its own pane — a button here would be a second
+    /// answer to a question already asked.
+    var settingsURL: URL? {
+        switch self {
+        case .languageUnavailable:
+            // Keyboard, where Dictation lists its languages. The identifier
+            // is the settings extension's own (macOS 13+).
+            return URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+        case .microphoneDenied, .recognitionDenied, .audioEngine, .recognizer:
+            return nil
+        }
+    }
 }

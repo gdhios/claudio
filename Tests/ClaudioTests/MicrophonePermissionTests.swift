@@ -51,4 +51,17 @@ final class MicrophonePermissionTests: XCTestCase {
         XCTAssertTrue(SpeechEngineError.microphoneDenied.errorDescription?.contains("Microphone") == true)
         XCTAssertTrue(SpeechEngineError.recognitionDenied.errorDescription?.contains("Speech Recognition") == true)
     }
+
+    /// A language that isn't installed is the one failure the panel can offer
+    /// a way out of, so it — and only it — carries the pane to open. The two
+    /// refusals come with their own alert, which opens its own pane.
+    func testOnlyAMissingLanguageCarriesAPaneToOpen() {
+        let missing = SpeechEngineError.languageUnavailable(Locale(identifier: "fr-FR"))
+        XCTAssertEqual(missing.settingsURL?.absoluteString,
+                       "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+        XCTAssertNil(SpeechEngineError.microphoneDenied.settingsURL)
+        XCTAssertNil(SpeechEngineError.recognitionDenied.settingsURL)
+        XCTAssertNil(SpeechEngineError.audioEngine("boom").settingsURL)
+        XCTAssertNil(SpeechEngineError.recognizer("boom").settingsURL)
+    }
 }

@@ -23,11 +23,15 @@ final class TranscriptSink: @unchecked Sendable {
     /// True once a terminal event went out: nothing more will.
     var isFinished: Bool { lock.withLock { continuation == nil } }
 
+    /// Yielded under the lock, unlike everything else here: `yield` never
+    /// blocks, and outside the lock a partial held by another thread could
+    /// slip in between the final's yield and the end of the stream — the
+    /// panel showing again what it had just pasted.
     func emitPartial(_ text: String) {
         lock.lock()
-        guard let continuation else { lock.unlock(); return }
+        defer { lock.unlock() }
+        guard let continuation else { return }
         latest = text
-        lock.unlock()
         continuation.yield(.partial(text))
     }
 

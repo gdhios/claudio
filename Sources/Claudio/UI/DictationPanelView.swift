@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The panel while dictating: what Claudio hears, then what the model makes
@@ -98,7 +99,11 @@ struct DictationPanelView: View {
         case .error(let message):
             messageView(icon: "exclamationmark.triangle",
                         title: loc("Dictée impossible", en: "Dictation stopped"),
-                        detail: message)
+                        detail: message,
+                        // A language that isn't installed is the one failure
+                        // the panel can act on: Claudio downloads nothing by
+                        // itself, and this opens the pane where it's added.
+                        settingsURL: session.failure?.settingsURL)
         default:
             dictatedText
         }
@@ -161,7 +166,8 @@ struct DictationPanelView: View {
         }
     }
 
-    private func messageView(icon: String, title: String, detail: String) -> some View {
+    private func messageView(icon: String, title: String, detail: String,
+                             settingsURL: URL? = nil) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
             Text(title).font(.system(size: textSize.points(13), weight: .semibold))
@@ -169,6 +175,17 @@ struct DictationPanelView: View {
                 .font(.system(size: textSize.points(12)))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                // An engine's message is a sentence, not a label: without
+                // this it is cut off at one line, right where it says what
+                // to do about it.
+                .fixedSize(horizontal: false, vertical: true)
+            if let settingsURL {
+                Button(loc("Ouvrir Réglages Système", en: "Open System Settings")) {
+                    NSWorkspace.shared.open(settingsURL)
+                }
+                .buttonStyle(PanelPillButtonStyle())
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)

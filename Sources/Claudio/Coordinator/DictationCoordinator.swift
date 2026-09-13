@@ -14,8 +14,20 @@ final class DictationCoordinator {
     /// A press shorter than this isn't speech: a slip of the finger, or a
     /// shortcut meant for something else. Nothing is pasted.
     static let shortPressThreshold: TimeInterval = 0.3
-    /// How long "Nothing heard" stays on screen before the panel closes.
-    static let emptyPanelDuration: Duration = .milliseconds(1500)
+
+    /// How long a panel that has nothing left to do but speak stays on
+    /// screen. Injected so a test can watch one close itself without waiting
+    /// four seconds for it.
+    struct MessageDurations: Sendable {
+        /// "Nothing heard": a glance is enough.
+        var empty: Duration = .milliseconds(1500)
+        /// A failure: long enough to read a sentence and reach the button it
+        /// may carry, short enough that the panel doesn't outlive the
+        /// dictation. Esc and the next press still cut it short.
+        var failure: Duration = .seconds(4)
+
+        static let standard = MessageDurations()
+    }
 
     /// Builds the client that answers for a model, `nil` when none can: the
     /// Claude key is missing, or the choice names no model at all.
@@ -31,6 +43,7 @@ final class DictationCoordinator {
     private let microphone: MicrophoneGate
     private let makePanel: PanelMaker
     private let history: DictationHistory
+    private let durations: MessageDurations
     private let now: @MainActor () -> Date
 
     private var panel: ResultPanel?
@@ -53,6 +66,7 @@ final class DictationCoordinator {
          microphone: MicrophoneGate = .system,
          panel: @escaping PanelMaker = DictationCoordinator.systemPanel,
          history: DictationHistory = .shared,
+         durations: MessageDurations = .standard,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
         self.model = model
@@ -61,6 +75,7 @@ final class DictationCoordinator {
         self.microphone = microphone
         self.makePanel = panel
         self.history = history
+        self.durations = durations
         self.now = now
     }
 
@@ -90,7 +105,15 @@ final class DictationCoordinator {
     /// dictates. Same bargain as the Accessibility gate.
     private func askForTheMicrophone() {
         permission = Task { [weak self] in
-            guard let self, await !microphone.request() else { return }
+            // Cancelled between the press and the first turn of the loop:
+            // a newer press owns the prompts, and this one asks nothing.
+            guard let self, !Task.isCancelled else { return }
+            let granted = await microphone.request()
+            // The prompts are modal, so a second press lands here long
+            // before the answer does. Only the last chain explains itself:
+            // two alerts stacked on the same refusal is what `dismiss()`
+            // cancelling this task is for.
+            guard !Task.isCancelled, !granted else { return }
             microphone.showExplanation()
         }
     }
@@ -140,7 +163,10 @@ final class DictationCoordinator {
             case .partial(let text), .final(let text):
                 session.transcript = text
             case .failed(let error):
-                session.phase = .error(error.localizedDescription)
+                // The message is read, not acted on: nothing was heard, so
+                // the panel says why and closes itself like an empty one.
+                session.fail(with: error)
+                closeAfter(durations.failure, session: session)
                 return
             }
         }
@@ -157,7 +183,7 @@ final class DictationCoordinator {
         guard !raw.isEmpty else {
             // A silence, a press on nothing: said rather than pasted.
             session.phase = .empty
-            closeAfterNothingHeard(session)
+            closeAfter(durations.empty, session: session)
             return
         }
         session.transcript = raw
@@ -173,16 +199,26 @@ final class DictationCoordinator {
         // the app, it was said, and the history keeps it.
         history.record(raw: raw, cleaned: cleaned, language: session.language)
 
-        session.phase = .pasting
-        let landed = await pasting.paste(cleaned ?? raw, target ?? PasteTarget())
-        guard self.session === session else { return }
-        guard landed else {
-            // Nowhere to paste: the panel stays open with Copy rather than
-            // dropping the text into nothing.
+        // Nowhere to paste: Claudio itself was frontmost when the key went
+        // down — the cursor in its own prompt editor, say. The keystroke
+        // isn't sent at all, since it would land in whatever has focus now:
+        // the panel keeps the text instead, with Copy as the way out.
+        guard let target, target.app != nil else {
             session.phase = .done
             return
         }
+
+        session.phase = .pasting
+        let text = cleaned ?? raw
+        // The panel leaves the screen before the keystroke, as
+        // `CorrectionCoordinator.pasteResult()` does: it is a key window
+        // while it is up, and a ⌘V sent to it pastes into Claudio.
         dismiss()
+        // In a task of its own, because `dismiss()` cancelled this one and a
+        // cancelled task turns the paste's activation delay into no delay.
+        await Task { [weak self] in
+            _ = await self?.pasting.paste(text, target)
+        }.value
     }
 
     /// Runs the cleanup pass and returns its text, `nil` when there was
@@ -230,11 +266,13 @@ final class DictationCoordinator {
         loc("Collé sans nettoyage : \(reason)", en: "Pasted without cleanup: \(reason)")
     }
 
-    /// "Nothing heard" is read in a second, then the panel takes itself off
-    /// the screen.
-    private func closeAfterNothingHeard(_ session: DictationSession) {
+    /// The panel has said its piece — "Nothing heard", or why the dictation
+    /// stopped — and takes itself off the screen. Esc and the next press cut
+    /// it short: both call `dismiss()`, and the session no longer being this
+    /// one is what makes the sleeping task harmless.
+    private func closeAfter(_ delay: Duration, session: DictationSession) {
         Task { [weak self] in
-            try? await Task.sleep(for: Self.emptyPanelDuration)
+            try? await Task.sleep(for: delay)
             guard self?.session === session else { return }
             self?.dismiss()
         }
@@ -277,6 +315,11 @@ final class DictationCoordinator {
     func dismiss() {
         cycle?.cancel()
         cycle = nil
+        // The prompts can't be taken back, but the explanation that follows
+        // them can: a press that starts a new chain drops the old one rather
+        // than letting two alerts pile up on the same refusal.
+        permission?.cancel()
+        permission = nil
         // Only a dictation under way has a microphone to close.
         if session != nil { engine.cancel() }
         panel?.orderOut(nil)
