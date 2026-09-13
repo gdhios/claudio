@@ -21,7 +21,7 @@ final class AppleSpeechEngineTests: XCTestCase {
         let events = await drain(engine.start(locale: unknownLanguage))
         XCTAssertEqual(events.count, 1)
         guard case .failed = events.first else {
-            return XCTFail("attendu un .failed, reçu \(String(describing: events.first))")
+            return XCTFail("expected a .failed, got \(String(describing: events.first))")
         }
     }
 
@@ -35,7 +35,7 @@ final class AppleSpeechEngineTests: XCTestCase {
         for event in await drain(stream) {
             switch event {
             case .partial, .final:
-                XCTFail("un cancel ne rend jamais de texte : \(event)")
+                XCTFail("a cancel never hands back text: \(event)")
             case .failed:
                 break  // The run had already given up on the language.
             }
@@ -87,7 +87,7 @@ final class AppleSpeechEngineTests: XCTestCase {
             return first
         }
         guard let outcome else {
-            XCTFail("le flux ne s'est pas terminé : un consommateur reste suspendu.",
+            XCTFail("the stream never finished: a consumer is left suspended.",
                     file: file, line: line)
             return []
         }

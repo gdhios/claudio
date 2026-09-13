@@ -4,8 +4,8 @@ import SwiftUI
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
 /// panel-noselection, panel-free, panel-free-filled, panel-listening,
-/// panel-dictation-cleaning, palette, palette-filtre, palette-libre,
-/// settings, settings-dictation.
+/// panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
+/// palette-libre, settings, settings-dictation.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -160,18 +160,20 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         panel.present()
     }
 
-    /// Dictation: the panel while listening, then while the cleanup streams.
-    /// No engine is ever built here and the microphone is never opened — a
-    /// preview renders the same screen on every machine, including one where
-    /// nothing is listening.
+    /// Dictation: the panel while listening, while the cleanup streams, and
+    /// when the language isn't installed. No engine is ever built here and
+    /// the microphone is never opened. The language and the model are fixed
+    /// rather than read from the settings: a preview renders the same screen
+    /// on every machine, including one where nothing is listening.
     private func showDictationPreview() {
-        let session = DictationSession(language: AppSettings.dictationPrimaryLanguage,
-                                       model: AppSettings.dictationModel)
+        let session = DictationSession(language: .frFR, model: .claude(.haiku45))
         switch mode {
         case "panel-dictation-cleaning":
             session.transcript = spokenText
             session.cleanedText = tidiedText
             session.phase = .cleaning
+        case "panel-dictation-error":
+            session.fail(with: .languageUnavailable(DictationLanguage.frFR.locale))
         default:  // "panel-listening"
             session.transcript = tidiedText
             session.phase = .listening

@@ -49,17 +49,15 @@ extension KeyboardShortcuts.Name {
         initial: .init(.k, modifiers: [.control, .option, .command])
     )
 
-    /// Dictation, held down: M as in "micro". D would have been the mnemonic,
-    /// but `freeAction` has held it since long before dictation existed, and
-    /// a default that steals a working shortcut is a regression.
-    ///
-    /// M is one of the keys that moves between layouts (see `freeAction`):
-    /// on AZERTY the physical key at this position is the one labelled ",".
-    /// Settings shows the key really bound, translated for the current
-    /// layout, and it is reconfigurable there.
+    /// Dictation, held down: the space bar, the one key a thumb finds without
+    /// looking — which is what a push-to-talk shortcut is. It also keeps the
+    /// same physical position on every layout, unlike a letter: Carbon binds
+    /// by position, and M (the mnemonic for "micro") is labelled "," on
+    /// AZERTY. Settings shows the key really bound and it is reconfigurable
+    /// there.
     static let dictate = Self(
         "dictate",
-        initial: .init(.m, modifiers: [.control, .option, .command])
+        initial: .init(.space, modifiers: [.control, .option, .command])
     )
     /// Same gesture in the other language. No default: a second dictation
     /// shortcut is worth a key only to whoever actually speaks two languages,

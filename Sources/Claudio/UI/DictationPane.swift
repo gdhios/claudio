@@ -7,10 +7,17 @@ import SwiftUI
 /// this one carries a list.
 @MainActor
 struct DictationPane: View {
-    @State private var primaryLanguage = AppSettings.dictationPrimaryLanguage
-    @State private var secondaryLanguage = AppSettings.dictationSecondaryLanguage
-    @State private var model = AppSettings.dictationModel
-    @State private var promptText = DictationCleanup.systemPrompt
+    // A preview shows fixed settings rather than this Mac's: the shot has to
+    // be the same on every machine, and nothing it displays is read from — or
+    // written back to — the real preferences.
+    @State private var primaryLanguage = PreviewRun.isActive
+        ? DictationLanguage.frFR : AppSettings.dictationPrimaryLanguage
+    @State private var secondaryLanguage = PreviewRun.isActive
+        ? DictationLanguage.enUS : AppSettings.dictationSecondaryLanguage
+    @State private var model = PreviewRun.isActive
+        ? AppSettings.defaultDictationModel : AppSettings.dictationModel
+    @State private var promptText = PreviewRun.isActive
+        ? DictationCleanup.defaultSystemPrompt : DictationCleanup.systemPrompt
     /// Models pulled on the Ollama server, read when the pane opens.
     @State private var localModels: [String] = []
     /// The history as it was when the pane opened. Re-read on every open: a
@@ -173,7 +180,8 @@ struct DictationPane: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(entry.date.formatted(date: .abbreviated, time: .shortened))
-                Text("·")
+                // Not a word: a separator, which no language translates.
+                Text(verbatim: "·")
                 Text(languageName(entry.language))
                 Spacer()
             }
