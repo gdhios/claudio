@@ -22,9 +22,14 @@ extension SpeechRun {
         }
         if isCancelled { return }
 
+        // `.fastResults` is what makes the words show up as they are said.
+        // Without it the transcriber holds every volatile result back for
+        // about twelve seconds, then sends them all at once: measured on
+        // macOS 26.6, French speech fed at the microphone's pace, first word
+        // at 12.2 s without it and 1.1 s with it, same final text either way.
         let transcriber = SpeechTranscriber(locale: supported,
                                             transcriptionOptions: [],
-                                            reportingOptions: [.volatileResults],
+                                            reportingOptions: [.volatileResults, .fastResults],
                                             attributeOptions: [])
         // `AssetInventory.status(forModules:)` answers `.supported`, never
         // `.installed`, for a language the system already has (verified on
