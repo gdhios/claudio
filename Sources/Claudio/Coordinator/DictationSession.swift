@@ -32,6 +32,9 @@ final class DictationSession: ObservableObject {
     /// The transcript as the engine gives it: partial, then final. The
     /// engine always sends the whole text, so this is assigned, never appended to.
     @Published var transcript = ""
+    /// The microphone's recent loudness, drawn as a waveform while listening:
+    /// the proof it hears, before the first word shows up.
+    @Published var levels = LevelHistory()
     /// The cleaned-up text, as the model streams it.
     @Published var cleanedText = ""
     /// Why the text wasn't cleaned up, shown at the bottom of the panel next

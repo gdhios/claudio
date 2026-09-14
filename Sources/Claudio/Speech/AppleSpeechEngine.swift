@@ -155,6 +155,7 @@ extension SpeechRun {
             gate.open()
         }
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
+            sink.emitLevel(AudioLevel.level(of: buffer))
             request.append(buffer)
         }
 

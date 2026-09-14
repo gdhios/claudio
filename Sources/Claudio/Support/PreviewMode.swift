@@ -3,7 +3,7 @@ import SwiftUI
 
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
-/// panel-noselection, panel-free, panel-free-filled, panel-listening,
+/// panel-noselection, panel-free, panel-free-filled, panel-listening, panel-listening-start,
 /// panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
 /// palette-libre, settings, settings-dictation.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
@@ -67,7 +67,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .about)
         } else if mode == "barre-de-menus" {
             showMenuBarPreview()
-        } else if mode == "panel-listening" || mode.hasPrefix("panel-dictation") {
+        } else if mode.hasPrefix("panel-listening") || mode.hasPrefix("panel-dictation") {
             showDictationPreview()
         } else if mode.hasPrefix("palette") {
             showPalettePreview()
@@ -174,13 +174,26 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.phase = .cleaning
         case "panel-dictation-error":
             session.fail(with: .languageUnavailable(DictationLanguage.frFR.locale))
+        case "panel-listening-start":
+            session.levels = voiceLevels
+            session.phase = .listening
         default:  // "panel-listening"
+            session.levels = voiceLevels
             session.transcript = tidiedText
             session.phase = .listening
         }
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         panel.present()
+    }
+
+    /// A voice starting in a quiet room: flat, then a phrase with its rises
+    /// and a breath. Fixed values, so the shot is the same on every machine.
+    private var voiceLevels: LevelHistory {
+        let readings: [Float] = [0, 0, 0.02, 0, 0.05, 0.1, 0.35, 0.62, 0.48, 0.7, 0.85, 0.55,
+                                 0.3, 0.12, 0.08, 0.4, 0.66, 0.9, 0.72, 0.5, 0.58, 0.8, 0.45, 0.2,
+                                 0.1, 0.3, 0.55, 0.75, 0.6, 0.38, 0.52, 0.68]
+        return readings.reduce(LevelHistory()) { $0.adding($1) }
     }
 
     /// A dictation as it comes out of speech recognition: no punctuation, a

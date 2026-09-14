@@ -65,7 +65,13 @@ struct DictationPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .listening:
-            workingPill(loc("À l'écoute…", en: "Listening…"))
+            // The spinner of the other phases says "wait"; while listening it
+            // is the voice that moves, so the pill carries the last readings.
+            StatusPill {
+                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
+                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
+                Text(loc("À l'écoute…", en: "Listening…"))
+            }
         case .finishing:
             workingPill(loc("Un instant…", en: "One moment…"))
         case .cleaning:
@@ -105,8 +111,32 @@ struct DictationPanelView: View {
                         // itself, and this opens the pane where it's added.
                         settingsURL: session.failure?.settingsURL)
         default:
-            dictatedText
+            Group {
+                if session.phase == .listening, session.transcript.isEmpty {
+                    listeningPlaceholder
+                } else {
+                    dictatedText
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: session.transcript.isEmpty)
         }
+    }
+
+    /// Before the first word: the waveform, large, where the text will be, at
+    /// the height the text will take so nothing jumps when it arrives.
+    private var listeningPlaceholder: some View {
+        VStack(spacing: 12) {
+            DictationWaveform(levels: session.levels.values,
+                              barWidth: textSize.points(3),
+                              spacing: textSize.points(3),
+                              maxHeight: textSize.points(40))
+            Text(loc("Parle, je t'écoute…", en: "Go ahead, I'm listening…"))
+                .font(.system(size: textSize.points(12)))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: textSize.minTextHeight)
+        .transition(.opacity)
     }
 
     /// The text being written: the transcript while listening, the cleaned-up
@@ -122,6 +152,11 @@ struct DictationPanelView: View {
                         .foregroundStyle(.white.opacity(0.92))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        // Each new result crossfades over the previous one:
+                        // the words already there don't move, the new ones
+                        // fade in instead of popping.
+                        .contentTransition(.opacity)
+                        .animation(.easeOut(duration: 0.22), value: session.finalText)
                     if session.phase == .cleaning, !session.transcript.isEmpty {
                         Text(session.transcript)
                             .font(.system(size: textSize.points(10)))
@@ -146,10 +181,13 @@ struct DictationPanelView: View {
             }
             .onChange(of: session.finalText) {
                 if textHeight > textSize.maxTextHeight {
-                    proxy.scrollTo("bottom", anchor: .bottom)
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
                 }
             }
         }
+        .transition(.opacity)
     }
 
     /// A blinking caret as long as words are still coming in; plain text

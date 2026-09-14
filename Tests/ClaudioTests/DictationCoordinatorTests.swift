@@ -40,6 +40,17 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.session)
     }
 
+    /// The microphone's loudness goes to the waveform, newest last, and
+    /// leaves the transcript alone.
+    func testLevelsFeedTheWaveformNotTheTranscript() async throws {
+        let bench = Bench(events: [.level(0.25), .partial("bon"), .level(0.75), .final("bon")])
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { session.levels.values.last == 0.75 }
+        XCTAssertEqual(Array(session.levels.values.suffix(2)), [0.25, 0.75])
+        XCTAssertEqual(session.transcript, "bon")
+    }
+
     /// The engine is started in the session's language, which is the
     /// shortcut's: that's the whole point of the second one.
     func testTheEngineListensInTheLanguageOfThePress() async {
@@ -478,7 +489,7 @@ private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
         self.continuation = continuation
         for event in events {
             switch event {
-            case .partial:
+            case .partial, .level:
                 continuation.yield(event)
             case .failed:
                 continuation.yield(event)

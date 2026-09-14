@@ -102,6 +102,7 @@ extension SpeechRun {
         }
 
         input.installTap(onBus: 0, bufferSize: 4096, format: microphoneFormat) { buffer, _ in
+            sink.emitLevel(AudioLevel.level(of: buffer))
             guard let converted = Self.convert(buffer, with: converter, to: analysisFormat) else { return }
             inputSink.yield(AnalyzerInput(buffer: converted))
         }

@@ -36,7 +36,7 @@ final class AppleSpeechEngineTests: XCTestCase {
             switch event {
             case .partial, .final:
                 XCTFail("a cancel never hands back text: \(event)")
-            case .failed:
+            case .failed, .level:
                 break  // The run had already given up on the language.
             }
         }

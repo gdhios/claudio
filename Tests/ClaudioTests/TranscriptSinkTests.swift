@@ -20,6 +20,24 @@ final class TranscriptSinkTests: XCTestCase {
         XCTAssertEqual(events, ["partial:bon", "final:bonjour"])
     }
 
+    /// Loudness rides the same stream as the words without being one: it
+    /// never changes the text kept for the final, and nothing of it leaves
+    /// once the session is over.
+    func testLevelsPassThroughWithoutTouchingTheText() async {
+        let (stream, continuation) = AsyncStream.makeStream(of: TranscriptEvent.self)
+        let sink = TranscriptSink(continuation)
+
+        sink.emitLevel(0.25)
+        sink.emitPartial("bon")
+        sink.emitLevel(0.75)
+        XCTAssertEqual(sink.textSoFar, "bon")
+        sink.emitFinal()
+        sink.emitLevel(0.5)  // the tap hadn't heard the stop yet
+
+        let events = await describe(stream)
+        XCTAssertEqual(events, ["level:0.25", "partial:bon", "level:0.75", "final:bon"])
+    }
+
     /// The same ordering under the interleaving that really happens: partials
     /// coming off other threads while this one closes the session. A partial
     /// may be lost — that is what a final means — but none may come out after
@@ -79,6 +97,7 @@ final class TranscriptSinkTests: XCTestCase {
             case .partial(let text): described.append("partial:\(text)")
             case .final(let text): described.append("final:\(text)")
             case .failed: described.append("failed")
+            case .level(let value): described.append("level:\(value)")
             }
         }
         return described

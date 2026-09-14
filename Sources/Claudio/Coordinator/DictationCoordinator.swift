@@ -162,6 +162,8 @@ final class DictationCoordinator {
             switch event {
             case .partial(let text), .final(let text):
                 session.transcript = text
+            case .level(let level):
+                session.levels = session.levels.adding(level)
             case .failed(let error):
                 // The message is read, not acted on: nothing was heard, so
                 // the panel says why and closes itself like an empty one.

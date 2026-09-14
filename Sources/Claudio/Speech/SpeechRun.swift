@@ -35,6 +35,15 @@ final class TranscriptSink: @unchecked Sendable {
         continuation.yield(.partial(text))
     }
 
+    /// Loudness for the waveform, straight from the microphone's tap. Under
+    /// the lock for the same reason as a partial, and without touching the
+    /// text kept for the final.
+    func emitLevel(_ level: Float) {
+        lock.lock()
+        defer { lock.unlock() }
+        continuation?.yield(.level(level))
+    }
+
     /// Ends the session with its text. `nil` means "whatever we have":
     /// that is how a recognizer that goes quiet still gives back the words.
     func emitFinal(_ text: String? = nil) {

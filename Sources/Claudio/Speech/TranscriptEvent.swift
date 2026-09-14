@@ -10,6 +10,10 @@ enum TranscriptEvent: Sendable {
     case final(String)
     /// The session ends without text. Nothing follows it.
     case failed(SpeechEngineError)
+    /// How loud the microphone is, from 0 to 1, several times a second while
+    /// it's open. Not text: it can come at any moment before the end and
+    /// changes nothing of what gets pasted.
+    case level(Float)
 }
 
 /// Why a dictation couldn't happen. The messages are shown in the panel, so
