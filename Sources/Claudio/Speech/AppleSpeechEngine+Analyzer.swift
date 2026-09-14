@@ -26,7 +26,14 @@ extension SpeechRun {
                                             transcriptionOptions: [],
                                             reportingOptions: [.volatileResults],
                                             attributeOptions: [])
-        guard await AssetInventory.status(forModules: [transcriber]) == .installed else {
+        // `AssetInventory.status(forModules:)` answers `.supported`, never
+        // `.installed`, for a language the system already has (verified on
+        // macOS 26.6 with fr_FR installed through Dictation), because it
+        // reports the app's own reservation, not the machine. The machine's
+        // truth is `installedLocales`; transcription then works without any
+        // reservation or download.
+        let installed = await SpeechTranscriber.installedLocales
+        guard installed.contains(where: { $0.identifier == supported.identifier }) else {
             sink.fail(.languageUnavailable(locale))
             return
         }
