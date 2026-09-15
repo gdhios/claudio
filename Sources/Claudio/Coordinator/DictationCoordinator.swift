@@ -38,6 +38,7 @@ final class DictationCoordinator {
 
     private let engine: SpeechEngine
     private let model: @MainActor () -> ModelChoice
+    private let vocabulary: @MainActor () -> DictationVocabulary
     private let client: ClientFactory
     private let pasting: PasteService
     private let microphone: MicrophoneGate
@@ -63,6 +64,9 @@ final class DictationCoordinator {
 
     init(engine: SpeechEngine,
          model: @escaping @MainActor () -> ModelChoice = { AppSettings.dictationModel },
+         vocabulary: @escaping @MainActor () -> DictationVocabulary = {
+             DictationVocabulary(parsing: AppSettings.dictationVocabulary)
+         },
          client: @escaping ClientFactory = TextStreamClientFactory.make(for:),
          pasting: PasteService = .system,
          microphone: MicrophoneGate = .system,
@@ -74,6 +78,7 @@ final class DictationCoordinator {
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
         self.model = model
+        self.vocabulary = vocabulary
         self.client = client
         self.pasting = pasting
         self.microphone = microphone
@@ -133,12 +138,16 @@ final class DictationCoordinator {
 
         let session = DictationSession(language: language, model: model())
         self.session = session
+        // Read on the press, like the language and the model: the engine,
+        // the replacements and the prompt all get this one, whatever
+        // Settings says by the time the key comes up.
+        let vocabulary = self.vocabulary()
         panel = makePanel(session, self)
         // Music talking over the voice is what makes dictation hard: the
         // other apps go quiet for as long as the key is held.
         if mutesOutput() { silencer.silence() }
         cycle = Task { [weak self] in
-            await self?.listen(session: session)
+            await self?.listen(session: session, vocabulary: vocabulary)
         }
     }
 
@@ -164,12 +173,13 @@ final class DictationCoordinator {
 
     // MARK: - The cycle
 
-    private func listen(session: DictationSession) async {
+    private func listen(session: DictationSession, vocabulary: DictationVocabulary) async {
         // Cancelled between the press and the first turn of the loop: the
         // microphone must not even open.
         guard self.session === session else { return }
 
-        for await event in engine.start(locale: session.language.locale) {
+        for await event in engine.start(locale: session.language.locale,
+                                        contextualStrings: vocabulary.terms) {
             guard self.session === session else { return }
             switch event {
             case .partial(let text), .final(let text):
@@ -189,25 +199,29 @@ final class DictationCoordinator {
         // The stream ends after the final, and on a cancellation: only the
         // first of the two still has a session to finish.
         guard self.session === session, !Task.isCancelled else { return }
-        await finish(session: session)
+        await finish(session: session, vocabulary: vocabulary)
     }
 
-    /// From the final transcript to the pasted text: clean up, remember,
-    /// paste.
-    private func finish(session: DictationSession) async {
-        let raw = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty else {
+    /// From the final transcript to the pasted text: fix the vocabulary,
+    /// clean up, remember, paste.
+    private func finish(session: DictationSession, vocabulary: DictationVocabulary) async {
+        let heard = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !heard.isEmpty else {
             // A silence, a press on nothing: said rather than pasted.
             session.phase = .empty
             closeAfter(durations.empty, session: session)
             return
         }
+        // The speaker's own spellings, before anything else reads the text:
+        // the model cleans up what they wrote, Raw pastes it, and it is the
+        // raw text the history keeps.
+        let raw = vocabulary.applyingReplacements(to: heard)
         session.transcript = raw
 
         var cleaned: String?
         if session.model != .raw {
             session.phase = .cleaning
-            cleaned = await cleanUp(raw, session: session)
+            cleaned = await cleanUp(raw, keeping: vocabulary.terms, session: session)
             guard self.session === session, !Task.isCancelled else { return }
         }
 
@@ -239,7 +253,8 @@ final class DictationCoordinator {
 
     /// Runs the cleanup pass and returns its text, `nil` when there was
     /// none: the transcript is then what gets pasted, and the panel says why.
-    private func cleanUp(_ raw: String, session: DictationSession) async -> String? {
+    /// `terms` are the spellings the model is told to keep.
+    private func cleanUp(_ raw: String, keeping terms: [String], session: DictationSession) async -> String? {
         guard let client = client(session.model) else {
             session.note = pastedWithoutCleanup(loc("clé API manquante", en: "no API key"))
             return nil
@@ -247,7 +262,7 @@ final class DictationCoordinator {
         do {
             let result = try await client.streamCompletion(
                 of: raw,
-                system: DictationCleanup.systemPrompt,
+                system: DictationCleanup.systemPrompt(keeping: terms),
                 maxTokens: DictationCleanup.maxTokens(forRawLength: raw.count)
             ) { @MainActor piece in
                 session.appendCleaned(piece)

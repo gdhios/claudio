@@ -45,6 +45,54 @@ final class DictationCleanupTests: XCTestCase {
         XCTAssertTrue(prompt.contains("language"), prompt)
     }
 
+    // MARK: - The vocabulary
+
+    /// No vocabulary, no change: the prompt sent is the effective one to the
+    /// byte, whether it's the code's or one edited in Settings.
+    func testWithoutTermsThePromptIsUnchangedToTheByte() {
+        AppSettings.language = .french
+        XCTAssertEqual(Array(DictationCleanup.systemPrompt(keeping: []).utf8),
+                       Array(DictationCleanup.systemPrompt.utf8))
+        XCTAssertEqual(Array(DictationCleanup.systemPrompt(keeping: [], base: "Ponctue seulement.").utf8),
+                       Array("Ponctue seulement.".utf8))
+    }
+
+    /// A model that doesn't know "Lapacompris" corrects it into French. One
+    /// instruction, after the prompt — edited or not — names every term.
+    func testTermsAddOneInstructionThatListsThemInFrench() {
+        AppSettings.language = .french
+        let base = "Ponctue seulement."
+        let prompt = DictationCleanup.systemPrompt(keeping: ["Okonoma", "Lapacompris"], base: base)
+
+        XCTAssertTrue(prompt.hasPrefix(base + "\n\n"), prompt)
+        let instruction = String(prompt.dropFirst(base.count + 2))
+        XCTAssertFalse(instruction.contains("\n"), "one instruction, one line: \(instruction)")
+        XCTAssertTrue(instruction.contains("« Okonoma », « Lapacompris »"), instruction)
+        XCTAssertTrue(instruction.contains("exactement"), instruction)
+    }
+
+    func testTermsAddTheSameInstructionInEnglish() {
+        AppSettings.language = .english
+        let base = "Punctuate only."
+        let prompt = DictationCleanup.systemPrompt(keeping: ["Okonoma", "Lapacompris"], base: base)
+
+        XCTAssertTrue(prompt.hasPrefix(base + "\n\n"), prompt)
+        let instruction = String(prompt.dropFirst(base.count + 2))
+        XCTAssertFalse(instruction.contains("\n"), "one instruction, one line: \(instruction)")
+        XCTAssertTrue(instruction.contains("“Okonoma”, “Lapacompris”"), instruction)
+        XCTAssertTrue(instruction.contains("exactly"), instruction)
+    }
+
+    /// The effective prompt is the base by default: the vocabulary is added
+    /// to what Settings would send, not to a prompt of its own.
+    func testTheEffectivePromptIsTheDefaultBase() {
+        AppSettings.language = .french
+        let prompt = DictationCleanup.systemPrompt(keeping: ["Okonoma"])
+        XCTAssertTrue(prompt.hasPrefix(DictationCleanup.systemPrompt + "\n\n"), prompt)
+    }
+
+    // MARK: - The budget
+
     /// The cleaned text is about as long as the raw one: the budget follows
     /// it, with room for punctuation, and never leaves its bounds.
     func testTheBudgetFollowsTheLengthOfTheTranscript() {

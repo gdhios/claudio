@@ -18,7 +18,19 @@ final class AppleSpeechEngineTests: XCTestCase {
     /// Not two events, not zero — the coordinator waits for exactly one.
     func testADictationThatCannotStartEndsWithASingleFailure() async {
         let engine = AppleSpeechEngine()
-        let events = await drain(engine.start(locale: unknownLanguage))
+        let events = await drain(engine.start(locale: unknownLanguage, contextualStrings: []))
+        XCTAssertEqual(events.count, 1)
+        guard case .failed = events.first else {
+            return XCTFail("expected a .failed, got \(String(describing: events.first))")
+        }
+    }
+
+    /// A vocabulary is a hint for the recognizer, not a reason to go further:
+    /// a language that doesn't exist still fails before the microphone, once.
+    func testAVocabularyChangesNothingOfTheContract() async {
+        let engine = AppleSpeechEngine()
+        let events = await drain(engine.start(locale: unknownLanguage,
+                                              contextualStrings: ["Okonoma", "Lapacompris"]))
         XCTAssertEqual(events.count, 1)
         guard case .failed = events.first else {
             return XCTFail("expected a .failed, got \(String(describing: events.first))")
@@ -30,7 +42,7 @@ final class AppleSpeechEngineTests: XCTestCase {
     /// suspended never releases the panel.
     func testCancelRightAfterStartEndsTheStream() async {
         let engine = AppleSpeechEngine()
-        let stream = engine.start(locale: unknownLanguage)
+        let stream = engine.start(locale: unknownLanguage, contextualStrings: [])
         engine.cancel()
         for event in await drain(stream) {
             switch event {
@@ -47,8 +59,8 @@ final class AppleSpeechEngineTests: XCTestCase {
     /// the second one.
     func testStartingTwiceEndsTheFirstStream() async {
         let engine = AppleSpeechEngine()
-        let first = engine.start(locale: unknownLanguage)
-        let second = engine.start(locale: unknownLanguage)
+        let first = engine.start(locale: unknownLanguage, contextualStrings: [])
+        let second = engine.start(locale: unknownLanguage, contextualStrings: [])
         _ = await drain(first)
         _ = await drain(second)
     }
@@ -61,7 +73,7 @@ final class AppleSpeechEngineTests: XCTestCase {
         engine.stop()
         engine.cancel()
         engine.stop()
-        let events = await drain(engine.start(locale: unknownLanguage))
+        let events = await drain(engine.start(locale: unknownLanguage, contextualStrings: []))
         XCTAssertEqual(events.count, 1)
     }
 

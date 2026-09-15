@@ -19,13 +19,17 @@ final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
     /// settling for the last partial. A caller that hangs on a silent
     /// recognizer is worse than a dictation that ends one word short.
     static let finalTimeout: Duration = .seconds(2)
+    /// How many vocabulary terms `SFSpeechRecognizer` is handed. Its header
+    /// asks for no more than 100 contextual strings; the first ones typed
+    /// are kept.
+    static let contextualStringsLimit = 100
 
     private let lock = NSLock()
     private var current: SpeechRun?
 
     init() {}
 
-    func start(locale: Locale) -> AsyncStream<TranscriptEvent> {
+    func start(locale: Locale, contextualStrings: [String]) -> AsyncStream<TranscriptEvent> {
         let (stream, continuation) = AsyncStream<TranscriptEvent>.makeStream()
         let run = SpeechRun(sink: TranscriptSink(continuation))
 
@@ -37,7 +41,7 @@ final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
         previous?.requestCancel()
 
         Task { [weak self] in
-            await run.drive(locale: locale)
+            await run.drive(locale: locale, contextualStrings: contextualStrings)
             self?.forget(run)
         }
         return stream
@@ -71,7 +75,7 @@ extension SpeechRun {
     /// The whole life of one dictation. Whatever happens — a refused
     /// permission, a missing language, a cancel, a recognizer that goes
     /// quiet — the microphone is released and the stream is finished.
-    func drive(locale: Locale) async {
+    func drive(locale: Locale, contextualStrings: [String]) async {
         defer {
             releaseResources()
             sink.finishSilently()
@@ -88,11 +92,11 @@ extension SpeechRun {
         // The macOS 26 path only compiles against an SDK that knows
         // `SpeechAnalyzer`, which shipped with the Swift 6.2 toolchain.
         if #available(macOS 26, *), SpeechTranscriber.isAvailable {
-            await driveAnalyzer(locale: locale)
+            await driveAnalyzer(locale: locale, contextualStrings: contextualStrings)
             return
         }
         #endif
-        await driveLegacy(locale: locale)
+        await driveLegacy(locale: locale, contextualStrings: contextualStrings)
     }
 
     /// macOS 14 to 25: `SFSpeechRecognizer`, forced on device, which is also
@@ -101,7 +105,7 @@ extension SpeechRun {
     /// The order matters: everything that can refuse the dictation is
     /// checked before the microphone is touched, so an unknown language
     /// never opens it.
-    func driveLegacy(locale: Locale) async {
+    func driveLegacy(locale: Locale, contextualStrings: [String]) async {
         guard let recognizer = SFSpeechRecognizer(locale: locale),
               recognizer.supportsOnDeviceRecognition else {
             sink.fail(.languageUnavailable(locale))
@@ -117,6 +121,11 @@ extension SpeechRun {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
+        // The speaker's own words made likelier. No vocabulary leaves the
+        // request exactly as it was.
+        if !contextualStrings.isEmpty {
+            request.contextualStrings = Array(contextualStrings.prefix(AppleSpeechEngine.contextualStringsLimit))
+        }
 
         let audio = AVAudioEngine()
         let input = audio.inputNode

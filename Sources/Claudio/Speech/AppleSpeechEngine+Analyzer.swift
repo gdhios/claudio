@@ -13,7 +13,7 @@ import Speech
 /// `#available(macOS 26, *)` is the other half: the app still runs on 14.
 @available(macOS 26, *)
 extension SpeechRun {
-    func driveAnalyzer(locale: Locale) async {
+    func driveAnalyzer(locale: Locale, contextualStrings: [String]) async {
         // Claudio downloads nothing by itself: a language that isn't on the
         // machine is an error with instructions, not a background download.
         guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
@@ -66,6 +66,20 @@ extension SpeechRun {
 
         let (inputStream, inputSink) = AsyncStream<AnalyzerInput>.makeStream()
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        // The vocabulary is in place before the first buffer exists. A
+        // context the analyzer refuses costs the spellings, not the
+        // dictation; no vocabulary leaves the analyzer exactly as it was.
+        // Measured on macOS 26.6.2 with French speech from `say`: these
+        // strings change nothing `SpeechTranscriber` writes, set here or at
+        // the analyzer's init, while `DictationTranscriber` picks them up
+        // ("Okuma" became "Okonoma"). On this path, the replacements and the
+        // cleanup prompt are what fix a spelling today.
+        if !contextualStrings.isEmpty {
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = contextualStrings
+            try? await analyzer.setContext(context)
+            if isCancelled { return }
+        }
         let gate = SpeechGate()
         let sink = self.sink
 

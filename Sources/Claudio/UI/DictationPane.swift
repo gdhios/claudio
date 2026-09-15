@@ -1,10 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// The Dictation tab: the two languages the shortcuts listen in, the model
-/// that tidies the transcript up, the prompt it is given, and the dictations
-/// already made. Split out of `SettingsView` like the other panes, because
-/// this one carries a list.
+/// The Dictation tab: the two languages the shortcuts listen in, the words
+/// they must get right, the model that tidies the transcript up, the prompt
+/// it is given, and the dictations already made. Split out of `SettingsView`
+/// like the other panes, because this one carries a list.
 @MainActor
 struct DictationPane: View {
     // A preview shows fixed settings rather than this Mac's: the shot has to
@@ -17,6 +17,8 @@ struct DictationPane: View {
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
     @State private var mutesOutput = PreviewRun.isActive ? true : AppSettings.dictationMutesOutput
+    @State private var vocabularyText = PreviewRun.isActive
+        ? DictationPane.frozenVocabulary : AppSettings.dictationVocabulary
     @State private var promptText = PreviewRun.isActive
         ? DictationCleanup.defaultSystemPrompt : DictationCleanup.systemPrompt
     /// Models pulled on the Ollama server, read when the pane opens.
@@ -39,6 +41,7 @@ struct DictationPane: View {
     var body: some View {
         Form {
             languages
+            vocabulary
             whileDictating
             cleanupModel
             cleanupPrompt
@@ -70,6 +73,27 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
                      en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Vocabulary
+
+    private var vocabulary: some View {
+        Section {
+            TextEditor(text: $vocabularyText)
+                .font(.callout)
+                // Names and made-up words are all it holds: nothing typed
+                // here is a mistake to correct.
+                .autocorrectionDisabled()
+                .frame(minHeight: 72)
+                .onChange(of: vocabularyText) { AppSettings.dictationVocabulary = vocabularyText }
+        } header: {
+            Text(loc("Vocabulaire", en: "Vocabulary"))
+        } footer: {
+            Text(loc("Un nom ou terme par ligne ; « entendu → écrit » corrige ce que la dictée écrit de travers.",
+                     en: "One name or term per line; “heard → written” fixes what dictation spells wrong."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -252,6 +276,10 @@ struct DictationPane: View {
                                              model: "").availableModels()
         }
     }
+
+    /// A vocabulary nobody typed, for the preview: two terms and a
+    /// replacement, both kinds of line.
+    private static let frozenVocabulary = "Okonoma\nClaudio\nl'a pas compris → Lapacompris"
 
     /// Three dictations that never happened, for the preview: one cleaned
     /// up, one in the other language, one pasted raw.

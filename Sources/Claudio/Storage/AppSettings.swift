@@ -153,6 +153,7 @@ enum AppSettings {
     private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
     private static let dictationModelKey = "dictationModel"
     private static let dictationSystemPromptKey = "dictationSystemPrompt"
+    private static let dictationVocabularyKey = "dictationVocabulary"
 
     private static let dictationMutesOutputKey = "dictationMutesOutput"
 
@@ -212,6 +213,19 @@ enum AppSettings {
                 UserDefaults.standard.set(newValue, forKey: dictationSystemPromptKey)
             } else {
                 UserDefaults.standard.removeObject(forKey: dictationSystemPromptKey)
+            }
+        }
+    }
+
+    /// The personal vocabulary, as typed in Settings: one entry per line,
+    /// read by `DictationVocabulary`. Empty by default; blank removes the key.
+    static var dictationVocabulary: String {
+        get { UserDefaults.standard.string(forKey: dictationVocabularyKey) ?? "" }
+        set {
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                UserDefaults.standard.removeObject(forKey: dictationVocabularyKey)
+            } else {
+                UserDefaults.standard.set(newValue, forKey: dictationVocabularyKey)
             }
         }
     }

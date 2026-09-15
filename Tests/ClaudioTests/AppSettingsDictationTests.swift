@@ -8,7 +8,8 @@ import XCTest
 final class AppSettingsDictationTests: XCTestCase {
 
     private static let keys = ["dictationPrimaryLanguage", "dictationSecondaryLanguage",
-                               "dictationModel", "dictationSystemPrompt", "dictationMutesOutput"]
+                               "dictationModel", "dictationSystemPrompt", "dictationMutesOutput",
+                               "dictationVocabulary"]
 
     private var saved: [String: Any] = [:]
 
@@ -97,5 +98,25 @@ final class AppSettingsDictationTests: XCTestCase {
         XCTAssertTrue(AppSettings.dictationMutesOutput)
         AppSettings.dictationMutesOutput = false
         XCTAssertFalse(AppSettings.dictationMutesOutput)
+    }
+
+    /// Empty until something is typed. The text is kept as typed, line
+    /// breaks and all — it's what the editor shows again next time — and
+    /// reading it is `DictationVocabulary`'s job, not the storage's.
+    func testTheVocabularyIsEmptyByDefaultAndKeptAsTyped() {
+        XCTAssertEqual(AppSettings.dictationVocabulary, "")
+
+        let typed = "Okonoma\n\nl'a pas compris → Lapacompris\n"
+        AppSettings.dictationVocabulary = typed
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationVocabulary"), typed)
+        XCTAssertEqual(AppSettings.dictationVocabulary, typed)
+    }
+
+    /// Erasing every line leaves no key behind, like a blank prompt.
+    func testABlankVocabularyRemovesTheKey() {
+        AppSettings.dictationVocabulary = "Okonoma"
+        AppSettings.dictationVocabulary = "  \n "
+        XCTAssertNil(UserDefaults.standard.object(forKey: "dictationVocabulary"))
+        XCTAssertEqual(AppSettings.dictationVocabulary, "")
     }
 }

@@ -134,6 +134,76 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(entry?.language, DictationLanguage.frFR.rawValue)
     }
 
+    // MARK: - The vocabulary
+
+    /// Recognition leans towards the speaker's own words from the first one
+    /// said: the terms go to the engine along with the language.
+    func testTheEngineIsStartedWithTheVocabularyTerms() async {
+        let bench = Bench(vocabulary: "Okonoma\nl'a pas compris → Lapacompris")
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        XCTAssertEqual(bench.engine.startedContextualStrings, [["Okonoma", "Lapacompris"]])
+    }
+
+    /// No vocabulary, no difference: the engine is asked for nothing more,
+    /// the model gets the transcript as heard and the prompt as it was.
+    func testWithoutAVocabularyNothingChanges() async {
+        let bench = Bench()
+        await bench.dictate()
+        XCTAssertEqual(bench.engine.startedContextualStrings, [[]])
+        XCTAssertEqual(bench.client.texts, ["bonjour"])
+        XCTAssertEqual(bench.client.systems, [DictationCleanup.systemPrompt])
+    }
+
+    /// The replacements come before anything else reads the text: the model
+    /// cleans up the transcript as the speaker spells it, and that is the
+    /// raw text the history keeps.
+    func testReplacementsReachTheModelAndTheHistory() async {
+        let bench = Bench(events: [.partial("ouvre l'a"), .final("ouvre l'a pas compris")],
+                          vocabulary: "l'a pas compris → Lapacompris")
+        await bench.dictate()
+        XCTAssertEqual(bench.client.texts, ["ouvre Lapacompris"])
+        XCTAssertEqual(bench.history.recents.entries.first?.raw, "ouvre Lapacompris")
+    }
+
+    /// Raw has no model to fix anything: the replacements are all it gets,
+    /// and what it pastes.
+    func testRawPastesTheTranscriptWithItsReplacements() async {
+        let bench = Bench(events: [.final("ouvre l'a pas compris")],
+                          model: .raw,
+                          vocabulary: "l'a pas compris → Lapacompris")
+        await bench.dictate()
+        XCTAssertEqual(bench.pasted, ["ouvre Lapacompris"])
+        XCTAssertEqual(bench.history.recents.entries.first?.raw, "ouvre Lapacompris")
+    }
+
+    /// The model is told which spellings to keep, after the prompt it gets
+    /// anyway.
+    func testTheCleanupPromptNamesTheTerms() async {
+        let bench = Bench(vocabulary: "Okonoma\nl'a pas compris → Lapacompris")
+        await bench.dictate()
+        XCTAssertEqual(bench.client.systems,
+                       [DictationCleanup.systemPrompt(keeping: ["Okonoma", "Lapacompris"])])
+        let sent = bench.client.systems.first ?? ""
+        XCTAssertTrue(sent.hasPrefix(DictationCleanup.systemPrompt), sent)
+        XCTAssertTrue(sent.contains("Okonoma") && sent.contains("Lapacompris"), sent)
+        // The heard side is a mistake to fix, not a spelling to keep.
+        XCTAssertFalse(sent.contains("l'a pas compris"), sent)
+    }
+
+    /// Read once, on the press, like the language and the model: edited
+    /// mid-dictation, the vocabulary waits for the next one, so the engine,
+    /// the replacements and the prompt never disagree.
+    func testTheVocabularyIsTheOneOfThePress() async {
+        let bench = Bench(events: [.final("ouvre l'a pas compris")],
+                          model: .raw,
+                          vocabulary: "l'a pas compris → Lapacompris")
+        bench.coordinator.keyDown(language: .frFR)
+        bench.vocabulary = .empty
+        await bench.finish()
+        XCTAssertEqual(bench.pasted, ["ouvre Lapacompris"])
+    }
+
     // MARK: - Presses that paste nothing
 
     /// Under 300 ms it isn't speech: a slip of the finger, or the shortcut
@@ -403,6 +473,9 @@ private final class Bench {
     var targetApp: NSRunningApplication? = .current
     /// Every model a client was asked for: empty proves nothing was asked.
     var clientRequests: [ModelChoice] = []
+    /// What the settings hold right now. Changing it mid-dictation is how a
+    /// test proves the press already read it.
+    var vocabulary: DictationVocabulary
     /// Whether the microphone and speech recognition are already granted.
     let microphoneGranted: Bool
     /// How many times the system prompts were asked for, and how many times
@@ -425,6 +498,7 @@ private final class Bench {
 
     init(events: [TranscriptEvent] = [.partial("bon"), .partial("bonjour"), .final("bonjour")],
          model: ModelChoice = .claude(.haiku45),
+         vocabulary: String = "",
          answer: Result<String, Error> = .success("Bonjour."),
          hasClient: Bool = true,
          microphoneGranted: Bool = true,
@@ -432,6 +506,7 @@ private final class Bench {
          mutesOutput: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard) {
         self.microphoneGranted = microphoneGranted
+        self.vocabulary = DictationVocabulary(parsing: vocabulary)
         engine = FakeSpeechEngine(events)
         client = FakeStreamClient(answer)
         history = DictationHistory(
@@ -441,6 +516,7 @@ private final class Bench {
         built = DictationCoordinator(
             engine: engine,
             model: { model },
+            vocabulary: { [weak self] in self?.vocabulary ?? .empty },
             client: { [weak self] choice in
                 self?.clientRequests.append(choice)
                 return hasClient ? client : nil
@@ -560,12 +636,15 @@ private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
     private(set) var stops = 0
     private(set) var cancels = 0
     private(set) var startedLocales: [Locale] = []
+    /// The terms each start was biased towards, one list per start.
+    private(set) var startedContextualStrings: [[String]] = []
 
     init(_ events: [TranscriptEvent]) { self.events = events }
 
-    func start(locale: Locale) -> AsyncStream<TranscriptEvent> {
+    func start(locale: Locale, contextualStrings: [String]) -> AsyncStream<TranscriptEvent> {
         starts += 1
         startedLocales.append(locale)
+        startedContextualStrings.append(contextualStrings)
         let (stream, continuation) = AsyncStream.makeStream(of: TranscriptEvent.self)
         self.continuation = continuation
         for event in events {
@@ -597,11 +676,13 @@ private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
 }
 
 /// Answers a fixed text in two pieces, or throws. Counts its calls, so a
-/// test can prove "Raw" never asks a model anything.
+/// test can prove "Raw" never asks a model anything, and keeps what each
+/// call was sent: the text to clean up, and the prompt it came with.
 private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
     private let answer: Result<String, Error>
     private(set) var calls = 0
-    private(set) var prompts: [String] = []
+    private(set) var texts: [String] = []
+    private(set) var systems: [String] = []
 
     init(_ answer: Result<String, Error>) { self.answer = answer }
 
@@ -610,7 +691,8 @@ private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
                           maxTokens: Int,
                           onDelta: @escaping @Sendable (String) async -> Void) async throws -> StreamResult {
         calls += 1
-        prompts.append(text)
+        texts.append(text)
+        systems.append(system)
         let cleaned = try answer.get()
         let middle = cleaned.index(cleaned.startIndex, offsetBy: cleaned.count / 2)
         await onDelta(String(cleaned[..<middle]))

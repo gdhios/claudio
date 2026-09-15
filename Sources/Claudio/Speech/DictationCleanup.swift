@@ -64,6 +64,20 @@ enum DictationCleanup {
     /// The effective prompt: the one edited in Settings, otherwise the code's.
     static var systemPrompt: String { AppSettings.dictationSystemPrompt ?? defaultSystemPrompt }
 
+    /// The prompt sent with a transcript: `base`, then — when the vocabulary
+    /// has terms — one instruction naming them, since a model that has never
+    /// seen "Lapacompris" corrects it. Added after a prompt edited in Settings
+    /// as well: the vocabulary is a setting of its own, and editing the
+    /// prompt shouldn't quietly switch it off. No terms: `base`, to the byte.
+    static func systemPrompt(keeping terms: [String],
+                             base: String = DictationCleanup.systemPrompt) -> String {
+        guard !terms.isEmpty else { return base }
+        let list = terms.map { loc("« \($0) »", en: "“\($0)”") }.joined(separator: ", ")
+        return base + "\n\n" + loc(
+            "Vocabulaire : quand l'un de ces noms ou termes apparaît, écris-le exactement comme dans cette liste : \(list).",
+            en: "Vocabulary: whenever one of these names or terms appears, spell it exactly as in this list: \(list).")
+    }
+
     /// Output budget for the cleanup, in tokens, from the raw transcript's
     /// length in characters. Deliberately loose — cleaning up shortens rather
     /// than lengthens, and a dictation is short — so the cleaned text is
