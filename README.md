@@ -36,7 +36,7 @@ Bring your own API key. Nothing goes through a third-party server: the app talks
 
 The panel opens near the pointer and streams the result. **⏎** pastes it over the selection and restores the clipboard; **Esc** cancels; **⌘C** copies only. The source app keeps focus throughout. Shortcuts and system prompts are editable in Settings.
 
-Dictation takes no selection: hold ⌃⌥⌘Space, speak, release, and the text is pasted where the cursor was. Recognition is Apple's own and runs on the Mac; the chosen model then punctuates the transcript and drops the hesitations, unless that model is **Raw**, which pastes it as it was heard. Other apps are muted while the key is held, so music doesn't talk over the voice. A second shortcut listens in another language, and the last 50 dictations are listed in Settings, text only.
+Dictation takes no selection: hold ⌃⌥⌘Space, speak, release, and the text is pasted where the cursor was — or tap it, and it listens hands-free until the next press. Recognition is Apple's own and runs on the Mac; the chosen model then punctuates the transcript and drops the hesitations, unless that model is **Raw**, which pastes it as it was heard. Other apps are muted while the key is held, so music doesn't talk over the voice. A second shortcut listens in another language, and the last 50 dictations are listed in Settings, text only.
 
 Two things on first launch: an Anthropic API key (stored in the Keychain; `ANTHROPIC_API_KEY` overrides it in development) and the Accessibility permission, which macOS requests on the first shortcut. Dictation adds two more, asked on the first press: Microphone and Speech Recognition.
 

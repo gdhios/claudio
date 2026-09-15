@@ -55,7 +55,9 @@ struct DictationPanelView: View {
                 Text(session.language.displayName)
             }
             Spacer()
-            statusLabel
+            // Squeezed by a long language name, the language gives way
+            // first: a locked dictation's pill says how to end it.
+            statusLabel.layoutPriority(1)
             PanelCloseButton(action: onClose)
         }
         .padding(.horizontal, 14)
@@ -67,10 +69,14 @@ struct DictationPanelView: View {
         case .listening:
             // The spinner of the other phases says "wait"; while listening it
             // is the voice that moves, so the pill carries the last readings.
+            // Locked by a tap, the waveform says it listens and the words say
+            // how it ends: with the key up, nothing else on screen does.
             StatusPill {
                 DictationWaveform(levels: Array(session.levels.values.suffix(6)),
                                   barWidth: 2, spacing: 1.5, maxHeight: 11)
-                Text(loc("À l'écoute…", en: "Listening…"))
+                Text(session.isLocked
+                     ? loc("Appuie encore pour finir", en: "Press again to finish")
+                     : loc("À l'écoute…", en: "Listening…"))
             }
         case .finishing:
             workingPill(loc("Un instant…", en: "One moment…"))

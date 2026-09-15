@@ -23,8 +23,10 @@ final class SystemAudioMute {
 
     /// How Claudio's tap is recognized in the system's list.
     nonisolated static let tapName = "Claudio dictation mute"
-    /// Longer than any dictation: past it, the sound comes back on its own.
-    static let longestSilence: Duration = .seconds(120)
+    /// Longer than any dictation can listen: a locked one finishes by itself
+    /// at its limit, and the margin covers the short press that locked it
+    /// and a timer that fires late. Past it, the sound comes back on its own.
+    static let longestSilence: Duration = DictationCoordinator.longestLockedDictation + .seconds(60)
 
     private var tap: AudioObjectID?
     private var watchdog: Task<Void, Never>?
