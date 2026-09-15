@@ -15,4 +15,15 @@ final class SystemAudioMuteTests: XCTestCase {
         ]
         XCTAssertEqual(SystemAudioMute.leftovers(among: taps), [12, 15])
     }
+
+    /// The watchdog gives the sound back when no way out of a dictation did.
+    /// It must never be what ends the silence of one still under way: a
+    /// locked dictation keeps the apps quiet from its press, through the tap,
+    /// to its own limit.
+    @MainActor
+    func testTheWatchdogOutlastsTheLongestLockedDictation() {
+        let tap = Duration.milliseconds(Int(DictationCoordinator.shortPressThreshold * 1000))
+        XCTAssertGreaterThan(SystemAudioMute.longestSilence,
+                             DictationCoordinator.longestLockedDictation + tap)
+    }
 }

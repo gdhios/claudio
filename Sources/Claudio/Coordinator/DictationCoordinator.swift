@@ -1,9 +1,9 @@
 import AppKit
 
-/// The dictation cycle: hold the shortcut, speak, release, and the text
-/// lands where the cursor was. `CorrectionCoordinator`'s counterpart — same
-/// panel, same paste path — except the material comes from a microphone
-/// instead of a selection.
+/// The dictation cycle: hold the shortcut, speak, release — or tap it, speak,
+/// press it again — and the text lands where the cursor was.
+/// `CorrectionCoordinator`'s counterpart — same panel, same paste path —
+/// except the material comes from a microphone instead of a selection.
 ///
 /// Everything that touches the outside world arrives through `init`: the
 /// engine, the model behind the cleanup, the paste, the panel, the clock.
@@ -11,9 +11,15 @@ import AppKit
 /// pasteboard or a screen.
 @MainActor
 final class DictationCoordinator {
-    /// A press shorter than this isn't speech: a slip of the finger, or a
-    /// shortcut meant for something else. Nothing is pasted.
+    /// A press shorter than this isn't a hold: the key was tapped, and the
+    /// microphone stays open without it until the next press.
     static let shortPressThreshold: TimeInterval = 0.3
+
+    /// How long a dictation locked by a tap listens before finishing by
+    /// itself, as the next press would have. A tap nobody follows up would
+    /// otherwise keep the microphone open, and the other apps quiet, for as
+    /// long as Claudio runs.
+    nonisolated static let longestLockedDictation: Duration = .seconds(5 * 60)
 
     /// How long a panel that has nothing left to do but speak stays on
     /// screen. Injected so a test can watch one close itself without waiting
@@ -47,11 +53,16 @@ final class DictationCoordinator {
     private let silencer: OutputSilencer
     private let mutesOutput: @MainActor () -> Bool
     private let durations: MessageDurations
+    /// `longestLockedDictation`, unless a test can't wait five minutes.
+    private let lockedLimit: Duration
     private let now: @MainActor () -> Date
 
     private var panel: ResultPanel?
     private var target: PasteTarget?
     private var pressedAt = Date.distantPast
+    /// Finishes a locked dictation at its limit. Runs from the tap, and is
+    /// cancelled by whatever ends the dictation first.
+    private var lockTimer: Task<Void, Never>?
 
     /// The dictation under way, `nil` between two.
     private(set) var session: DictationSession?
@@ -75,6 +86,7 @@ final class DictationCoordinator {
          silencer: OutputSilencer = .system,
          mutesOutput: @escaping @MainActor () -> Bool = { AppSettings.dictationMutesOutput },
          durations: MessageDurations = .standard,
+         lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
         self.model = model
@@ -87,13 +99,21 @@ final class DictationCoordinator {
         self.silencer = silencer
         self.mutesOutput = mutesOutput
         self.durations = durations
+        self.lockedLimit = lockedLimit
         self.now = now
     }
 
     // MARK: - The gesture
 
-    /// Key down: the microphone opens and the panel shows what it hears.
+    /// Key down: the microphone opens and the panel shows what it hears. On
+    /// a dictation locked by a tap, it's the press that finishes it.
     func keyDown(language: DictationLanguage) {
+        // Either shortcut ends a locked dictation, in the language it was
+        // started in. The release that follows finds nothing listening.
+        if let session, session.isLocked, session.phase == .listening {
+            finishListening(session)
+            return
+        }
         dismiss()  // idempotent: a press during a cycle starts a fresh one
 
         // Same gate as a correction: without Accessibility nothing can be
@@ -144,7 +164,7 @@ final class DictationCoordinator {
         let vocabulary = self.vocabulary()
         panel = makePanel(session, self)
         // Music talking over the voice is what makes dictation hard: the
-        // other apps go quiet for as long as the key is held.
+        // other apps go quiet for as long as the microphone listens.
         if mutesOutput() { silencer.silence() }
         cycle = Task { [weak self] in
             await self?.listen(session: session, vocabulary: vocabulary)
@@ -152,24 +172,49 @@ final class DictationCoordinator {
     }
 
     /// Key up: the microphone closes and the engine gets to say its last
-    /// word. Too short a press, and the whole thing is dropped.
+    /// word. Too short a press is a tap, and the dictation locks instead.
     func keyUp() {
-        guard let session, session.phase == .listening else { return }
+        // A locked dictation waits for a press, not a release; one already
+        // finishing has nothing left to close.
+        guard let session, session.phase == .listening, !session.isLocked else { return }
         guard now().timeIntervalSince(pressedAt) >= Self.shortPressThreshold else {
-            dismiss()
+            lock(session)
             return
         }
-        session.phase = .finishing
-        engine.stop()
-        // After the microphone has closed, so the returning sound is never
-        // heard as speech. The cleanup doesn't need silence.
-        silencer.restore()
+        finishListening(session)
     }
 
     /// Esc, at any phase: the microphone is cancelled, the cycle dropped,
     /// nothing pasted. Nothing was written to the clipboard either — only
     /// the paste writes it, and it never ran.
     func escape() { dismiss() }
+
+    /// A tap rather than a hold: holding a key through a long dictation is
+    /// the hard part, so the microphone stays open without it. The words
+    /// keep coming and the other apps stay quiet; the next press finishes,
+    /// Esc cancels, and the limit finishes it if neither comes.
+    private func lock(_ session: DictationSession) {
+        session.isLocked = true
+        let limit = lockedLimit
+        lockTimer = Task { [weak self] in
+            try? await Task.sleep(for: limit)
+            guard let self, !Task.isCancelled,
+                  self.session === session, session.phase == .listening else { return }
+            finishListening(session)
+        }
+    }
+
+    /// The end of listening — a release, the press after a tap, or the
+    /// limit: the microphone closes and the engine gets to say its last word.
+    private func finishListening(_ session: DictationSession) {
+        lockTimer?.cancel()
+        lockTimer = nil
+        session.phase = .finishing
+        engine.stop()
+        // After the microphone has closed, so the returning sound is never
+        // heard as speech. The cleanup doesn't need silence.
+        silencer.restore()
+    }
 
     // MARK: - The cycle
 
@@ -205,6 +250,11 @@ final class DictationCoordinator {
     /// From the final transcript to the pasted text: fix the vocabulary,
     /// clean up, remember, paste.
     private func finish(session: DictationSession, vocabulary: DictationVocabulary) async {
+        // The stream is over, so is the microphone. A release or a press
+        // gave the sound back already; an engine that stopped by itself —
+        // likelier minutes into a locked dictation — didn't, and the panel
+        // may stay up with a text that has nowhere to go.
+        silencer.restore()
         let heard = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !heard.isEmpty else {
             // A silence, a press on nothing: said rather than pasted.
@@ -346,6 +396,8 @@ final class DictationCoordinator {
     func dismiss() {
         cycle?.cancel()
         cycle = nil
+        lockTimer?.cancel()
+        lockTimer = nil
         // The prompts can't be taken back, but the explanation that follows
         // them can: a press that starts a new chain drops the old one rather
         // than letting two alerts pile up on the same refusal.
@@ -353,8 +405,9 @@ final class DictationCoordinator {
         permission = nil
         // Only a dictation under way has a microphone to close.
         if session != nil { engine.cancel() }
-        // Every way out of a dictation ends here or in `keyUp()`: the sound
-        // comes back whatever happened. Harmless when nothing was silenced.
+        // Every way out of a dictation ends here or in `finishListening(_:)`:
+        // the sound comes back whatever happened. Harmless when nothing was
+        // silenced.
         silencer.restore()
         panel?.orderOut(nil)
         panel = nil

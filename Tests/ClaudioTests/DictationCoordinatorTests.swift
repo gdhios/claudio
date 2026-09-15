@@ -79,13 +79,12 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertFalse(bench.silenced)
     }
 
-    func testAPressTooShortBringsTheSoundBack() async {
+    /// A tap locks the dictation rather than dropping it: still under way,
+    /// so the music stays off with the key up.
+    func testATapKeepsTheOtherAppsQuietWhileItListens() async throws {
         let bench = Bench()
-        bench.coordinator.keyDown(language: .frFR)
-        await bench.settle { bench.engine.starts == 1 }
-        bench.hold(for: 0.1)
-        bench.coordinator.keyUp()
-        XCTAssertFalse(bench.silenced)
+        try await bench.lock()
+        XCTAssertTrue(bench.silenced)
     }
 
     /// A dictation that fails keeps its panel up for a few seconds to be
@@ -204,25 +203,192 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.pasted, ["ouvre Lapacompris"])
     }
 
-    // MARK: - Presses that paste nothing
+    // MARK: - Hands-free: a tap locks the microphone open
 
-    /// Under 300 ms it isn't speech: a slip of the finger, or the shortcut
-    /// pressed for something else. The microphone is cancelled rather than
-    /// closed, and nothing is pasted or remembered.
-    func testAPressTooShortIsIgnored() async {
+    /// Under 300 ms the key was tapped, not held. Holding a key through a
+    /// long dictation is the hard part, so a tap no longer drops anything:
+    /// the microphone stays open, the words keep coming with the key up, and
+    /// nothing is closed or pasted until the dictation is told to finish.
+    func testATapLocksListeningInsteadOfCancelling() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+        bench.engine.say(.partial("bonjour tout le monde"))
+        await bench.settle { session.transcript == "bonjour tout le monde" }
+
+        XCTAssertTrue(session.isLocked)
+        XCTAssertEqual(session.phase, .listening)
+        XCTAssertEqual(session.transcript, "bonjour tout le monde")
+        XCTAssertEqual(bench.engine.stops, 0)
+        XCTAssertEqual(bench.engine.cancels, 0)
+        XCTAssertTrue(bench.pasted.isEmpty)
+        XCTAssertTrue(bench.coordinator.session === session)
+    }
+
+    /// A hold is what it always was: released past the threshold, it closes
+    /// the microphone on the spot and never locks.
+    func testAHoldFinishesOnReleaseAndNeverLocks() async throws {
         let bench = Bench()
         bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
         await bench.settle { bench.engine.starts == 1 }
 
-        bench.hold(for: 0.2)
+        bench.hold(for: 0.35)
+        bench.coordinator.keyUp()
+        XCTAssertFalse(session.isLocked)
+        XCTAssertEqual(session.phase, .finishing)
+        XCTAssertEqual(bench.engine.stops, 1)
+
+        await bench.cycleEnds()
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+    }
+
+    /// The press after a tap is the release a hold would have had: the
+    /// microphone closes, the sound comes back behind it, and the cleaned-up
+    /// text is pasted — the same way out as a hold, phase for phase.
+    func testTheNextPressFinishesALockedDictationAndPastes() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+        let log = bench.watch(session)
+
+        bench.coordinator.keyDown(language: .frFR)
+        XCTAssertEqual(bench.engine.stops, 1)
+        XCTAssertEqual(bench.engine.cancels, 0)
+        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.stopsWhenSoundCameBack, [1])
+        await bench.cycleEnds()
+
+        XCTAssertEqual(log.phases, [.listening, .finishing, .cleaning, .pasting])
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+        XCTAssertEqual(bench.engine.starts, 1)
+        XCTAssertNil(bench.coordinator.session)
+    }
+
+    /// Either shortcut ends a locked dictation. The other one's press
+    /// finishes it in the language it was started in, rather than starting
+    /// over in its own.
+    func testEitherShortcutFinishesALockedDictation() async throws {
+        let bench = Bench()
+        try await bench.lock(language: .frFR)
+
+        bench.coordinator.keyDown(language: .enUS)
+        await bench.cycleEnds()
+
+        XCTAssertEqual(bench.engine.startedLocales.map(\.identifier), ["fr-FR"])
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+    }
+
+    /// The press that finishes still has a release to come, and a quick
+    /// one: it must read as neither a slip that cancels nor a tap that locks
+    /// again. The dictation carries on to its paste.
+    func testTheReleaseOfTheFinishingPressDoesNothing() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+
+        bench.coordinator.keyDown(language: .frFR)
+        bench.hold(for: 0.1)
         bench.coordinator.keyUp()
 
-        XCTAssertEqual(bench.engine.stops, 0)
+        XCTAssertEqual(session.phase, .finishing)
+        XCTAssertTrue(bench.coordinator.session === session)
+        XCTAssertEqual(bench.engine.stops, 1)
+        XCTAssertEqual(bench.engine.cancels, 0)
+        await bench.cycleEnds()
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+        XCTAssertEqual(bench.engine.starts, 1)
+    }
+
+    /// Esc on a locked dictation is Esc as ever: the microphone cancelled,
+    /// nothing pasted or remembered, and the music back.
+    func testEscapeCancelsALockedDictationAndBringsTheSoundBack() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+        XCTAssertTrue(session.isLocked)
+        XCTAssertTrue(bench.silenced)
+
+        bench.coordinator.escape()
+
         XCTAssertEqual(bench.engine.cancels, 1)
+        XCTAssertEqual(bench.engine.stops, 0)
         XCTAssertTrue(bench.pasted.isEmpty)
         XCTAssertTrue(bench.history.recents.entries.isEmpty)
         XCTAssertNil(bench.coordinator.session)
+        XCTAssertFalse(bench.silenced)
     }
+
+    /// A tap nobody follows up doesn't listen forever: past the limit, the
+    /// dictation finishes as if pressed again — pasted, not dropped — and the
+    /// sound comes back with it.
+    func testALockedDictationFinishesByItselfAtItsLimit() async throws {
+        let bench = Bench(lockedLimit: .milliseconds(5))
+        try await bench.lock()
+
+        await bench.wait { bench.engine.stops == 1 }
+        await bench.cycleEnds()
+
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+        XCTAssertFalse(bench.silenced)
+    }
+
+    /// The limit belongs to the dictation that locked. Once that one has
+    /// ended, it must not reach into the next and stop it mid-sentence.
+    func testTheLimitOfAnEndedLockedDictationSparesTheNextOne() async throws {
+        let bench = Bench(lockedLimit: .milliseconds(20))
+        try await bench.lock()
+        bench.coordinator.escape()
+
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 2 }
+        try await Task.sleep(for: .milliseconds(60))
+
+        XCTAssertEqual(bench.engine.stops, 0)
+        XCTAssertEqual(bench.coordinator.session?.phase, .listening)
+    }
+
+    /// A locked dictation can end on a silence too: the panel says so, as
+    /// for a held one, and the music doesn't wait for it to close.
+    func testNothingHeardOnALockedDictationPastesNothing() async throws {
+        let bench = Bench(events: [.partial("  "), .final("   ")])
+        let session = try await bench.lock()
+
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.cycleEnds()
+
+        XCTAssertEqual(session.phase, .empty)
+        XCTAssertTrue(bench.pasted.isEmpty)
+        XCTAssertFalse(bench.silenced)
+    }
+
+    /// The engine giving up minutes into a locked dictation shows why, and
+    /// gives the sound back at once.
+    func testAFailureWhileLockedBringsTheSoundBack() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+
+        bench.engine.say(.failed(.recognizer("timeout")))
+        await bench.cycleEnds()
+
+        XCTAssertEqual(session.phase,
+                       .error(SpeechEngineError.recognizer("timeout").localizedDescription))
+        XCTAssertFalse(bench.silenced)
+    }
+
+    /// Minutes of listening leave the engine time to end a locked dictation
+    /// before any press does. Its microphone is closed then, so the sound
+    /// comes back — even when the text has nowhere to go and the panel stays
+    /// up with it.
+    func testWhenTheEngineEndsALockedDictationTheSoundComesBack() async throws {
+        let bench = Bench()
+        bench.targetApp = nil
+        let session = try await bench.lock()
+
+        bench.engine.say(.final("bonjour"))
+        await bench.cycleEnds()
+
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertFalse(bench.silenced)
+    }
+
+    // MARK: - Presses that paste nothing
 
     /// Esc at any phase: the microphone is cancelled, the cycle is dropped,
     /// nothing is pasted. The clipboard is untouched because the only path
@@ -504,7 +670,8 @@ private final class Bench {
          microphoneGranted: Bool = true,
          promptsWait: Bool = false,
          mutesOutput: Bool = true,
-         durations: DictationCoordinator.MessageDurations = .standard) {
+         durations: DictationCoordinator.MessageDurations = .standard,
+         lockedLimit: Duration = DictationCoordinator.longestLockedDictation) {
         self.microphoneGranted = microphoneGranted
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
         engine = FakeSpeechEngine(events)
@@ -559,6 +726,7 @@ private final class Bench {
             ),
             mutesOutput: { mutesOutput },
             durations: durations,
+            lockedLimit: lockedLimit,
             now: { [weak self] in self?.clock ?? .distantPast }
         )
     }
@@ -578,6 +746,35 @@ private final class Bench {
     func dictate(language: DictationLanguage = .frFR) async {
         coordinator.keyDown(language: language)
         await finish()
+    }
+
+    /// A tap: the key down, the engine started, and the key up again before
+    /// the threshold. Hands back the dictation it locked.
+    @discardableResult
+    func lock(language: DictationLanguage = .frFR) async throws -> DictationSession {
+        let starts = engine.starts
+        coordinator.keyDown(language: language)
+        let session = try XCTUnwrap(coordinator.session)
+        await settle { engine.starts == starts + 1 }
+        hold(for: 0.1)
+        coordinator.keyUp()
+        return session
+    }
+
+    /// Waits for the cycle under way to end. One that never does — a
+    /// dictation nothing finishes, the stream still open — fails its test
+    /// instead of hanging the suite: past the ceiling it is cancelled.
+    func cycleEnds(seconds: TimeInterval = 2,
+                   file: StaticString = #filePath, line: UInt = #line) async {
+        guard let cycle = coordinator.cycle else { return }
+        let ceiling = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            XCTFail("the dictation never finished", file: file, line: line)
+            cycle.cancel()
+        }
+        await cycle.value
+        ceiling.cancel()
     }
 
     /// Releases a press already under way and waits for the cycle to end.
@@ -659,6 +856,16 @@ private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
             }
         }
         return stream
+    }
+
+    /// What the engine says later on, while the dictation goes on: another
+    /// partial, or an end it reaches by itself — a final, a failure.
+    func say(_ event: TranscriptEvent) {
+        continuation?.yield(event)
+        switch event {
+        case .final, .failed: continuation?.finish()
+        case .partial, .level: break
+        }
     }
 
     func stop() {

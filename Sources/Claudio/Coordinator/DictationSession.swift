@@ -29,6 +29,10 @@ final class DictationSession: ObservableObject {
     let model: ModelChoice
 
     @Published var phase: Phase = .listening
+    /// The key was tapped rather than held: listening goes on with the key
+    /// up, and the next press finishes. The panel says so, since nothing
+    /// else on screen tells a locked dictation from a held one.
+    @Published var isLocked = false
     /// The transcript as the engine gives it: partial, then final. The
     /// engine always sends the whole text, so this is assigned, never appended to.
     @Published var transcript = ""
