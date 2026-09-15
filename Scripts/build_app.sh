@@ -119,8 +119,16 @@ if [ "${NOTARIZE:-0}" = "1" ]; then
         exit 1
     fi
     echo "   Identity: $DEV_ID_IDENTITY"
-    codesign --force --sign "$DEV_ID_IDENTITY" --options runtime --timestamp "$APP"
+    # The hardened runtime refuses the microphone to a signature that doesn't
+    # ask for it, whatever System Settings says: dictation then fails on every
+    # press with the permission switched on. Local builds aren't hardened, so
+    # only this path can break that way, and the check below catches it here.
+    ENTITLEMENTS="Scripts/Claudio.entitlements"
+    codesign --force --sign "$DEV_ID_IDENTITY" --options runtime --timestamp \
+        --entitlements "$ENTITLEMENTS" "$APP"
     codesign --verify --strict "$APP"
+    codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "com.apple.security.device.audio-input" \
+        || { echo "❌ The signature lacks the audio-input entitlement: dictation would be refused."; exit 1; }
 
     echo "→ Apple notarization (a few minutes)…"
     mkdir -p dist
