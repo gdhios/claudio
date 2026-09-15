@@ -8,7 +8,7 @@ import XCTest
 final class AppSettingsDictationTests: XCTestCase {
 
     private static let keys = ["dictationPrimaryLanguage", "dictationSecondaryLanguage",
-                               "dictationModel", "dictationSystemPrompt"]
+                               "dictationModel", "dictationSystemPrompt", "dictationMutesOutput"]
 
     private var saved: [String: Any] = [:]
 
@@ -90,5 +90,12 @@ final class AppSettingsDictationTests: XCTestCase {
         AppSettings.dictationSystemPrompt = nil
         XCTAssertNil(AppSettings.dictationSystemPrompt)
         XCTAssertNil(UserDefaults.standard.string(forKey: "dictationSystemPrompt"))
+    }
+
+    /// On until switched off: dictating over music is the case it exists for.
+    func testMutingOtherAppsIsOnByDefaultAndRemembered() {
+        XCTAssertTrue(AppSettings.dictationMutesOutput)
+        AppSettings.dictationMutesOutput = false
+        XCTAssertFalse(AppSettings.dictationMutesOutput)
     }
 }

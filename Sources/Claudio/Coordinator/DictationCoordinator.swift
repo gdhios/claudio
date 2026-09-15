@@ -43,6 +43,8 @@ final class DictationCoordinator {
     private let microphone: MicrophoneGate
     private let makePanel: PanelMaker
     private let history: DictationHistory
+    private let silencer: OutputSilencer
+    private let mutesOutput: @MainActor () -> Bool
     private let durations: MessageDurations
     private let now: @MainActor () -> Date
 
@@ -66,6 +68,8 @@ final class DictationCoordinator {
          microphone: MicrophoneGate = .system,
          panel: @escaping PanelMaker = DictationCoordinator.systemPanel,
          history: DictationHistory = .shared,
+         silencer: OutputSilencer = .system,
+         mutesOutput: @escaping @MainActor () -> Bool = { AppSettings.dictationMutesOutput },
          durations: MessageDurations = .standard,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
@@ -75,6 +79,8 @@ final class DictationCoordinator {
         self.microphone = microphone
         self.makePanel = panel
         self.history = history
+        self.silencer = silencer
+        self.mutesOutput = mutesOutput
         self.durations = durations
         self.now = now
     }
@@ -128,6 +134,9 @@ final class DictationCoordinator {
         let session = DictationSession(language: language, model: model())
         self.session = session
         panel = makePanel(session, self)
+        // Music talking over the voice is what makes dictation hard: the
+        // other apps go quiet for as long as the key is held.
+        if mutesOutput() { silencer.silence() }
         cycle = Task { [weak self] in
             await self?.listen(session: session)
         }
@@ -143,6 +152,9 @@ final class DictationCoordinator {
         }
         session.phase = .finishing
         engine.stop()
+        // After the microphone has closed, so the returning sound is never
+        // heard as speech. The cleanup doesn't need silence.
+        silencer.restore()
     }
 
     /// Esc, at any phase: the microphone is cancelled, the cycle dropped,
@@ -168,6 +180,8 @@ final class DictationCoordinator {
                 // The message is read, not acted on: nothing was heard, so
                 // the panel says why and closes itself like an empty one.
                 session.fail(with: error)
+                // The panel stays up to be read; the sound doesn't wait for it.
+                silencer.restore()
                 closeAfter(durations.failure, session: session)
                 return
             }
@@ -324,6 +338,9 @@ final class DictationCoordinator {
         permission = nil
         // Only a dictation under way has a microphone to close.
         if session != nil { engine.cancel() }
+        // Every way out of a dictation ends here or in `keyUp()`: the sound
+        // comes back whatever happened. Harmless when nothing was silenced.
+        silencer.restore()
         panel?.orderOut(nil)
         panel = nil
         session = nil

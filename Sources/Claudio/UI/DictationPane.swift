@@ -16,6 +16,7 @@ struct DictationPane: View {
         ? DictationLanguage.enUS : AppSettings.dictationSecondaryLanguage
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
+    @State private var mutesOutput = PreviewRun.isActive ? true : AppSettings.dictationMutesOutput
     @State private var promptText = PreviewRun.isActive
         ? DictationCleanup.defaultSystemPrompt : DictationCleanup.systemPrompt
     /// Models pulled on the Ollama server, read when the pane opens.
@@ -38,6 +39,7 @@ struct DictationPane: View {
     var body: some View {
         Form {
             languages
+            whileDictating
             cleanupModel
             cleanupPrompt
             history
@@ -68,6 +70,22 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
                      en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - While dictating
+
+    private var whileDictating: some View {
+        Section {
+            Toggle(loc("Couper le son des autres apps", en: "Mute other apps"), isOn: $mutesOutput)
+                .onChange(of: mutesOutput) { AppSettings.dictationMutesOutput = mutesOutput }
+        } header: {
+            Text(loc("Pendant la dictée", en: "While dictating"))
+        } footer: {
+            Text(loc("La musique et les vidéos se taisent tant que le raccourci est maintenu, et reprennent au relâchement.",
+                     en: "Music and videos go quiet for as long as the shortcut is held, and come back on release."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -154,6 +154,16 @@ enum AppSettings {
     private static let dictationModelKey = "dictationModel"
     private static let dictationSystemPromptKey = "dictationSystemPrompt"
 
+    private static let dictationMutesOutputKey = "dictationMutesOutput"
+
+    /// Silence the other apps while the dictation shortcut is held. On by
+    /// default: dictating over music is what it's for, and the sound comes
+    /// back on release.
+    static var dictationMutesOutput: Bool {
+        get { UserDefaults.standard.object(forKey: dictationMutesOutputKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: dictationMutesOutputKey) }
+    }
+
     /// Language of the "Dictate" shortcut. Missing or unknown value (a
     /// setting written by a future version) falls back to French.
     static var dictationPrimaryLanguage: DictationLanguage {

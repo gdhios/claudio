@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installDictation(coordinator: dictation)
+        // A crash mid-dictation leaves every app silent: the tap outlives
+        // its process. The next launch gives the sound back.
+        SystemAudioMute.removeLeftovers()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.showUpdateMenuItem(feed)
@@ -32,6 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if KeychainStore.currentAPIKey() == nil {
             settingsController.show()
         }
+    }
+
+    /// Quitting while the key is held: the sound comes back with the app
+    /// gone, not at the next launch.
+    func applicationWillTerminate(_ notification: Notification) {
+        SystemAudioMute.shared.restore()
     }
 
     /// Invisible main menu (app .accessory): without an Edit menu, macOS

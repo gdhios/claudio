@@ -51,6 +51,68 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.transcript, "bon")
     }
 
+    // MARK: - The other apps' sound
+
+    /// Music playing while dictating goes quiet the moment the key goes
+    /// down, and comes back on release — after the microphone has closed,
+    /// so the returning sound is never heard as speech.
+    func testOtherAppsAreSilencedWhileTheKeyIsHeld() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        XCTAssertTrue(bench.silenced)
+
+        bench.hold(for: 1)
+        bench.coordinator.keyUp()
+        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.stopsWhenSoundCameBack, [1])
+
+        await bench.coordinator.cycle?.value
+        XCTAssertEqual(bench.silenceCount, 1)
+    }
+
+    func testEscapeBringsTheSoundBack() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        bench.coordinator.escape()
+        XCTAssertFalse(bench.silenced)
+    }
+
+    func testAPressTooShortBringsTheSoundBack() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        bench.hold(for: 0.1)
+        bench.coordinator.keyUp()
+        XCTAssertFalse(bench.silenced)
+    }
+
+    /// A dictation that fails keeps its panel up for a few seconds to be
+    /// read; the sound doesn't wait for it to close.
+    func testAFailureBringsTheSoundBackAtOnce() async {
+        let bench = Bench(events: [.failed(.microphoneDenied)])
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.coordinator.cycle?.value
+        XCTAssertNotNil(bench.coordinator.session)
+        XCTAssertFalse(bench.silenced)
+    }
+
+    func testNothingIsSilencedWhenTheSettingIsOff() async {
+        let bench = Bench(mutesOutput: false)
+        await bench.dictate()
+        XCTAssertEqual(bench.silenceCount, 0)
+    }
+
+    /// A press that only asks for the microphone listens to nothing, so it
+    /// has no business silencing anything.
+    func testNothingIsSilencedWhileAskingForTheMicrophone() async {
+        let bench = Bench(microphoneGranted: false)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.coordinator.permission?.value
+        XCTAssertEqual(bench.silenceCount, 0)
+    }
+
     /// The engine is started in the session's language, which is the
     /// shortcut's: that's the whole point of the second one.
     func testTheEngineListensInTheLanguageOfThePress() async {
@@ -349,6 +411,12 @@ private final class Bench {
     var explanations = 0
     /// How many panels were put on screen: nothing is heard without one.
     var panels = 0
+    /// Whether the other apps are silenced right now, and how many times
+    /// they were. `stopsWhenSoundCameBack` is the microphone's state each
+    /// time the sound returned: it must already be closed.
+    private(set) var silenced = false
+    private(set) var silenceCount = 0
+    private(set) var stopsWhenSoundCameBack: [Int] = []
 
     private var clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
     /// The prompts still waiting for an answer, when the bench holds them
@@ -361,6 +429,7 @@ private final class Bench {
          hasClient: Bool = true,
          microphoneGranted: Bool = true,
          promptsWait: Bool = false,
+         mutesOutput: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard) {
         self.microphoneGranted = microphoneGranted
         engine = FakeSpeechEngine(events)
@@ -401,6 +470,18 @@ private final class Bench {
                 return nil
             },
             history: history,
+            silencer: OutputSilencer(
+                silence: { [weak self] in
+                    self?.silenced = true
+                    self?.silenceCount += 1
+                },
+                restore: { [weak self] in
+                    guard let self, silenced else { return }
+                    silenced = false
+                    stopsWhenSoundCameBack.append(engine.stops + engine.cancels)
+                }
+            ),
+            mutesOutput: { mutesOutput },
             durations: durations,
             now: { [weak self] in self?.clock ?? .distantPast }
         )
