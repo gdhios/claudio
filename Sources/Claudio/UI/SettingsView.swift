@@ -391,22 +391,22 @@ private struct ShortcutsPane: View {
                 HStack(spacing: 10) {
                     IconBadge(systemName: SettingsSection.dictation.symbolName,
                               color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter (maintenir)", en: "Dictate (hold)"))
+                    Text(loc("Dicter", en: "Dictate"))
                     Spacer()
                     KeyboardShortcuts.Recorder("", name: .dictate)
                 }
                 HStack(spacing: 10) {
                     IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter dans l'autre langue (maintenir)",
-                             en: "Dictate in the other language (hold)"))
+                    Text(loc("Dicter dans l'autre langue",
+                             en: "Dictate in the other language"))
                     Spacer()
                     KeyboardShortcuts.Recorder("", name: .dictateOtherLanguage)
                 }
             } header: {
                 Text(SettingsSection.dictation.title)
             } footer: {
-                Text(loc("Ces deux-là se maintiennent : la touche enfoncée écoute, relâchée colle ce qui a été dit. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
-                         en: "These two are held down: pressed listens, released pastes what was said. The languages and the cleanup model are set in the Dictation tab."))
+                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
+                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. The languages and the cleanup model are set in the Dictation tab."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

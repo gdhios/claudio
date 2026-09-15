@@ -71,8 +71,8 @@ struct DictationPane: View {
         } header: {
             Text(loc("Langues", en: "Languages"))
         } footer: {
-            Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
-                     en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
+            Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Tapé une fois, il écoute jusqu'au prochain appui. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
+                     en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. Tapped once, it listens until the next press. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -108,8 +108,8 @@ struct DictationPane: View {
         } header: {
             Text(loc("Pendant la dictée", en: "While dictating"))
         } footer: {
-            Text(loc("La musique et les vidéos se taisent tant que le raccourci est maintenu, et reprennent au relâchement.",
-                     en: "Music and videos go quiet for as long as the shortcut is held, and come back on release."))
+            Text(loc("La musique et les vidéos se taisent tant que Claudio écoute, et reprennent dès qu'il a fini.",
+                     en: "Music and videos go quiet for as long as Claudio listens, and come back as soon as it stops."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
