@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// repopulated on every open (recents change).
     private var recentsItem: NSMenuItem?
     private var recentsMenu: NSMenu?
+    /// "Recent dictations ▸", on the same terms: hidden while no dictation
+    /// was made, repopulated on every open.
+    private var recentDictationsItem: NSMenuItem?
+    private var recentDictationsMenu: NSMenu?
     private let updateMenuItemTag = 777
     private let coordinator = CorrectionCoordinator()
     /// Dictation's own coordinator, on Apple's engine. Built here and kept
@@ -114,6 +118,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.recentsMenu = recentsMenu
         self.recentsItem = recentsItem
 
+        // The last few dictations, to paste one again at the cursor when its
+        // first paste landed in the wrong place: a way back to a text, not a
+        // way to dictate. Also rebuilt on open.
+        let dictationsMenu = NSMenu()
+        dictationsMenu.autoenablesItems = false
+        dictationsMenu.delegate = self
+        let dictationsItem = NSMenuItem(title: RecentDictationsMenu.menuTitle,
+                                        action: nil, keyEquivalent: "")
+        dictationsItem.submenu = dictationsMenu
+        menu.addItem(dictationsItem)
+        self.recentDictationsMenu = dictationsMenu
+        self.recentDictationsItem = dictationsItem
+
         menu.addItem(.separator())
 
         let settings = NSMenuItem(title: loc("Réglages…", en: "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
@@ -131,14 +148,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - History ("Recent")
 
-    /// When the main menu opens, "Recent ▸" only appears if there's
-    /// something to relaunch. When the submenu itself opens, it's
-    /// repopulated: history may have changed since last time.
+    /// When the main menu opens, "Recent ▸" and "Recent dictations ▸" only
+    /// appear if there's something in them. When a submenu itself opens,
+    /// it's repopulated: its history may have changed since last time.
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === statusMenu {
             recentsItem?.isHidden = TransformHistory.shared.recents.entries.isEmpty
+            recentDictationsItem?.isHidden = DictationHistory.shared.recents.entries.isEmpty
         } else if menu === recentsMenu {
             rebuildRecentsMenu(menu)
+        } else if menu === recentDictationsMenu {
+            rebuildRecentDictationsMenu(menu)
         }
     }
 
@@ -177,6 +197,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func clearRecents() {
         TransformHistory.shared.clear()
+    }
+
+    // MARK: - Dictations ("Recent dictations")
+
+    /// Which dictations and under which titles is `RecentDictationsMenu`'s
+    /// call; this only makes the rows. No "Clear" here: Settings has it.
+    private func rebuildRecentDictationsMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for row in RecentDictationsMenu(DictationHistory.shared.recents).items {
+            let item = NSMenuItem(title: row.title,
+                                  action: #selector(recentDictationFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = row.text
+            item.toolTip = row.text  // the truncated title, in full on hover
+            menu.addItem(item)
+        }
+    }
+
+    /// Pastes the dictation again at the cursor of the app in front, or
+    /// copies it when that app is Claudio. Either panel still on screen has
+    /// the keyboard, so both close before the keystroke.
+    @objc private func recentDictationFromMenu(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        let paster = RecentDictationPaster(closePanels: { [weak self] in
+            self?.coordinator.dismiss()
+            self?.dictation.dismiss()
+        })
+        Task { await paster.paste(text) }
     }
 
     private func updateMenuTitle(_ feed: UpdateChecker.Feed) -> String {
