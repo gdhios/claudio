@@ -5,6 +5,11 @@ import SwiftUI
 @MainActor
 final class CorrectionCoordinator {
     var openSettings: (() -> Void)?
+    /// Called whenever the panel leaves the screen, for whatever reason:
+    /// Esc, another shortcut, a paste. A spoken instruction hangs its own
+    /// ending on it — a microphone left open behind a closed panel would go
+    /// on listening, and the other apps would stay quiet.
+    var onDismiss: (() -> Void)?
 
     private var panel: ResultPanel?
     private var session: CorrectionSession?
@@ -25,6 +30,13 @@ final class CorrectionCoordinator {
         trigger(.awaitingInstruction)
     }
 
+    /// Same custom action, with its instruction about to be spoken rather
+    /// than typed: same capture, same panel, except it opens listening.
+    /// Hands back the session the words land in, `nil` when nothing opened.
+    func beginSpokenInstruction() -> CorrectionSession? {
+        trigger(.awaitingInstruction, listening: true)
+    }
+
     /// Palette: the selection is captured first, the action is chosen
     /// afterward in the panel. The starting request is just filler.
     func triggerPalette() {
@@ -38,13 +50,18 @@ final class CorrectionCoordinator {
         trigger(.free(instruction: instruction))
     }
 
-    func trigger(_ request: ClaudioRequest, opensPalette: Bool = false) {
+    /// `listening` is the custom action whose instruction is being spoken:
+    /// the panel opens on the waveform instead of the field.
+    @discardableResult
+    func trigger(_ request: ClaudioRequest,
+                 opensPalette: Bool = false,
+                 listening: Bool = false) -> CorrectionSession? {
         dismiss()  // idempotent: a shortcut while a panel is open starts fresh
 
         guard AccessibilityPermission.isGranted else {
             AccessibilityPermission.request()
             AccessibilityPermission.showExplanation()
-            return
+            return nil
         }
 
         // Captured BEFORE showing anything.
@@ -52,11 +69,13 @@ final class CorrectionCoordinator {
         clipboardSnapshot = PasteboardSnapshot.capture()
 
         let session = CorrectionSession(request: request, opensPalette: opensPalette)
+        if listening { session.phase = .listeningInstruction }
         self.session = session
 
         streamTask = Task { [weak self] in
             await self?.runCorrection(session: session)
         }
+        return session
     }
 
     private func runCorrection(session: CorrectionSession) async {
@@ -79,19 +98,31 @@ final class CorrectionCoordinator {
             return
         }
 
-        // Custom action: nothing to send until the instruction is typed.
+        // Custom action: nothing to send until the instruction is given.
         // The rest resumes from `submitInstruction()`.
         guard !session.request.needsInstruction else {
-            session.phase = .askingInstruction
+            // The shortcut held rather than tapped: the panel keeps
+            // listening instead of asking for the instruction to be typed.
+            if session.phase != .listeningInstruction {
+                session.phase = .askingInstruction
+            }
             return
         }
         await stream(session: session)
     }
 
+    /// The instruction was spoken rather than typed: it lands in the session
+    /// as if it had been, and the custom action carries on in the same panel.
+    func runSpokenInstruction(_ instruction: String) {
+        guard let session, session.phase == .listeningInstruction else { return }
+        session.instruction = instruction
+        submitInstruction()
+    }
+
     /// Instruction validated in the panel: the custom request is built here,
     /// then follows the common path.
     func submitInstruction() {
-        guard let session, session.phase == .askingInstruction else { return }
+        guard let session, session.isEnteringInstruction else { return }
         let instruction = session.trimmedInstruction
         guard !instruction.isEmpty else { return }
 
@@ -291,5 +322,6 @@ final class CorrectionCoordinator {
         session = nil
         previousApp = nil
         clipboardSnapshot = nil
+        onDismiss?()
     }
 }

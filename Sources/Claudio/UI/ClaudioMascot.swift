@@ -45,10 +45,12 @@ extension ClaudioMascot.Gaze {
     /// What Claudio is doing at this instant reads in his eyes.
     init(_ phase: CorrectionSession.Phase) {
         switch phase {
-        case .capturing, .choosingAction, .askingInstruction: self = .repos
-        case .streaming:                                      self = .veille
-        case .done:                                           self = .fait
-        case .noSelection, .missingKey, .error:               self = .vide
+        case .capturing, .choosingAction, .askingInstruction,
+             .listeningInstruction:                            self = .repos
+        case .streaming:                                       self = .veille
+        case .done:                                            self = .fait
+        case .noSelection, .missingKey, .error,
+             .instructionNotHeard:                             self = .vide
         }
     }
 }

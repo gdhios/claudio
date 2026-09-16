@@ -3,7 +3,8 @@ import SwiftUI
 
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
-/// panel-noselection, panel-free, panel-free-filled, panel-listening, panel-listening-start,
+/// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
+/// panel-free-unheard, panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
 /// palette-libre, settings, settings-dictation.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
@@ -37,6 +38,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     /// Sample instruction for the custom-action previews.
     private var sampleInstruction: String {
         loc("Traduis en espagnol", en: "Translate to Spanish")
+    }
+
+    /// The same instruction being said rather than typed, caught
+    /// mid-sentence: the shortcut is still held.
+    private var spokenInstruction: String {
+        loc("Traduis ce message en ", en: "Translate this message to ")
     }
 
     /// Preview's text size: `--size large`, otherwise the current setting.
@@ -150,6 +157,19 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.originalText = sampleText
             session.instruction = sampleInstruction
             session.phase = .askingInstruction
+        case "panel-free-listening":
+            // The shortcut held: the instruction is being said into the same
+            // panel that will stream the answer. Fixed readings, so the shot
+            // is the same on every machine — and no microphone is opened.
+            session = CorrectionSession(request: .awaitingInstruction)
+            session.originalText = sampleText
+            session.levels = voiceLevels
+            session.instruction = spokenInstruction
+            session.phase = .listeningInstruction
+        case "panel-free-unheard":
+            session = CorrectionSession(request: .awaitingInstruction)
+            session.originalText = sampleText
+            session.phase = .instructionNotHeard(reason: nil)
         default:  // "panel"
             session = CorrectionSession(action: .translateEN)
             session.phase = .done

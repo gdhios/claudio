@@ -220,9 +220,6 @@ enum HotkeySetup {
                 coordinator?.trigger(action: action)
             }
         }
-        KeyboardShortcuts.onKeyUp(for: .freeAction) { [weak coordinator] in
-            coordinator?.triggerFreeAction()
-        }
         KeyboardShortcuts.onKeyUp(for: .actionPalette) { [weak coordinator] in
             coordinator?.triggerPalette()
         }
@@ -245,7 +242,20 @@ enum HotkeySetup {
         setWindowShortcutsEnabled(AppSettings.windowShortcutsEnabled)
     }
 
-    /// Dictation: the only shortcuts that act on the key going down as well
+    /// The free action, which acts on the key going down as well as coming
+    /// up: tapped it opens the field where the instruction is typed, held it
+    /// opens the microphone and the instruction is spoken. Only the
+    /// coordinator can tell the two gestures apart, so both go to it.
+    static func installFreeAction(coordinator: SpokenInstructionCoordinator) {
+        KeyboardShortcuts.onKeyDown(for: .freeAction) { [weak coordinator] in
+            coordinator?.keyDown()
+        }
+        KeyboardShortcuts.onKeyUp(for: .freeAction) { [weak coordinator] in
+            coordinator?.keyUp()
+        }
+    }
+
+    /// Dictation: the other shortcuts that act on the key going down as well
     /// as coming up — pressed is "listen", released is "paste what I said".
     /// Installed apart from the actions above because it drives its own
     /// coordinator, and because the two shortcuts differ only by the language

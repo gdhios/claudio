@@ -8,6 +8,14 @@ final class CorrectionSession: ObservableObject {
         case choosingAction
         /// Custom action: the selection is captured, the instruction is entered in the panel.
         case askingInstruction
+        /// Custom action with the shortcut held: the selection is captured,
+        /// the microphone is open, and the instruction is being said rather
+        /// than typed. The words land in `instruction` as they come.
+        case listeningInstruction
+        /// The instruction was to be spoken and wasn't: nothing was heard,
+        /// or the microphone gave up — its reason, when it had one. The
+        /// panel says so, then closes itself.
+        case instructionNotHeard(reason: String?)
         case streaming
         case done
         case noSelection
@@ -35,8 +43,16 @@ final class CorrectionSession: ObservableObject {
     @Published var correctedText = ""
     @Published var truncated = false
     @Published var justCopied = false
-    /// Instruction currently being typed (custom action).
+    /// Instruction currently being typed — or said, when the shortcut is
+    /// held: both gestures fill the same field (custom action).
     @Published var instruction = ""
+    /// The microphone's recent loudness while the instruction is spoken,
+    /// drawn as a waveform: the proof it hears, before the first word shows up.
+    @Published var levels = LevelHistory()
+    /// The key came up and the microphone with it, while the engine still
+    /// has its last word to say. Without this the pill would go on claiming
+    /// to listen over a waveform that has gone flat.
+    @Published var listeningEnded = false
     /// Palette input: filters the catalog, and serves as the instruction if it's
     /// the custom-action row that gets launched.
     @Published var paletteQuery = "" {
@@ -100,6 +116,25 @@ final class CorrectionSession: ObservableObject {
     /// Usable instruction: the "Run" button and ⏎ stay inert without it.
     var trimmedInstruction: String {
         instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The instruction is still being given — typed in the field, or said
+    /// into the microphone. Both end the same way: the request adopts it.
+    var isEnteringInstruction: Bool {
+        phase == .askingInstruction || phase == .listeningInstruction
+    }
+
+    /// The shortcut was tapped, not held: the instruction goes back to being
+    /// typed, in the panel the press already opened over the same selection.
+    /// Only from the listening phase — the capture may have said in the
+    /// meantime that there was no selection at all.
+    ///
+    /// The word or two caught before the key came up are dropped: they were
+    /// never meant to be the instruction, and the field starts empty as ever.
+    func typeInstructionInstead() {
+        guard phase == .listeningInstruction else { return }
+        instruction = ""
+        phase = .askingInstruction
     }
 
     // MARK: - Stream
@@ -262,6 +297,17 @@ struct ResultPanelView: View {
                 ProgressView().controlSize(.mini)
                 Text(loc("Capture…", en: "Reading…"))
             }
+        case .listeningInstruction:
+            // The spinner of the other phases says "wait"; while listening
+            // it is the voice that moves, so the pill carries the last
+            // readings — the dictation panel's own pill.
+            StatusPill {
+                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
+                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
+                Text(session.listeningEnded
+                     ? loc("Un instant…", en: "One moment…")
+                     : loc("À l'écoute…", en: "Listening…"))
+            }
         case .streaming:
             StatusPill {
                 ProgressView().controlSize(.mini)
@@ -279,7 +325,8 @@ struct ResultPanelView: View {
                     Text(loc("Prêt", en: "Ready"))
                 }
             }
-        case .choosingAction, .askingInstruction, .noSelection, .missingKey, .error:
+        case .choosingAction, .askingInstruction, .instructionNotHeard,
+             .noSelection, .missingKey, .error:
             EmptyView()
         }
     }
@@ -290,6 +337,17 @@ struct ResultPanelView: View {
             PaletteView(session: session, textSize: textSize, onLaunch: onLaunchPaletteRow)
         case .askingInstruction:
             instructionPrompt
+        case .listeningInstruction:
+            spokenInstructionPrompt
+        case .instructionNotHeard(let reason):
+            // A silence and a microphone that gave up are two different
+            // pieces of news: only the second one has something to report.
+            messageView(icon: reason == nil ? "waveform.slash" : "exclamationmark.triangle",
+                        title: reason == nil
+                            ? loc("Rien entendu", en: "Nothing heard")
+                            : loc("Consigne non entendue", en: "Couldn't hear the instruction"),
+                        detail: reason ?? loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
+                                              en: "No speech was picked up. Hold the shortcut while you talk."))
         case .noSelection:
             messageView(icon: "cursorarrow.rays",
                         title: loc("Aucune sélection détectée", en: "No selection found"),
@@ -378,6 +436,48 @@ struct ResultPanelView: View {
         }
     }
 
+    /// The same prompt, said rather than typed: the waveform takes the
+    /// field's place and the words land in it as they are spoken. Same box,
+    /// same excerpt of the selection underneath — one panel, which goes on
+    /// to stream the answer.
+    private var spokenInstructionPrompt: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 10) {
+                DictationWaveform(levels: Array(session.levels.values.suffix(12)),
+                                  barWidth: textSize.points(2.5),
+                                  spacing: textSize.points(2.5),
+                                  maxHeight: textSize.points(18))
+                Text(session.instruction.isEmpty
+                     ? loc("Dis ce que Claudio doit en faire…",
+                           en: "Say what Claudio should do with it…")
+                     : session.instruction)
+                    .font(.system(size: textSize.bodyPoints))
+                    .foregroundStyle(.white.opacity(session.instruction.isEmpty ? 0.35 : 0.92))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // The words already there don't move, the new ones fade
+                    // in — as they do in the dictation panel.
+                    .contentTransition(.opacity)
+                    .animation(.easeOut(duration: 0.22), value: session.instruction)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.06),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+            )
+
+            Text(session.originalText)
+                .font(.system(size: textSize.points(10)))
+                .foregroundStyle(.white.opacity(0.35))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(14)
+    }
+
     /// Streaming text with a blinking caret; plain text once finished.
     @ViewBuilder private var resultText: some View {
         if session.phase == .capturing || session.phase == .streaming {
@@ -411,8 +511,9 @@ struct ResultPanelView: View {
     /// or no call has gone out yet.
     private var showsModelName: Bool {
         switch session.phase {
-        case .askingInstruction, .streaming, .done, .error: return true
-        case .capturing, .choosingAction, .noSelection, .missingKey: return false
+        case .askingInstruction, .listeningInstruction, .streaming, .done, .error: return true
+        case .capturing, .choosingAction, .instructionNotHeard, .noSelection, .missingKey:
+            return false
         }
     }
 
@@ -429,6 +530,12 @@ struct ResultPanelView: View {
             }
             Spacer()
             switch session.phase {
+            case .listeningInstruction:
+                // No button: the gesture is the button. What ends it is the
+                // key coming up, and nothing else on screen says so.
+                Text(loc("Relâche pour lancer", en: "Release to run"))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             case .askingInstruction:
                 Button(action: onSubmitInstruction) {
                     Text(loc("Lancer ", en: "Run ")) + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
