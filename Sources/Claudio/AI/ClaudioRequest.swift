@@ -23,6 +23,27 @@ struct ClaudioRequest: Sendable {
         case design
         /// Summary: reduced room.
         case condense
+
+        /// Tokens this shape asks for, from the input's length in
+        /// characters. On the shape rather than on the request, so anything
+        /// sending a text of its own — a dictation turned into a prompt —
+        /// can ask for the same room without inventing a budget.
+        /// `multiplier` is used by "Retry +" after truncation.
+        func maxTokens(forLength length: Int, multiplier: Int = 1) -> Int {
+            let approxInputTokens = max(length / 4, 1)
+            let base: Int
+            switch self {
+            case .rewrite:
+                base = min(8192, max(256, approxInputTokens * 2 + 128))
+            case .expand:
+                base = min(8192, max(512, approxInputTokens * 3 + 256))
+            case .design:
+                base = min(8192, max(768, approxInputTokens * 5 + 768))
+            case .condense:
+                base = min(8192, max(384, approxInputTokens + 256))
+            }
+            return min(16384, base * max(1, multiplier))
+        }
     }
 
     let origin: Origin
@@ -57,19 +78,7 @@ struct ClaudioRequest: Sendable {
     /// Output budget computed from the length of the input.
     /// `multiplier` is used by "Retry +" after truncation.
     func maxTokens(forText text: String, multiplier: Int = 1) -> Int {
-        let approxInputTokens = max(text.count / 4, 1)
-        let base: Int
-        switch budget {
-        case .rewrite:
-            base = min(8192, max(256, approxInputTokens * 2 + 128))
-        case .expand:
-            base = min(8192, max(512, approxInputTokens * 3 + 256))
-        case .design:
-            base = min(8192, max(768, approxInputTokens * 5 + 768))
-        case .condense:
-            base = min(8192, max(384, approxInputTokens + 256))
-        }
-        return min(16384, base * max(1, multiplier))
+        budget.maxTokens(forLength: text.count, multiplier: multiplier)
     }
 }
 

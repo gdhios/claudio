@@ -248,16 +248,19 @@ enum HotkeySetup {
     /// Dictation: the only shortcuts that act on the key going down as well
     /// as coming up — pressed is "listen", released is "paste what I said".
     /// Installed apart from the actions above because it drives its own
-    /// coordinator, and because the two shortcuts differ only by the language
-    /// they start listening in.
+    /// coordinator, and because the two shortcuts differ only by what they
+    /// are set to: the language they listen in, and what they turn it into.
+    /// Both are read on the press, never mid-dictation.
     static func installDictation(coordinator: DictationCoordinator) {
-        let languages: [(KeyboardShortcuts.Name, @MainActor () -> DictationLanguage)] = [
-            (.dictate, { AppSettings.dictationPrimaryLanguage }),
-            (.dictateOtherLanguage, { AppSettings.dictationSecondaryLanguage }),
+        let shortcuts: [(KeyboardShortcuts.Name, @MainActor () -> (DictationLanguage, DictationOutput))] = [
+            (.dictate, { (AppSettings.dictationPrimaryLanguage, AppSettings.dictationOutput) }),
+            (.dictateOtherLanguage,
+             { (AppSettings.dictationSecondaryLanguage, AppSettings.dictationSecondaryOutput) }),
         ]
-        for (name, language) in languages {
+        for (name, settings) in shortcuts {
             KeyboardShortcuts.onKeyDown(for: name) { [weak coordinator] in
-                coordinator?.keyDown(language: language())
+                let (language, output) = settings()
+                coordinator?.keyDown(language: language, output: output)
             }
             KeyboardShortcuts.onKeyUp(for: name) { [weak coordinator] in
                 coordinator?.keyUp()

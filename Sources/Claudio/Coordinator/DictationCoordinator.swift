@@ -107,7 +107,10 @@ final class DictationCoordinator {
 
     /// Key down: the microphone opens and the panel shows what it hears. On
     /// a dictation locked by a tap, it's the press that finishes it.
-    func keyDown(language: DictationLanguage) {
+    /// `output` is what the shortcut turns what is said into: each of the
+    /// two has its own, which is why it arrives with the language rather
+    /// than being read from the settings here.
+    func keyDown(language: DictationLanguage, output: DictationOutput = .cleanup) {
         // Either shortcut ends a locked dictation, in the language it was
         // started in. The release that follows finds nothing listening.
         if let session, session.isLocked, session.phase == .listening {
@@ -126,7 +129,7 @@ final class DictationCoordinator {
             askForTheMicrophone()
             return
         }
-        beginListening(language: language)
+        beginListening(language: language, output: output)
     }
 
     /// The first press, on a machine that hasn't been asked yet: the two
@@ -150,13 +153,13 @@ final class DictationCoordinator {
     }
 
     /// Opens the microphone and puts the panel on screen.
-    private func beginListening(language: DictationLanguage) {
+    private func beginListening(language: DictationLanguage, output: DictationOutput) {
         pressedAt = now()
         // Captured BEFORE showing anything, while the app being dictated
         // into is still the frontmost one.
         target = pasting.capture()
 
-        let session = DictationSession(language: language, model: model())
+        let session = DictationSession(language: language, model: model(), output: output)
         self.session = session
         // Read on the press, like the language and the model: the engine,
         // the replacements and the prompt all get this one, whatever
@@ -301,8 +304,10 @@ final class DictationCoordinator {
         }.value
     }
 
-    /// Runs the cleanup pass and returns its text, `nil` when there was
+    /// Runs the single model pass and returns its text, `nil` when there was
     /// none: the transcript is then what gets pasted, and the panel says why.
+    /// What the dictation becomes — cleaned up, translated, turned into a
+    /// prompt — is the session's output: one call, whichever it is.
     /// `terms` are the spellings the model is told to keep.
     private func cleanUp(_ raw: String, keeping terms: [String], session: DictationSession) async -> String? {
         guard let client = client(session.model) else {
@@ -312,8 +317,8 @@ final class DictationCoordinator {
         do {
             let result = try await client.streamCompletion(
                 of: raw,
-                system: DictationCleanup.systemPrompt(keeping: terms),
-                maxTokens: DictationCleanup.maxTokens(forRawLength: raw.count)
+                system: session.output.systemPrompt(keeping: terms),
+                maxTokens: session.output.maxTokens(forRawLength: raw.count)
             ) { @MainActor piece in
                 session.appendCleaned(piece)
             }

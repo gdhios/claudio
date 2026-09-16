@@ -27,6 +27,9 @@ final class DictationSession: ObservableObject {
     /// The model doing the cleanup, `.raw` when the transcript is pasted as
     /// it was heard.
     let model: ModelChoice
+    /// What this dictation is becoming: cleaned up, translated, turned into
+    /// a prompt. The shortcut's own, read on the press like the language.
+    let output: DictationOutput
 
     @Published var phase: Phase = .listening
     /// The key was tapped rather than held: listening goes on with the key
@@ -52,9 +55,12 @@ final class DictationSession: ObservableObject {
     @Published private(set) var failure: SpeechEngineError?
     @Published var justCopied = false
 
-    init(language: DictationLanguage, model: ModelChoice) {
+    init(language: DictationLanguage,
+         model: ModelChoice,
+         output: DictationOutput = .cleanup) {
         self.language = language
         self.model = model
+        self.output = output
     }
 
     /// What the panel shows and what gets pasted: the cleaned-up text once

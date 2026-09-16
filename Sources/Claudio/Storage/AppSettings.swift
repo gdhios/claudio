@@ -154,6 +154,8 @@ enum AppSettings {
     private static let dictationModelKey = "dictationModel"
     private static let dictationSystemPromptKey = "dictationSystemPrompt"
     private static let dictationVocabularyKey = "dictationVocabulary"
+    private static let dictationOutputKey = "dictationOutput"
+    private static let dictationSecondaryOutputKey = "dictationSecondaryOutput"
 
     private static let dictationMutesOutputKey = "dictationMutesOutput"
 
@@ -182,6 +184,27 @@ enum AppSettings {
                 .flatMap(DictationLanguage.init(rawValue:)) ?? .enUS
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationSecondaryLanguageKey) }
+    }
+
+    /// What the "Dictate" shortcut's dictation becomes. Cleanup by default:
+    /// what every dictation did before there was a choice. A value written
+    /// by a future version falls back to it rather than to no output at all.
+    static var dictationOutput: DictationOutput {
+        get {
+            UserDefaults.standard.string(forKey: dictationOutputKey)
+                .flatMap(DictationOutput.init(rawValue:)) ?? .cleanup
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationOutputKey) }
+    }
+
+    /// Same, for the other-language shortcut, and its own setting: speaking
+    /// French to paste English is what a second shortcut is good for.
+    static var dictationSecondaryOutput: DictationOutput {
+        get {
+            UserDefaults.standard.string(forKey: dictationSecondaryOutputKey)
+                .flatMap(DictationOutput.init(rawValue:)) ?? .cleanup
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationSecondaryOutputKey) }
     }
 
     /// Model doing the cleanup pass, `.raw` to paste the transcript as is.

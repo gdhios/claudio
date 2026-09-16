@@ -81,7 +81,9 @@ struct DictationPanelView: View {
         case .finishing:
             workingPill(loc("Un instant…", en: "One moment…"))
         case .cleaning:
-            workingPill(loc("Nettoyage…", en: "Cleaning up…"))
+            // Named after the output rather than always "cleaning up": a
+            // translation taking its time shouldn't look like a stuck one.
+            workingPill(session.output.progressLabel)
         case .pasting:
             workingPill(loc("Collage…", en: "Pasting…"))
         case .done:

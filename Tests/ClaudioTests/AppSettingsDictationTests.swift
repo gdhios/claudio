@@ -9,7 +9,7 @@ final class AppSettingsDictationTests: XCTestCase {
 
     private static let keys = ["dictationPrimaryLanguage", "dictationSecondaryLanguage",
                                "dictationModel", "dictationSystemPrompt", "dictationMutesOutput",
-                               "dictationVocabulary"]
+                               "dictationVocabulary", "dictationOutput", "dictationSecondaryOutput"]
 
     private var saved: [String: Any] = [:]
 
@@ -33,12 +33,15 @@ final class AppSettingsDictationTests: XCTestCase {
     }
 
     /// Nothing stored yet: French on the main shortcut, English on the other
-    /// one, a fast Claude model for the cleanup, and the code's prompt.
+    /// one, a fast Claude model for the cleanup, the code's prompt, and both
+    /// shortcuts doing what every dictation did before there was a choice.
     func testTheDefaultsHoldWithNothingStored() {
         XCTAssertEqual(AppSettings.dictationPrimaryLanguage, .frFR)
         XCTAssertEqual(AppSettings.dictationSecondaryLanguage, .enUS)
         XCTAssertEqual(AppSettings.dictationModel, .claude(.haiku45))
         XCTAssertNil(AppSettings.dictationSystemPrompt)
+        XCTAssertEqual(AppSettings.dictationOutput, .cleanup)
+        XCTAssertEqual(AppSettings.dictationSecondaryOutput, .cleanup)
     }
 
     func testTheLanguagesReadBackUnderTheirOwnKeys() {
@@ -110,6 +113,28 @@ final class AppSettingsDictationTests: XCTestCase {
         AppSettings.dictationVocabulary = typed
         XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationVocabulary"), typed)
         XCTAssertEqual(AppSettings.dictationVocabulary, typed)
+    }
+
+    /// Each shortcut decides what its dictation becomes, under its own key:
+    /// French in, English out on one of them, cleanup on the other.
+    func testEachShortcutKeepsItsOwnOutput() {
+        AppSettings.dictationOutput = .translateEN
+        AppSettings.dictationSecondaryOutput = .makePrompt
+
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationOutput"), "translateEN")
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationSecondaryOutput"), "makePrompt")
+        XCTAssertEqual(AppSettings.dictationOutput, .translateEN)
+        XCTAssertEqual(AppSettings.dictationSecondaryOutput, .makePrompt)
+    }
+
+    /// An output written by a future version must not leave a shortcut
+    /// without one: it falls back to the cleanup, the behaviour of before.
+    func testAnUnknownOutputFallsBackToTheCleanup() {
+        UserDefaults.standard.set("summarise", forKey: "dictationOutput")
+        UserDefaults.standard.set("", forKey: "dictationSecondaryOutput")
+
+        XCTAssertEqual(AppSettings.dictationOutput, .cleanup)
+        XCTAssertEqual(AppSettings.dictationSecondaryOutput, .cleanup)
     }
 
     /// Erasing every line leaves no key behind, like a blank prompt.

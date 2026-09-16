@@ -1,10 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// The Dictation tab: the two languages the shortcuts listen in, the words
-/// they must get right, the model that tidies the transcript up, the prompt
-/// it is given, and the dictations already made. Split out of `SettingsView`
-/// like the other panes, because this one carries a list.
+/// The Dictation tab: the two languages the shortcuts listen in, what each
+/// turns what is said into, the words they must get right, the model that
+/// tidies the transcript up, the prompt it is given, and the dictations
+/// already made. Split out of `SettingsView` like the other panes, because
+/// this one carries a list.
 @MainActor
 struct DictationPane: View {
     // A preview shows fixed settings rather than this Mac's: the shot has to
@@ -14,6 +15,12 @@ struct DictationPane: View {
         ? DictationLanguage.frFR : AppSettings.dictationPrimaryLanguage
     @State private var secondaryLanguage = PreviewRun.isActive
         ? DictationLanguage.enUS : AppSettings.dictationSecondaryLanguage
+    @State private var output = PreviewRun.isActive
+        ? DictationOutput.cleanup : AppSettings.dictationOutput
+    // The preview shows the other shortcut translating: it is what the
+    // choice is for, and a screen of three identical pickers shows nothing.
+    @State private var secondaryOutput = PreviewRun.isActive
+        ? DictationOutput.translateEN : AppSettings.dictationSecondaryOutput
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
     @State private var mutesOutput = PreviewRun.isActive ? true : AppSettings.dictationMutesOutput
@@ -41,6 +48,7 @@ struct DictationPane: View {
     var body: some View {
         Form {
             languages
+            outputs
             vocabulary
             whileDictating
             cleanupModel
@@ -73,6 +81,44 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Tapé une fois, il écoute jusqu'au prochain appui. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
                      en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. Tapped once, it listens until the next press. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - What the dictation becomes
+
+    /// One choice per shortcut, next to the languages they go with: dictate
+    /// in French on one, paste corrected English from it, and keep the other
+    /// for plain cleanup. Greyed out under "Raw", which has no model to ask.
+    private var outputs: some View {
+        Section {
+            Picker(loc("Raccourci principal", en: "Main shortcut"), selection: $output) {
+                ForEach(DictationOutput.allCases, id: \.self) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            .disabled(model == .raw)
+            .onChange(of: output) { AppSettings.dictationOutput = output }
+
+            Picker(loc("Raccourci de l'autre langue", en: "Other-language shortcut"),
+                   selection: $secondaryOutput) {
+                ForEach(DictationOutput.allCases, id: \.self) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            .disabled(model == .raw)
+            .onChange(of: secondaryOutput) { AppSettings.dictationSecondaryOutput = secondaryOutput }
+        } header: {
+            Text(loc("Sortie", en: "Output"))
+        } footer: {
+            // Said plainly rather than quietly ignored: under "Raw" nothing
+            // here happens, and the pickers above are greyed out to match.
+            Text(model == .raw
+                 ? loc("Sans effet tant que le modèle de nettoyage est « Brut » : la dictée est collée telle qu'elle a été entendue.",
+                       en: "No effect while the cleanup model is “Raw”: the dictation is pasted exactly as it was heard.")
+                 : loc("Chaque raccourci décide de ce que sa dictée devient : mise au propre, traduite en anglais, ou tournée en prompt — en un seul appel au modèle.",
+                       en: "Each shortcut decides what its dictation becomes: cleaned up, translated to English, or turned into a prompt — in a single model call."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

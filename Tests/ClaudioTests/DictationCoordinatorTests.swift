@@ -203,6 +203,71 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.pasted, ["ouvre Lapacompris"])
     }
 
+    // MARK: - What the dictation becomes
+
+    /// The shortcut's output decides what the one call is asked for: speak
+    /// French, paste corrected English, in a single pass over the transcript.
+    func testTheOutputOfThePressComposesTheOnlyCall() async {
+        let bench = Bench(answer: .success("Hello."))
+        await bench.dictate(output: .translateEN)
+
+        XCTAssertEqual(bench.client.calls, 1)
+        XCTAssertEqual(bench.client.systems, [DictationOutput.translateEN.systemPrompt(keeping: [])])
+        XCTAssertEqual(bench.client.texts, ["bonjour"])
+        XCTAssertEqual(bench.pasted, ["Hello."])
+    }
+
+    /// The vocabulary survives the composition: the spellings to keep are
+    /// still named, after the output's own instruction.
+    func testTheVocabularyStillReachesAComposedPrompt() async {
+        let bench = Bench(vocabulary: "Okonoma")
+        await bench.dictate(output: .makePrompt)
+        XCTAssertEqual(bench.client.systems,
+                       [DictationOutput.makePrompt.systemPrompt(keeping: ["Okonoma"])])
+    }
+
+    /// A rough idea turned into a prompt runs longer than what was said:
+    /// the call gets the room, where the cleanup's budget would cut it off.
+    func testAPromptOutputAsksForMoreRoomThanACleanup() async {
+        let bench = Bench()
+        await bench.dictate(output: .makePrompt)
+
+        XCTAssertEqual(bench.client.budgets, [DictationOutput.makePrompt.maxTokens(forRawLength: 7)])
+        XCTAssertGreaterThan(bench.client.budgets.first ?? 0,
+                             DictationCleanup.maxTokens(forRawLength: 7))
+    }
+
+    /// Nothing chosen is the cleanup: byte for byte the prompt and budget
+    /// of before there was an output at all.
+    func testTheDefaultOutputChangesNothing() async {
+        let bench = Bench()
+        await bench.dictate()
+
+        XCTAssertEqual(bench.client.systems, [DictationCleanup.systemPrompt])
+        XCTAssertEqual(bench.client.budgets, [DictationCleanup.maxTokens(forRawLength: 7)])
+    }
+
+    /// The panel says which of the three is running, so the session carries
+    /// the output the press chose — not the one Settings holds now.
+    func testTheSessionCarriesTheOutputOfThePress() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR, output: .translateEN)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { bench.engine.starts == 1 }
+
+        XCTAssertEqual(session.output, .translateEN)
+    }
+
+    /// "Raw" names no model: there is no call for an output to shape, and
+    /// the transcript is pasted as it was heard.
+    func testRawPastesAsHeardWhateverTheOutput() async {
+        let bench = Bench(model: .raw)
+        await bench.dictate(output: .makePrompt)
+
+        XCTAssertEqual(bench.client.calls, 0)
+        XCTAssertEqual(bench.pasted, ["bonjour"])
+    }
+
     // MARK: - Hands-free: a tap locks the microphone open
 
     /// Under 300 ms the key was tapped, not held. Holding a key through a
@@ -743,8 +808,9 @@ private final class Bench {
     func hold(for seconds: TimeInterval) { clock += seconds }
 
     /// A full dictation: press, speak, release, and wait for the text to land.
-    func dictate(language: DictationLanguage = .frFR) async {
-        coordinator.keyDown(language: language)
+    func dictate(language: DictationLanguage = .frFR,
+                 output: DictationOutput = .cleanup) async {
+        coordinator.keyDown(language: language, output: output)
         await finish()
     }
 
@@ -884,12 +950,14 @@ private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
 
 /// Answers a fixed text in two pieces, or throws. Counts its calls, so a
 /// test can prove "Raw" never asks a model anything, and keeps what each
-/// call was sent: the text to clean up, and the prompt it came with.
+/// call was sent: the text to clean up, the prompt it came with, and the
+/// room its answer was given.
 private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
     private let answer: Result<String, Error>
     private(set) var calls = 0
     private(set) var texts: [String] = []
     private(set) var systems: [String] = []
+    private(set) var budgets: [Int] = []
 
     init(_ answer: Result<String, Error>) { self.answer = answer }
 
@@ -900,6 +968,7 @@ private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
         calls += 1
         texts.append(text)
         systems.append(system)
+        budgets.append(maxTokens)
         let cleaned = try answer.get()
         let middle = cleaned.index(cleaned.startIndex, offsetBy: cleaned.count / 2)
         await onDelta(String(cleaned[..<middle]))
