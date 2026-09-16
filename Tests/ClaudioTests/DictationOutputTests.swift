@@ -115,6 +115,44 @@ final class DictationOutputTests: XCTestCase {
         XCTAssertTrue(prompt.contains("answer with their result only"), prompt)
     }
 
+    // MARK: - Where the text is going
+
+    /// A dictation always lands somewhere: whichever of the three the
+    /// shortcut asked for, the model is told the name of the app it is
+    /// writing into.
+    func testEveryOutputIsToldWhichAppTheTextIsGoingInto() {
+        AppSettings.language = .french
+        for output in DictationOutput.allCases {
+            let prompt = output.systemPrompt(keeping: [], pastedInto: "Slack")
+            XCTAssertTrue(prompt.contains("Ce texte sera collé dans Slack."), output.rawValue)
+        }
+    }
+
+    /// The destination sits after the whole composition and before the
+    /// vocabulary, which stays the last word whatever else is said.
+    func testTheDestinationSitsBetweenTheCompositionAndTheVocabulary() {
+        AppSettings.language = .french
+        let prompt = DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"],
+                                                              pastedInto: "Mail")
+
+        XCTAssertTrue(prompt.hasPrefix(DictationOutput.translateEN.systemPrompt(keeping: [])),
+                      prompt)
+        XCTAssertTrue(prompt.contains("Ce texte sera collé dans Mail."), prompt)
+        XCTAssertTrue(prompt.hasSuffix("« Okonoma »."), prompt)
+    }
+
+    /// An app with no name adds nothing at all: every output sends the prompt
+    /// it sent before there was a destination, byte for byte.
+    func testANamelessAppAddsNothingToAnyOutput() {
+        AppSettings.language = .french
+        for output in DictationOutput.allCases {
+            let prompt = output.systemPrompt(keeping: ["Okonoma"], pastedInto: "  ")
+            XCTAssertEqual(Array(prompt.utf8),
+                           Array(output.systemPrompt(keeping: ["Okonoma"]).utf8), output.rawValue)
+            XCTAssertFalse(prompt.contains("collé dans"), output.rawValue)
+        }
+    }
+
     // MARK: - The budget
 
     /// The cleanup keeps the budget it has always had.

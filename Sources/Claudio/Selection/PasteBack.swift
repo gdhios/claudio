@@ -10,6 +10,11 @@ struct PasteTarget {
     /// The clipboard as it was, put back after the paste. `nil` leaves the
     /// pasted text on it.
     var clipboard: PasteboardSnapshot?
+    /// That app's name as macOS shows it, `nil` when it has none. A snapshot
+    /// like the clipboard's, taken with the app itself: what a dictation is
+    /// cleaned up for — a Slack message, an email — is known here and nowhere
+    /// else by the time the model is asked.
+    var appName: String?
 }
 
 /// The one path that puts a text into another app: activate it, write the
@@ -25,8 +30,10 @@ enum PasteBack {
 
     /// Everything worth remembering before the panel opens.
     static func captureTarget() -> PasteTarget {
-        PasteTarget(app: frontmostApp(),
-                    clipboard: Constants.restoreClipboardAfterPaste ? PasteboardSnapshot.capture() : nil)
+        let app = frontmostApp()
+        return PasteTarget(app: app,
+                           clipboard: Constants.restoreClipboardAfterPaste ? PasteboardSnapshot.capture() : nil,
+                           appName: app?.localizedName)
     }
 
     /// Pastes into the target, and says whether anything could receive the

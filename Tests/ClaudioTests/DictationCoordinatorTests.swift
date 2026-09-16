@@ -268,6 +268,46 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.pasted, ["bonjour"])
     }
 
+    // MARK: - Where the dictation is going
+
+    /// A Slack message, an email and a prompt typed into a terminal are not
+    /// written the same way. The app that had focus when the key went down is
+    /// where the text will land, and the model is told its name — the name
+    /// alone, and it takes it from there.
+    func testTheModelIsToldWhichAppTheTextIsGoingInto() async {
+        let bench = Bench()
+        bench.targetAppName = "Slack"
+        await bench.dictate()
+
+        XCTAssertEqual(bench.client.systems,
+                       [DictationCleanup.systemPrompt(keeping: [], pastedInto: "Slack")])
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+    }
+
+    /// Whatever the shortcut turns the dictation into, it still lands in an
+    /// app: a translation is told where it is going too, and the spellings to
+    /// keep survive next to it.
+    func testAComposedOutputIsToldWhereTheTextIsGoingToo() async {
+        let bench = Bench(vocabulary: "Okonoma", answer: .success("Hello."))
+        bench.targetAppName = "Mail"
+        await bench.dictate(output: .translateEN)
+
+        XCTAssertEqual(bench.client.systems,
+                       [DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"],
+                                                                 pastedInto: "Mail")])
+    }
+
+    /// "Raw" asks no model anything, so there is nothing to tell: the
+    /// transcript is pasted as it was heard, app or no app.
+    func testRawIsToldNothingBecauseItAsksNoModel() async {
+        let bench = Bench(model: .raw)
+        bench.targetAppName = "Terminal"
+        await bench.dictate()
+
+        XCTAssertEqual(bench.client.calls, 0)
+        XCTAssertEqual(bench.pasted, ["bonjour"])
+    }
+
     // MARK: - Hands-free: a tap locks the microphone open
 
     /// Under 300 ms the key was tapped, not held. Holding a key through a
@@ -702,6 +742,10 @@ private final class Bench {
     /// The app that had focus when the key went down, `nil` when Claudio
     /// itself did and there is nowhere to paste.
     var targetApp: NSRunningApplication? = .current
+    /// That app's name, as the cleanup will be told it. `nil` by default —
+    /// an app macOS names nothing — so every other test here reads the prompt
+    /// of before there was a destination.
+    var targetAppName: String?
     /// Every model a client was asked for: empty proves nothing was asked.
     var clientRequests: [ModelChoice] = []
     /// What the settings hold right now. Changing it mid-dictation is how a
@@ -755,7 +799,9 @@ private final class Bench {
             },
             pasting: PasteService(
                 isAllowed: { true },
-                capture: { [weak self] in PasteTarget(app: self?.targetApp, clipboard: nil) },
+                capture: { [weak self] in
+                    PasteTarget(app: self?.targetApp, clipboard: nil, appName: self?.targetAppName)
+                },
                 paste: { [weak self] text, _ in
                     guard let self else { return false }
                     pasted.append(text)
