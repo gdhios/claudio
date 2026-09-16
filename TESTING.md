@@ -33,6 +33,7 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "
 | Auto-update (version comparison, `version.json` format) | update offered in a loop, or never again | `UpdateCheckerTests` — level 1 |
 | Screens build (panel, palette, Settings) | crash on opening a screen | level 2 |
 | Live contract with the Anthropic API | all of the above, in production | level 3 |
+| Dictation on a lone modifier key (a lone press told from a combination, left from right, guards) | ⌥( or ⌥⇧L opens a microphone and pauses the music, or right ⌥ never dictates | `LoneKeyGestureTests`, `LoneKeyRecordingTests`, `LoneModifierKeyTests` — level 1; the real keyboard in the checklist below |
 | Selection capture, simulated paste, clipboard restore, global shortcuts | the core gesture | not automatable (Accessibility permission, real session): checklist below |
 
 ## Manual checklist before a release (2 minutes)
@@ -48,6 +49,7 @@ On the local build of the committed work (`Scripts/build_app.sh`):
 7. Next display (needs two screens): snap a window to a half, then ⌃⌥⌘⇟ — it lands on the other screen **on the same half**, and pressing again cycles back. Same check with a maximized window.
 8. Recent dictations (Accessibility): after a dictation, click into another text field and pick the top row of the menu bar's Recent dictations — the same text pastes **at the cursor**. With Claudio's Settings window in front, the same row copies the text instead of pasting it.
 9. Music while dictating: with Spotify or Music playing, hold the dictation shortcut — playback pauses, and resumes once the key is released. Paused beforehand, it **stays paused** after the dictation. Same with a tapped dictation ended by the next press, and with Esc.
+10. Dictation on a lone key (Accessibility): in Settings → Shortcuts → Dictate, click the field, press right ⌥ and let go — the field shows “Right ⌥” (“⌥ droite” in French). In Notes, hold right ⌥, speak, release: the text is pasted, and the combination set before (⌃A, say) no longer dictates. Type ⌥⇧L with right ⌥ (“|” on AZERTY): the character is typed, no panel opens, the music keeps playing. Left ⌥ alone does nothing. Tap right ⌥ once: it listens hands-free; press it again: the text is pasted.
 
 ## Adding a feature means extending the net
 

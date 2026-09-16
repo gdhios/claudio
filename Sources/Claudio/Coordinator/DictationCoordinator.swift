@@ -193,6 +193,17 @@ final class DictationCoordinator {
     /// the paste writes it, and it never ran.
     func escape() { dismiss() }
 
+    /// A lone modifier key held to dictate turned out to be the start of a
+    /// combination: a key, another modifier or a click came while it was
+    /// down (⌥( types "{"). Cancelled like Esc — nothing pasted, nothing
+    /// remembered, the music back — but only while the key is what keeps the
+    /// microphone open. A dictation locked hands-free, or one already
+    /// finishing, was not started by this press, and carries on.
+    func cancelHeld() {
+        guard let session, session.phase == .listening, !session.isLocked else { return }
+        dismiss()
+    }
+
     /// A tap rather than a hold: holding a key through a long dictation is
     /// the hard part, so the microphone stays open without it. The words
     /// keep coming and the music stays paused; the next press finishes, Esc

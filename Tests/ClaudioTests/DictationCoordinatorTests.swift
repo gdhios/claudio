@@ -627,6 +627,76 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
+    // MARK: - A lone key that was a combination after all
+
+    /// Right ⌥ held alone long enough to dictate, then a key: it was ⌥( all
+    /// along. The microphone is cancelled, nothing is pasted or remembered,
+    /// the music comes back — and the release that follows finds nothing to
+    /// finish.
+    func testCancellingAHeldDictationKeepsNothing() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        await bench.readAnswered()
+
+        bench.coordinator.cancelHeld()
+        XCTAssertEqual(bench.engine.cancels, 1)
+        XCTAssertNil(bench.coordinator.session)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+
+        bench.hold(for: 1)
+        bench.coordinator.keyUp()
+        await bench.coordinator.cycle?.value
+        XCTAssertEqual(bench.engine.stops, 0)
+        XCTAssertTrue(bench.pasted.isEmpty)
+        XCTAssertTrue(bench.history.recents.entries.isEmpty)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+    }
+
+    /// Hands-free, the key is up: what is typed next is typing, and the
+    /// dictation listens on.
+    func testCancellingSparesALockedDictation() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+
+        bench.coordinator.cancelHeld()
+        XCTAssertTrue(bench.coordinator.session === session)
+        XCTAssertTrue(session.isLocked)
+        XCTAssertEqual(session.phase, .listening)
+        XCTAssertEqual(bench.engine.cancels, 0)
+        XCTAssertEqual(bench.media.commands, [.pause])
+    }
+
+    /// The press that finishes a locked dictation is held too, and a key
+    /// typed under it cancels nothing: the words were said, they get pasted.
+    func testCancellingSparesAFinishingDictation() async throws {
+        let bench = Bench()
+        let session = try await bench.lock()
+        bench.coordinator.keyDown(language: .frFR)
+        XCTAssertEqual(session.phase, .finishing)
+
+        bench.coordinator.cancelHeld()
+        XCTAssertEqual(bench.engine.cancels, 0)
+        await bench.cycleEnds()
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+    }
+
+    /// Released after a hold, same: finishing is past cancelling.
+    func testCancellingAfterTheReleaseStillPastes() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        await bench.readAnswered()
+        bench.hold(for: 1)
+        bench.coordinator.keyUp()
+
+        bench.coordinator.cancelHeld()
+        XCTAssertEqual(bench.coordinator.session?.phase, .finishing)
+        XCTAssertEqual(bench.engine.cancels, 0)
+        await bench.cycleEnds()
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+    }
+
     // MARK: - Presses that paste nothing
 
     /// Esc at any phase: the microphone is cancelled, the cycle is dropped,

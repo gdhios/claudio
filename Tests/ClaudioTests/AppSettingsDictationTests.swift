@@ -157,6 +157,20 @@ final class AppSettingsDictationTests: XCTestCase {
         XCTAssertEqual(AppSettings.dictationSecondaryOutput, .makePrompt)
     }
 
+    /// A shortcut dictates with its own language and output, whether it is
+    /// pressed as a key combination or as a lone key: both read them here.
+    func testEachShortcutReadsItsOwnLanguageAndOutput() {
+        AppSettings.dictationPrimaryLanguage = .enGB
+        AppSettings.dictationSecondaryLanguage = .deDE
+        AppSettings.dictationOutput = .makePrompt
+        AppSettings.dictationSecondaryOutput = .translateEN
+
+        XCTAssertEqual(DictationShortcut.dictate.language, .enGB)
+        XCTAssertEqual(DictationShortcut.dictate.output, .makePrompt)
+        XCTAssertEqual(DictationShortcut.dictateOtherLanguage.language, .deDE)
+        XCTAssertEqual(DictationShortcut.dictateOtherLanguage.output, .translateEN)
+    }
+
     /// An output written by a future version must not leave a shortcut
     /// without one: it falls back to the cleanup, the behaviour of before.
     func testAnUnknownOutputFallsBackToTheCleanup() {

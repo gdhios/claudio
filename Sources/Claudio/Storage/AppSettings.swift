@@ -248,6 +248,56 @@ enum AppSettings {
         }
     }
 
+    // MARK: - Dictation lone keys
+
+    /// Posted with the defaults written to, whenever a dictation shortcut's
+    /// lone key changes: the keyboard monitor and the Settings fields follow.
+    static let dictationLoneKeysDidChange = Notification.Name("ClaudioDictationLoneKeysDidChange")
+
+    private static func loneKeyStorageKey(for shortcut: DictationShortcut) -> String {
+        switch shortcut {
+        case .dictate: "dictationLoneKey"
+        case .dictateOtherLanguage: "dictationSecondaryLoneKey"
+        }
+    }
+
+    /// The modifier key a dictation shortcut is set to on its own, `nil` when
+    /// it is a key combination — or nothing. A key written by a future
+    /// version reads as none.
+    static func dictationLoneKey(for shortcut: DictationShortcut,
+                                 in defaults: UserDefaults = .standard) -> LoneModifierKey? {
+        defaults.string(forKey: loneKeyStorageKey(for: shortcut))
+            .flatMap(LoneModifierKey.init(rawValue:))
+    }
+
+    /// `nil` removes the storage key. A lone key serves one shortcut only:
+    /// given to this one, it is taken from the other. The shortcut's key
+    /// combination is Settings' to remove, through the library that stores it.
+    static func setDictationLoneKey(_ key: LoneModifierKey?,
+                                    for shortcut: DictationShortcut,
+                                    in defaults: UserDefaults = .standard) {
+        var changed = false
+        if let key {
+            for other in DictationShortcut.allCases
+            where other != shortcut && dictationLoneKey(for: other, in: defaults) == key {
+                defaults.removeObject(forKey: loneKeyStorageKey(for: other))
+                changed = true
+            }
+        }
+        let storageKey = loneKeyStorageKey(for: shortcut)
+        if defaults.string(forKey: storageKey) != key?.rawValue {
+            if let key {
+                defaults.set(key.rawValue, forKey: storageKey)
+            } else {
+                defaults.removeObject(forKey: storageKey)
+            }
+            changed = true
+        }
+        if changed {
+            NotificationCenter.default.post(name: dictationLoneKeysDidChange, object: defaults)
+        }
+    }
+
     /// The personal vocabulary, as typed in Settings: one entry per line,
     /// read by `DictationVocabulary`. Empty by default; blank removes the key.
     static var dictationVocabulary: String {

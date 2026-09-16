@@ -349,9 +349,24 @@ private struct OllamaPane: View {
 
 @MainActor
 private struct ShortcutsPane: View {
+    /// Where the dictation rows start, for the preview that scrolls to them.
+    private static let dictationRows = "dictationRows"
+
     @State private var windowShortcutsEnabled = AppSettings.windowShortcutsEnabled
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                .onAppear {
+                    // The dictation rows sit below the fold of a preview's
+                    // window, and nothing scrolls a preview but itself.
+                    guard !PreviewRun.dictationLoneKeys.isEmpty else { return }
+                    DispatchQueue.main.async { proxy.scrollTo(Self.dictationRows, anchor: .center) }
+                }
+        }
+    }
+
+    private var form: some View {
         Form {
             Section {
                 // At the top: the palette, which gives access to everything else.
@@ -393,20 +408,22 @@ private struct ShortcutsPane: View {
                               color: SettingsSection.dictation.color, size: 22)
                     Text(loc("Dicter", en: "Dictate"))
                     Spacer()
-                    KeyboardShortcuts.Recorder("", name: .dictate)
+                    // A key combination, or a right-hand modifier held alone.
+                    DictationShortcutField(shortcut: .dictate)
                 }
+                .id(Self.dictationRows)
                 HStack(spacing: 10) {
                     IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
                     Text(loc("Dicter dans l'autre langue",
                              en: "Dictate in the other language"))
                     Spacer()
-                    KeyboardShortcuts.Recorder("", name: .dictateOtherLanguage)
+                    DictationShortcutField(shortcut: .dictateOtherLanguage)
                 }
             } header: {
                 Text(SettingsSection.dictation.title)
             } footer: {
-                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
-                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. The languages and the cleanup model are set in the Dictation tab."))
+                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
+                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -32,7 +32,7 @@ Bring your own API key. Nothing goes through a third-party server: the app talks
 | ⌃⌥⌘R | Summarize |
 | ⌃⌥⌘L | Explain in plain words |
 | ⌃⌥⌘D | Free instruction ("translate to Spanish", "make it bullet points"…). Hold it to say the instruction instead of typing it |
-| ⌃⌥⌘Space | **Dictation**: hold, speak, release — the text lands at the cursor. Tap it to go hands-free |
+| ⌃⌥⌘Space | **Dictation**: hold, speak, release — the text lands at the cursor. Tap it to go hands-free. A right-hand modifier held alone, such as right ⌥, can replace it |
 
 The panel opens near the pointer and streams the result. **⏎** pastes it over the selection and restores the clipboard; **Esc** cancels; **⌘C** copies only. The source app keeps focus throughout. Shortcuts and system prompts are editable in Settings.
 

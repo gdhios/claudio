@@ -6,7 +6,7 @@ import SwiftUI
 /// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
 /// panel-free-unheard, panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
-/// palette-libre, settings, settings-dictation.
+/// palette-libre, settings, settings-dictation, settings-shortcuts-lone-key.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -17,6 +17,11 @@ import SwiftUI
 /// (TESTING.md, level 2).
 enum PreviewRun {
     static let isActive = CommandLine.arguments.contains("--preview")
+
+    /// The lone keys a preview shows on the dictation shortcuts: none unless
+    /// its mode sets one, and never this Mac's. A preview that sets one is
+    /// about those rows, and scrolls down to them.
+    @MainActor static var dictationLoneKeys: [DictationShortcut: LoneModifierKey] = [:]
 }
 
 @MainActor
@@ -64,6 +69,10 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         } else if mode == "settings-ollama" {
             settingsController.show(initialSection: .ollama)
         } else if mode == "settings-shortcuts" {
+            settingsController.show(initialSection: .shortcuts)
+        } else if mode == "settings-shortcuts-lone-key" {
+            // "Dictate" on right ⌥ held alone, the dictation rows in view.
+            PreviewRun.dictationLoneKeys = [.dictate: .rightOption]
             settingsController.show(initialSection: .shortcuts)
         } else if mode == "settings-dictation" {
             // The pane freezes its own history and its model list behind

@@ -169,6 +169,16 @@ extension ClaudioAction {
     }
 }
 
+extension DictationShortcut {
+    /// Its key combination, when it isn't set to a lone key.
+    var name: KeyboardShortcuts.Name {
+        switch self {
+        case .dictate: .dictate
+        case .dictateOtherLanguage: .dictateOtherLanguage
+        }
+    }
+}
+
 extension ClaudioRequest {
     /// Same for the free action, which isn't a catalog entry.
     @MainActor
@@ -255,6 +265,10 @@ enum HotkeySetup {
         }
     }
 
+    /// Listens for the dictation shortcuts set to a lone key. Kept for the
+    /// life of the app, like the handlers the library keeps.
+    private static var loneKeyMonitor: LoneKeyMonitor?
+
     /// Dictation: the other shortcuts that act on the key going down as well
     /// as coming up — pressed is "listen", released is "paste what I said".
     /// Installed apart from the actions above because it drives its own
@@ -262,20 +276,17 @@ enum HotkeySetup {
     /// are set to: the language they listen in, and what they turn it into.
     /// Both are read on the press, never mid-dictation.
     static func installDictation(coordinator: DictationCoordinator) {
-        let shortcuts: [(KeyboardShortcuts.Name, @MainActor () -> (DictationLanguage, DictationOutput))] = [
-            (.dictate, { (AppSettings.dictationPrimaryLanguage, AppSettings.dictationOutput) }),
-            (.dictateOtherLanguage,
-             { (AppSettings.dictationSecondaryLanguage, AppSettings.dictationSecondaryOutput) }),
-        ]
-        for (name, settings) in shortcuts {
-            KeyboardShortcuts.onKeyDown(for: name) { [weak coordinator] in
-                let (language, output) = settings()
-                coordinator?.keyDown(language: language, output: output)
+        for shortcut in DictationShortcut.allCases {
+            KeyboardShortcuts.onKeyDown(for: shortcut.name) { [weak coordinator] in
+                coordinator?.keyDown(language: shortcut.language, output: shortcut.output)
             }
-            KeyboardShortcuts.onKeyUp(for: name) { [weak coordinator] in
+            KeyboardShortcuts.onKeyUp(for: shortcut.name) { [weak coordinator] in
                 coordinator?.keyUp()
             }
         }
+        // The same two on a modifier key held alone, which the library can't
+        // register: the key is watched instead, and only while one is set.
+        loneKeyMonitor = LoneKeyMonitor(coordinator: coordinator)
     }
 
     /// Registers or unregisters the window shortcuts as a group and persists
