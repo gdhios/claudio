@@ -51,13 +51,18 @@ enum DictationOutput: String, CaseIterable, Sendable {
 
     /// The system prompt of the one call: the dictation preamble, then — for
     /// anything but the cleanup — the action's prompt as a second step, then
-    /// the spellings to keep, which stay last as they always have.
+    /// the app the text is heading into, then the spellings to keep, which
+    /// stay last as they always have. The destination is added where the
+    /// vocabulary is, so all three outputs get it for free.
     /// `.cleanup` composes nothing: its prompt is the preamble, to the byte.
     func systemPrompt(keeping terms: [String],
+                      pastedInto app: String? = nil,
                       preamble: String = DictationCleanup.systemPrompt) -> String {
-        guard let action else { return DictationCleanup.systemPrompt(keeping: terms, base: preamble) }
+        guard let action else {
+            return DictationCleanup.systemPrompt(keeping: terms, pastedInto: app, base: preamble)
+        }
         let composed = preamble + "\n\n" + Self.secondStep + "\n\n" + action.system
-        return DictationCleanup.systemPrompt(keeping: terms, base: composed)
+        return DictationCleanup.systemPrompt(keeping: terms, pastedInto: app, base: composed)
     }
 
     /// The paragraph that joins the two: without it the model reads two

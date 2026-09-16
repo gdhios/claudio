@@ -274,7 +274,13 @@ final class DictationCoordinator {
         var cleaned: String?
         if session.model != .raw {
             session.phase = .cleaning
-            cleaned = await cleanUp(raw, keeping: vocabulary.terms, session: session)
+            // Where the text is heading was captured on the press, with the
+            // app itself: a Slack message and an email aren't cleaned up the
+            // same way, and only the model can tell how.
+            cleaned = await cleanUp(raw,
+                                    keeping: vocabulary.terms,
+                                    pastedInto: target?.appName,
+                                    session: session)
             guard self.session === session, !Task.isCancelled else { return }
         }
 
@@ -308,8 +314,12 @@ final class DictationCoordinator {
     /// none: the transcript is then what gets pasted, and the panel says why.
     /// What the dictation becomes — cleaned up, translated, turned into a
     /// prompt — is the session's output: one call, whichever it is.
-    /// `terms` are the spellings the model is told to keep.
-    private func cleanUp(_ raw: String, keeping terms: [String], session: DictationSession) async -> String? {
+    /// `terms` are the spellings the model is told to keep, `app` the name of
+    /// the one the text is about to land in.
+    private func cleanUp(_ raw: String,
+                         keeping terms: [String],
+                         pastedInto app: String?,
+                         session: DictationSession) async -> String? {
         guard let client = client(session.model) else {
             session.note = pastedWithoutCleanup(loc("clé API manquante", en: "no API key"))
             return nil
@@ -317,7 +327,7 @@ final class DictationCoordinator {
         do {
             let result = try await client.streamCompletion(
                 of: raw,
-                system: session.output.systemPrompt(keeping: terms),
+                system: session.output.systemPrompt(keeping: terms, pastedInto: app),
                 maxTokens: session.output.maxTokens(forRawLength: raw.count)
             ) { @MainActor piece in
                 session.appendCleaned(piece)

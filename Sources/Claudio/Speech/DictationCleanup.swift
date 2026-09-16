@@ -64,18 +64,38 @@ enum DictationCleanup {
     /// The effective prompt: the one edited in Settings, otherwise the code's.
     static var systemPrompt: String { AppSettings.dictationSystemPrompt ?? defaultSystemPrompt }
 
-    /// The prompt sent with a transcript: `base`, then — when the vocabulary
-    /// has terms — one instruction naming them, since a model that has never
-    /// seen "Lapacompris" corrects it. Added after a prompt edited in Settings
-    /// as well: the vocabulary is a setting of its own, and editing the
-    /// prompt shouldn't quietly switch it off. No terms: `base`, to the byte.
+    /// The prompt sent with a transcript: `base`, then the app the text is
+    /// heading into when it is known, then — when the vocabulary has terms —
+    /// one instruction naming them, since a model that has never seen
+    /// "Lapacompris" corrects it. Both are added after a prompt edited in
+    /// Settings as well: each is a setting of its own, and editing the prompt
+    /// shouldn't quietly switch them off. The vocabulary stays last, where it
+    /// has always been. Nothing to add: `base`, to the byte.
     static func systemPrompt(keeping terms: [String],
+                             pastedInto app: String? = nil,
                              base: String = DictationCleanup.systemPrompt) -> String {
-        guard !terms.isEmpty else { return base }
+        var prompt = base
+        if let destination = destinationClause(for: app) { prompt += "\n\n" + destination }
+        guard !terms.isEmpty else { return prompt }
         let list = terms.map { loc("« \($0) »", en: "“\($0)”") }.joined(separator: ", ")
-        return base + "\n\n" + loc(
+        return prompt + "\n\n" + loc(
             "Vocabulaire : quand l'un de ces noms ou termes apparaît, écris-le exactement comme dans cette liste : \(list).",
             en: "Vocabulary: whenever one of these names or terms appears, spell it exactly as in this list: \(list).")
+    }
+
+    /// The one sentence that says where the text is going. The same cleanup
+    /// serves a Slack message, an email and a prompt typed into a terminal:
+    /// the model knows what those are, so it is given the app's name and
+    /// nothing else — no rule per app, no list to keep up to date.
+    /// `nil` when there is nowhere to paste or macOS names the app nothing:
+    /// the prompt is then the one of before, to the byte.
+    private static func destinationClause(for app: String?) -> String? {
+        // An app's name is a file name, and anyone can name one: flattened to
+        // a single line, it can never become a line of the prompt itself.
+        guard let name = app?.split(whereSeparator: \.isWhitespace).joined(separator: " "),
+              !name.isEmpty else { return nil }
+        return loc("Ce texte sera collé dans \(name).",
+                   en: "This text will be pasted into \(name).")
     }
 
     /// Output budget for the cleanup, in tokens, from the raw transcript's
