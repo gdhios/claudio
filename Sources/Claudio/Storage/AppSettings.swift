@@ -157,14 +157,22 @@ enum AppSettings {
     private static let dictationOutputKey = "dictationOutput"
     private static let dictationSecondaryOutputKey = "dictationSecondaryOutput"
 
+    private static let dictationPausesMediaKey = "dictationPausesMedia"
+    /// "Mute other apps", which pausing replaced. No longer written, still
+    /// read: whoever switched it off keeps dictation away from their sound.
     private static let dictationMutesOutputKey = "dictationMutesOutput"
 
-    /// Silence the other apps while the dictation shortcut is held. On by
-    /// default: dictating over music is what it's for, and the sound comes
-    /// back on release.
-    static var dictationMutesOutput: Bool {
-        get { UserDefaults.standard.object(forKey: dictationMutesOutputKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: dictationMutesOutputKey) }
+    /// Pause whatever is playing while dictation listens, and resume it when
+    /// the microphone closes. On by default — dictating over music is what
+    /// it's for — unless muting had been switched off before it.
+    static var dictationPausesMedia: Bool {
+        get {
+            let defaults = UserDefaults.standard
+            return defaults.object(forKey: dictationPausesMediaKey) as? Bool
+                ?? defaults.object(forKey: dictationMutesOutputKey) as? Bool
+                ?? true
+        }
+        set { UserDefaults.standard.set(newValue, forKey: dictationPausesMediaKey) }
     }
 
     /// Language of the "Dictate" shortcut. Missing or unknown value (a

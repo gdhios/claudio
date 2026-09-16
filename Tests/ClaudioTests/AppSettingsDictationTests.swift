@@ -9,7 +9,8 @@ final class AppSettingsDictationTests: XCTestCase {
 
     private static let keys = ["dictationPrimaryLanguage", "dictationSecondaryLanguage",
                                "dictationModel", "dictationSystemPrompt", "dictationMutesOutput",
-                               "dictationVocabulary", "dictationOutput", "dictationSecondaryOutput"]
+                               "dictationPausesMedia", "dictationVocabulary", "dictationOutput",
+                               "dictationSecondaryOutput"]
 
     private var saved: [String: Any] = [:]
 
@@ -97,10 +98,39 @@ final class AppSettingsDictationTests: XCTestCase {
     }
 
     /// On until switched off: dictating over music is the case it exists for.
-    func testMutingOtherAppsIsOnByDefaultAndRemembered() {
-        XCTAssertTrue(AppSettings.dictationMutesOutput)
-        AppSettings.dictationMutesOutput = false
-        XCTAssertFalse(AppSettings.dictationMutesOutput)
+    func testPausingMediaIsOnByDefaultAndRemembered() {
+        XCTAssertTrue(AppSettings.dictationPausesMedia)
+        AppSettings.dictationPausesMedia = false
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "dictationPausesMedia") as? Bool, false)
+        XCTAssertFalse(AppSettings.dictationPausesMedia)
+    }
+
+    /// Whoever switched off "Mute other apps" didn't want dictation to touch
+    /// their sound: the pause that replaces it starts off for them too.
+    func testMutingSwitchedOffBeforeKeepsPausingOff() {
+        UserDefaults.standard.set(false, forKey: "dictationMutesOutput")
+        XCTAssertFalse(AppSettings.dictationPausesMedia)
+    }
+
+    /// Muting left on, or chosen on, is no opt-out: the pause is on.
+    func testMutingLeftOnKeepsPausingOn() {
+        UserDefaults.standard.set(true, forKey: "dictationMutesOutput")
+        XCTAssertTrue(AppSettings.dictationPausesMedia)
+    }
+
+    /// The old choice is only a default. Once the new toggle is set, it
+    /// decides — both ways — and the old key is left as it was: a storage
+    /// key is never renamed or deleted.
+    func testTheNewSettingWinsOverTheOldOne() {
+        UserDefaults.standard.set(false, forKey: "dictationMutesOutput")
+        AppSettings.dictationPausesMedia = true
+        XCTAssertTrue(AppSettings.dictationPausesMedia)
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "dictationMutesOutput") as? Bool, false)
+
+        UserDefaults.standard.set(true, forKey: "dictationMutesOutput")
+        AppSettings.dictationPausesMedia = false
+        XCTAssertFalse(AppSettings.dictationPausesMedia)
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "dictationMutesOutput") as? Bool, true)
     }
 
     /// Empty until something is typed. The text is kept as typed, line

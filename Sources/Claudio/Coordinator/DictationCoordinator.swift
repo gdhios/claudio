@@ -17,8 +17,8 @@ final class DictationCoordinator {
 
     /// How long a dictation locked by a tap listens before finishing by
     /// itself, as the next press would have. A tap nobody follows up would
-    /// otherwise keep the microphone open, and the other apps quiet, for as
-    /// long as Claudio runs.
+    /// otherwise keep the microphone open, and the music paused, for as long
+    /// as Claudio runs.
     nonisolated static let longestLockedDictation: Duration = .seconds(5 * 60)
 
     /// How long a panel that has nothing left to do but speak stays on
@@ -50,8 +50,8 @@ final class DictationCoordinator {
     private let microphone: MicrophoneGate
     private let makePanel: PanelMaker
     private let history: DictationHistory
-    private let silencer: OutputSilencer
-    private let mutesOutput: @MainActor () -> Bool
+    private let pauser: MediaPauser
+    private let pausesMedia: @MainActor () -> Bool
     private let durations: MessageDurations
     /// `longestLockedDictation`, unless a test can't wait five minutes.
     private let lockedLimit: Duration
@@ -83,8 +83,8 @@ final class DictationCoordinator {
          microphone: MicrophoneGate = .system,
          panel: @escaping PanelMaker = DictationCoordinator.systemPanel,
          history: DictationHistory = .shared,
-         silencer: OutputSilencer = .system,
-         mutesOutput: @escaping @MainActor () -> Bool = { AppSettings.dictationMutesOutput },
+         pauser: MediaPauser = MediaPauser(),
+         pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
          durations: MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          now: @escaping @MainActor () -> Date = Date.init) {
@@ -96,8 +96,8 @@ final class DictationCoordinator {
         self.microphone = microphone
         self.makePanel = panel
         self.history = history
-        self.silencer = silencer
-        self.mutesOutput = mutesOutput
+        self.pauser = pauser
+        self.pausesMedia = pausesMedia
         self.durations = durations
         self.lockedLimit = lockedLimit
         self.now = now
@@ -166,12 +166,13 @@ final class DictationCoordinator {
         // Settings says by the time the key comes up.
         let vocabulary = self.vocabulary()
         panel = makePanel(session, self)
-        // Music talking over the voice is what makes dictation hard: the
-        // other apps go quiet for as long as the microphone listens.
-        if mutesOutput() { silencer.silence() }
         cycle = Task { [weak self] in
             await self?.listen(session: session, vocabulary: vocabulary)
         }
+        // Music talking over the voice is what makes dictation hard: what
+        // plays pauses for as long as the microphone listens. Asked after the
+        // microphone was sent on its way, which never waits for the answer.
+        if pausesMedia() { pauser.pause() }
     }
 
     /// Key up: the microphone closes and the engine gets to say its last
@@ -194,8 +195,8 @@ final class DictationCoordinator {
 
     /// A tap rather than a hold: holding a key through a long dictation is
     /// the hard part, so the microphone stays open without it. The words
-    /// keep coming and the other apps stay quiet; the next press finishes,
-    /// Esc cancels, and the limit finishes it if neither comes.
+    /// keep coming and the music stays paused; the next press finishes, Esc
+    /// cancels, and the limit finishes it if neither comes.
     private func lock(_ session: DictationSession) {
         session.isLocked = true
         let limit = lockedLimit
@@ -214,9 +215,9 @@ final class DictationCoordinator {
         lockTimer = nil
         session.phase = .finishing
         engine.stop()
-        // After the microphone has closed, so the returning sound is never
-        // heard as speech. The cleanup doesn't need silence.
-        silencer.restore()
+        // After the microphone has closed, so the music coming back is never
+        // heard as speech. The cleanup and the paste don't need silence.
+        pauser.resume()
     }
 
     // MARK: - The cycle
@@ -238,8 +239,8 @@ final class DictationCoordinator {
                 // The message is read, not acted on: nothing was heard, so
                 // the panel says why and closes itself like an empty one.
                 session.fail(with: error)
-                // The panel stays up to be read; the sound doesn't wait for it.
-                silencer.restore()
+                // The panel stays up to be read; the music doesn't wait for it.
+                pauser.resume()
                 closeAfter(durations.failure, session: session)
                 return
             }
@@ -254,10 +255,10 @@ final class DictationCoordinator {
     /// clean up, remember, paste.
     private func finish(session: DictationSession, vocabulary: DictationVocabulary) async {
         // The stream is over, so is the microphone. A release or a press
-        // gave the sound back already; an engine that stopped by itself —
+        // resumed the music already; an engine that stopped by itself —
         // likelier minutes into a locked dictation — didn't, and the panel
         // may stay up with a text that has nowhere to go.
-        silencer.restore()
+        pauser.resume()
         let heard = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !heard.isEmpty else {
             // A silence, a press on nothing: said rather than pasted.
@@ -420,10 +421,10 @@ final class DictationCoordinator {
         permission = nil
         // Only a dictation under way has a microphone to close.
         if session != nil { engine.cancel() }
-        // Every way out of a dictation ends here or in `finishListening(_:)`:
-        // the sound comes back whatever happened. Harmless when nothing was
-        // silenced.
-        silencer.restore()
+        // Every way out of a dictation ends here or in `finishListening(_:)`,
+        // quitting included: what was paused resumes whatever happened, and
+        // nothing does when nothing was.
+        pauser.resume()
         panel?.orderOut(nil)
         panel = nil
         session = nil

@@ -47,6 +47,7 @@ On the local build of the committed work (`Scripts/build_app.sh`):
 6. Window snapping (Accessibility): with another app's window frontmost, ⌃⌥⌘ + arrows (halves), ↩ (maximize), and 7/9/1/3 (corners) / 5 (center) — from the top row **and** the numeric keypad. Toggling "Move windows from the keyboard" off in Settings → Shortcuts stops the snapping and frees all these keys.
 7. Next display (needs two screens): snap a window to a half, then ⌃⌥⌘⇟ — it lands on the other screen **on the same half**, and pressing again cycles back. Same check with a maximized window.
 8. Recent dictations (Accessibility): after a dictation, click into another text field and pick the top row of the menu bar's Recent dictations — the same text pastes **at the cursor**. With Claudio's Settings window in front, the same row copies the text instead of pasting it.
+9. Music while dictating: with Spotify or Music playing, hold the dictation shortcut — playback pauses, and resumes once the key is released. Paused beforehand, it **stays paused** after the dictation. Same with a tapped dictation ended by the next press, and with Esc.
 
 ## Adding a feature means extending the net
 

@@ -23,7 +23,7 @@ struct DictationPane: View {
         ? DictationOutput.translateEN : AppSettings.dictationSecondaryOutput
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
-    @State private var mutesOutput = PreviewRun.isActive ? true : AppSettings.dictationMutesOutput
+    @State private var pausesMedia = PreviewRun.isActive ? true : AppSettings.dictationPausesMedia
     @State private var vocabularyText = PreviewRun.isActive
         ? DictationPane.frozenVocabulary : AppSettings.dictationVocabulary
     @State private var promptText = PreviewRun.isActive
@@ -149,13 +149,14 @@ struct DictationPane: View {
 
     private var whileDictating: some View {
         Section {
-            Toggle(loc("Couper le son des autres apps", en: "Mute other apps"), isOn: $mutesOutput)
-                .onChange(of: mutesOutput) { AppSettings.dictationMutesOutput = mutesOutput }
+            Toggle(loc("Mettre la musique en pause pendant la dictée", en: "Pause music while dictating"),
+                   isOn: $pausesMedia)
+                .onChange(of: pausesMedia) { AppSettings.dictationPausesMedia = pausesMedia }
         } header: {
             Text(loc("Pendant la dictée", en: "While dictating"))
         } footer: {
-            Text(loc("La musique et les vidéos se taisent tant que Claudio écoute, et reprennent dès qu'il a fini.",
-                     en: "Music and videos go quiet for as long as Claudio listens, and come back as soon as it stops."))
+            Text(loc("La musique reprend dès que Claudio a fini d'écouter ; ce qui était déjà en pause y reste.",
+                     en: "Music resumes as soon as Claudio stops listening; anything already paused stays paused."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

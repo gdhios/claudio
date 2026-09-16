@@ -36,12 +36,12 @@ struct SpokenInstructionPanel {
 /// instruction is spoken, then applied to the selection the press captured.
 ///
 /// `DictationCoordinator`'s counterpart — same engine, same vocabulary, same
-/// silence around it — except the words are an instruction, not a text: they
+/// pause around it — except the words are an instruction, not a text: they
 /// are used as heard, no model is asked to tidy them, and what streams back
 /// is an ordinary free action.
 ///
 /// Everything that touches the outside world arrives through `init`: the
-/// engine, the panel, the microphone, the sound, the clock.
+/// engine, the panel, the microphone, the music, the clock.
 @MainActor
 final class SpokenInstructionCoordinator {
     /// What the key going down started, and so what its release has to do.
@@ -61,8 +61,8 @@ final class SpokenInstructionCoordinator {
     private let language: @MainActor () -> DictationLanguage
     private let vocabulary: @MainActor () -> DictationVocabulary
     private let microphone: MicrophoneGate
-    private let silencer: OutputSilencer
-    private let mutesOutput: @MainActor () -> Bool
+    private let pauser: MediaPauser
+    private let pausesMedia: @MainActor () -> Bool
     private let durations: DictationCoordinator.MessageDurations
     private let now: @MainActor () -> Date
 
@@ -89,8 +89,8 @@ final class SpokenInstructionCoordinator {
              DictationVocabulary(parsing: AppSettings.dictationVocabulary)
          },
          microphone: MicrophoneGate = .system,
-         silencer: OutputSilencer = .system,
-         mutesOutput: @escaping @MainActor () -> Bool = { AppSettings.dictationMutesOutput },
+         pauser: MediaPauser = MediaPauser(),
+         pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
          durations: DictationCoordinator.MessageDurations = .standard,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
@@ -98,8 +98,8 @@ final class SpokenInstructionCoordinator {
         self.language = language
         self.vocabulary = vocabulary
         self.microphone = microphone
-        self.silencer = silencer
-        self.mutesOutput = mutesOutput
+        self.pauser = pauser
+        self.pausesMedia = pausesMedia
         self.durations = durations
         self.now = now
     }
@@ -131,12 +131,13 @@ final class SpokenInstructionCoordinator {
         // replacements and the words all get this one, whatever Settings
         // says by the time the key comes up.
         let vocabulary = self.vocabulary()
-        // Music talking over the voice is what makes an instruction hard to
-        // hear: the other apps go quiet for as long as the microphone listens.
-        if mutesOutput() { silencer.silence() }
         cycle = Task { [weak self] in
             await self?.listen(session: session, vocabulary: vocabulary)
         }
+        // Music talking over the voice is what makes an instruction hard to
+        // hear: what plays pauses for as long as the microphone listens. A tap
+        // is over before the answer comes, and then nothing is paused at all.
+        if pausesMedia() { pauser.pause() }
     }
 
     /// Key up: held, the microphone closes and the engine gets to say its
@@ -171,7 +172,8 @@ final class SpokenInstructionCoordinator {
     }
 
     /// The panel went away — Esc, another shortcut, the free action starting
-    /// over: whatever was listening stops, and the sound comes back with it.
+    /// over, Claudio quitting: whatever was listening stops, and the music it
+    /// paused resumes.
     /// Idempotent, and never closes anything itself: it is called from the
     /// closing.
     func cancel() {
@@ -185,9 +187,9 @@ final class SpokenInstructionCoordinator {
         permission = nil
         // Only an instruction under way has a microphone to close.
         if session != nil { engine.cancel() }
-        // Every way out ends here or in `finishListening(_:)`: the sound
-        // comes back whatever happened. Harmless when nothing was silenced.
-        silencer.restore()
+        // Every way out ends here or in `finishListening(_:)`: what was paused
+        // resumes whatever happened, and nothing does when nothing was.
+        pauser.resume()
         session = nil
     }
 
@@ -206,9 +208,9 @@ final class SpokenInstructionCoordinator {
         press = .none
         session.listeningEnded = true
         engine.stop()
-        // After the microphone has closed, so the returning sound is never
+        // After the microphone has closed, so the music coming back is never
         // heard as part of the instruction.
-        silencer.restore()
+        pauser.resume()
     }
 
     // MARK: - The cycle
@@ -229,8 +231,8 @@ final class SpokenInstructionCoordinator {
             case .level(let level):
                 session.levels = session.levels.adding(level)
             case .failed(let error):
-                // The panel stays up to be read; the sound doesn't wait for it.
-                silencer.restore()
+                // The panel stays up to be read; the music doesn't wait for it.
+                pauser.resume()
                 giveUp(reason: error.localizedDescription, session: session)
                 return
             }
@@ -246,8 +248,8 @@ final class SpokenInstructionCoordinator {
     /// is asked to clean it up — an instruction is read, not pasted.
     private func finish(session: CorrectionSession, vocabulary: DictationVocabulary) {
         // The stream is over, so is the microphone: an engine that stopped
-        // by itself never gave the sound back.
-        silencer.restore()
+        // by itself never resumed the music.
+        pauser.resume()
         let heard = session.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !heard.isEmpty else {
             // A silence, a key held on nothing: said rather than run.

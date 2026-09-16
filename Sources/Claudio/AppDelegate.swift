@@ -37,9 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
-        // A crash mid-dictation leaves every app silent: the tap outlives
-        // its process. The next launch gives the sound back.
-        SystemAudioMute.removeLeftovers()
+        // Earlier builds muted the other apps with a tap that outlives a
+        // crash, and every app with it: a launch gives the sound back.
+        LeftoverMuteTaps.remove()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.showUpdateMenuItem(feed)
@@ -52,10 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// Quitting while the key is held: the sound comes back with the app
-    /// gone, not at the next launch.
+    /// Quitting mid-dictation — easy once a tap has locked it: the music
+    /// Claudio paused resumes with the app gone, rather than staying off.
     func applicationWillTerminate(_ notification: Notification) {
-        SystemAudioMute.shared.restore()
+        dictation.dismiss()
+        spokenInstruction.cancel()
     }
 
     /// Invisible main menu (app .accessory): without an Edit menu, macOS

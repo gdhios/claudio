@@ -51,65 +51,195 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.transcript, "bon")
     }
 
-    // MARK: - The other apps' sound
+    // MARK: - What was playing
 
-    /// Music playing while dictating goes quiet the moment the key goes
-    /// down, and comes back on release — after the microphone has closed,
-    /// so the returning sound is never heard as speech.
-    func testOtherAppsAreSilencedWhileTheKeyIsHeld() async {
+    /// Music talking over the voice is what makes dictation hard: whatever
+    /// plays is paused while the key is down, and resumed on release — after
+    /// the microphone has closed, so the music coming back is never heard as
+    /// speech, and before the paste, which doesn't need silence.
+    func testWhatPlaysPausesWhileTheKeyIsHeldAndResumesOnRelease() async {
         let bench = Bench()
         bench.coordinator.keyDown(language: .frFR)
-        await bench.settle { bench.engine.starts == 1 }
-        XCTAssertTrue(bench.silenced)
+        await bench.settle { bench.media.commands == [.pause] }
+        XCTAssertEqual(bench.media.commands, [.pause])
 
         bench.hold(for: 1)
         bench.coordinator.keyUp()
-        XCTAssertFalse(bench.silenced)
-        XCTAssertEqual(bench.stopsWhenSoundCameBack, [1])
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        XCTAssertEqual(bench.media.microphoneClosesAtResume, [1])
+        XCTAssertTrue(bench.pasted.isEmpty)
 
         await bench.coordinator.cycle?.value
-        XCTAssertEqual(bench.silenceCount, 1)
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        XCTAssertEqual(bench.media.reads, 1)
     }
 
-    func testEscapeBringsTheSoundBack() async {
+    /// Nothing playing, nothing sent: above all no play at the end, which
+    /// would start music that was paused before anyone dictated.
+    func testNothingPlayingSendsNoCommandAtAll() async {
+        let bench = Bench(playing: false)
+        await bench.dictate()
+        XCTAssertEqual(bench.media.reads, 1)
+        XCTAssertEqual(bench.media.commands, [])
+    }
+
+    /// The microphone never waits for the state: it opens on the press, the
+    /// read still out, and the pause follows whenever the answer comes.
+    func testTheMicrophoneOpensWithoutWaitingForTheRead() async {
+        let bench = Bench(readsWait: true)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 && bench.media.reads == 1 }
+        XCTAssertEqual(bench.engine.starts, 1)
+        XCTAssertEqual(bench.media.commands, [])
+
+        bench.media.answerRead()
+        await bench.pauser.read?.value
+        XCTAssertEqual(bench.media.commands, [.pause])
+        bench.coordinator.escape()
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+    }
+
+    /// Over before the state was read — Esc on the spot: the answer finds the
+    /// microphone closed, and nothing is paused for it. Music that went on
+    /// playing needs no resume.
+    func testAReadAnsweredAfterTheEndPausesNothing() async {
+        let bench = Bench(readsWait: true)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 && bench.media.reads == 1 }
+        let read = bench.pauser.read
+        bench.coordinator.escape()
+
+        bench.media.answerRead()
+        await read?.value
+        XCTAssertEqual(bench.media.reads, 1)
+        XCTAssertEqual(bench.media.commands, [])
+    }
+
+    /// Same for a microphone that fails the moment it opens.
+    func testAReadAnsweredAfterAnImmediateFailurePausesNothing() async {
+        let bench = Bench(events: [.failed(.microphoneDenied)], readsWait: true)
+        bench.coordinator.keyDown(language: .frFR)
+        let read = bench.pauser.read
+        await bench.coordinator.cycle?.value
+
+        bench.media.answerRead()
+        await read?.value
+        XCTAssertEqual(bench.media.commands, [])
+    }
+
+    /// A late answer belongs to the press that asked. The next dictation has
+    /// its own read, and only that one pauses anything.
+    func testALateReadNeverPausesForTheNextDictation() async {
+        let bench = Bench(readsWait: true)
+        bench.coordinator.keyDown(language: .frFR)
+        let first = bench.pauser.read
+        await bench.settle { bench.engine.starts == 1 && bench.media.reads == 1 }
+        bench.coordinator.escape()
+        bench.coordinator.keyDown(language: .frFR)
+        let second = bench.pauser.read
+        await bench.settle { bench.engine.starts == 2 && bench.media.reads == 2 }
+
+        bench.media.answerRead()
+        await first?.value
+        XCTAssertEqual(bench.media.commands, [])
+
+        bench.media.answerRead()
+        await second?.value
+        XCTAssertEqual(bench.media.commands, [.pause])
+        bench.coordinator.escape()
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+    }
+
+    /// Esc resumes what the press paused, and a second one — or the panel
+    /// closing, or quitting, which all end in the same place — resumes
+    /// nothing more.
+    func testEscapeResumesExactlyOnce() async {
         let bench = Bench()
         bench.coordinator.keyDown(language: .frFR)
-        await bench.settle { bench.engine.starts == 1 }
+        await bench.settle { bench.media.commands == [.pause] }
+
         bench.coordinator.escape()
-        XCTAssertFalse(bench.silenced)
+        bench.coordinator.escape()
+        bench.coordinator.dismiss()
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        XCTAssertEqual(bench.media.microphoneClosesAtResume, [1])
     }
 
-    /// A tap locks the dictation rather than dropping it: still under way,
-    /// so the music stays off with the key up.
-    func testATapKeepsTheOtherAppsQuietWhileItListens() async throws {
+    /// A tap locks the dictation rather than dropping it: still listening,
+    /// so the music stays paused with the key up.
+    func testATapKeepsTheMusicPausedWhileItListens() async throws {
         let bench = Bench()
         try await bench.lock()
-        XCTAssertTrue(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause])
     }
 
     /// A dictation that fails keeps its panel up for a few seconds to be
-    /// read; the sound doesn't wait for it to close.
-    func testAFailureBringsTheSoundBackAtOnce() async {
-        let bench = Bench(events: [.failed(.microphoneDenied)])
+    /// read; the music doesn't wait for it to close, and its closing resumes
+    /// nothing more.
+    func testAFailureResumesAtOnceAndOnlyOnce() async throws {
+        let bench = Bench(durations: .init(empty: .milliseconds(50), failure: .milliseconds(50)))
         bench.coordinator.keyDown(language: .frFR)
-        await bench.coordinator.cycle?.value
-        XCTAssertNotNil(bench.coordinator.session)
-        XCTAssertFalse(bench.silenced)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { bench.media.commands == [.pause] }
+
+        bench.engine.say(.failed(.recognizer("timeout")))
+        await bench.cycleEnds()
+        XCTAssertEqual(session.phase,
+                       .error(SpeechEngineError.recognizer("timeout").localizedDescription))
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+
+        await bench.wait { bench.coordinator.session == nil }
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
-    func testNothingIsSilencedWhenTheSettingIsOff() async {
-        let bench = Bench(mutesOutput: false)
+    /// Nothing heard is an end like any other: resumed once, not again when
+    /// "Nothing heard" leaves the screen.
+    func testNothingHeardResumesOnce() async throws {
+        let bench = Bench(events: [.partial("  "), .final("   ")],
+                          durations: .init(empty: .milliseconds(50), failure: .milliseconds(50)))
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.finish()
+        XCTAssertEqual(session.phase, .empty)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+
+        await bench.wait { bench.coordinator.session == nil }
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+    }
+
+    /// A press during a dictation starts a fresh one: the first resumes what
+    /// it paused, and the second reads the state for itself.
+    func testANewPressResumesThenReadsAgain() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.media.commands == [.pause] }
+
+        bench.coordinator.keyDown(language: .enUS)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        await bench.pauser.read?.value
+        XCTAssertEqual(bench.media.reads, 2)
+        XCTAssertEqual(bench.media.commands, [.pause, .play, .pause])
+    }
+
+    /// Switched off in Settings: the state isn't even read, and nothing is
+    /// ever sent.
+    func testWithTheSettingOffNothingIsReadNorSent() async {
+        let bench = Bench(pausesMedia: false)
         await bench.dictate()
-        XCTAssertEqual(bench.silenceCount, 0)
+        bench.coordinator.escape()
+        XCTAssertEqual(bench.media.reads, 0)
+        XCTAssertEqual(bench.media.commands, [])
     }
 
     /// A press that only asks for the microphone listens to nothing, so it
-    /// has no business silencing anything.
-    func testNothingIsSilencedWhileAskingForTheMicrophone() async {
+    /// has no business pausing anything.
+    func testNothingIsReadWhileAskingForTheMicrophone() async {
         let bench = Bench(microphoneGranted: false)
         bench.coordinator.keyDown(language: .frFR)
         await bench.coordinator.permission?.value
-        XCTAssertEqual(bench.silenceCount, 0)
+        XCTAssertEqual(bench.media.reads, 0)
+        XCTAssertEqual(bench.media.commands, [])
     }
 
     /// The engine is started in the session's language, which is the
@@ -348,7 +478,7 @@ final class DictationCoordinatorTests: XCTestCase {
     }
 
     /// The press after a tap is the release a hold would have had: the
-    /// microphone closes, the sound comes back behind it, and the cleaned-up
+    /// microphone closes, the music resumes behind it, and the cleaned-up
     /// text is pasted — the same way out as a hold, phase for phase.
     func testTheNextPressFinishesALockedDictationAndPastes() async throws {
         let bench = Bench()
@@ -358,14 +488,17 @@ final class DictationCoordinatorTests: XCTestCase {
         bench.coordinator.keyDown(language: .frFR)
         XCTAssertEqual(bench.engine.stops, 1)
         XCTAssertEqual(bench.engine.cancels, 0)
-        XCTAssertFalse(bench.silenced)
-        XCTAssertEqual(bench.stopsWhenSoundCameBack, [1])
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        XCTAssertEqual(bench.media.microphoneClosesAtResume, [1])
         await bench.cycleEnds()
 
         XCTAssertEqual(log.phases, [.listening, .finishing, .cleaning, .pasting])
         XCTAssertEqual(bench.pasted, ["Bonjour."])
         XCTAssertEqual(bench.engine.starts, 1)
         XCTAssertNil(bench.coordinator.session)
+        // The release of that press, the paste and the panel closing: still
+        // the one resume.
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
     /// Either shortcut ends a locked dictation. The other one's press
@@ -404,11 +537,11 @@ final class DictationCoordinatorTests: XCTestCase {
 
     /// Esc on a locked dictation is Esc as ever: the microphone cancelled,
     /// nothing pasted or remembered, and the music back.
-    func testEscapeCancelsALockedDictationAndBringsTheSoundBack() async throws {
+    func testEscapeCancelsALockedDictationAndResumesTheMusic() async throws {
         let bench = Bench()
         let session = try await bench.lock()
         XCTAssertTrue(session.isLocked)
-        XCTAssertTrue(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause])
 
         bench.coordinator.escape()
 
@@ -417,12 +550,12 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertTrue(bench.pasted.isEmpty)
         XCTAssertTrue(bench.history.recents.entries.isEmpty)
         XCTAssertNil(bench.coordinator.session)
-        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
     /// A tap nobody follows up doesn't listen forever: past the limit, the
     /// dictation finishes as if pressed again — pasted, not dropped — and the
-    /// sound comes back with it.
+    /// music resumes with it.
     func testALockedDictationFinishesByItselfAtItsLimit() async throws {
         let bench = Bench(lockedLimit: .milliseconds(5))
         try await bench.lock()
@@ -431,7 +564,8 @@ final class DictationCoordinatorTests: XCTestCase {
         await bench.cycleEnds()
 
         XCTAssertEqual(bench.pasted, ["Bonjour."])
-        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
+        XCTAssertEqual(bench.media.microphoneClosesAtResume, [1])
     }
 
     /// The limit belongs to the dictation that locked. Once that one has
@@ -460,12 +594,12 @@ final class DictationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(session.phase, .empty)
         XCTAssertTrue(bench.pasted.isEmpty)
-        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
     /// The engine giving up minutes into a locked dictation shows why, and
-    /// gives the sound back at once.
-    func testAFailureWhileLockedBringsTheSoundBack() async throws {
+    /// resumes the music at once.
+    func testAFailureWhileLockedResumesTheMusic() async throws {
         let bench = Bench()
         let session = try await bench.lock()
 
@@ -474,14 +608,14 @@ final class DictationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(session.phase,
                        .error(SpeechEngineError.recognizer("timeout").localizedDescription))
-        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
     /// Minutes of listening leave the engine time to end a locked dictation
-    /// before any press does. Its microphone is closed then, so the sound
-    /// comes back — even when the text has nowhere to go and the panel stays
-    /// up with it.
-    func testWhenTheEngineEndsALockedDictationTheSoundComesBack() async throws {
+    /// before any press does. Its microphone is closed then, so the music
+    /// resumes — even when the text has nowhere to go and the panel stays up
+    /// with it.
+    func testWhenTheEngineEndsALockedDictationTheMusicResumes() async throws {
         let bench = Bench()
         bench.targetApp = nil
         let session = try await bench.lock()
@@ -490,7 +624,7 @@ final class DictationCoordinatorTests: XCTestCase {
         await bench.cycleEnds()
 
         XCTAssertEqual(session.phase, .done)
-        XCTAssertFalse(bench.silenced)
+        XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
     // MARK: - Presses that paste nothing
@@ -759,12 +893,11 @@ private final class Bench {
     var explanations = 0
     /// How many panels were put on screen: nothing is heard without one.
     var panels = 0
-    /// Whether the other apps are silenced right now, and how many times
-    /// they were. `stopsWhenSoundCameBack` is the microphone's state each
-    /// time the sound returned: it must already be closed.
-    private(set) var silenced = false
-    private(set) var silenceCount = 0
-    private(set) var stopsWhenSoundCameBack: [Int] = []
+    /// What plays on the Mac, and the pauser the coordinator tells about
+    /// each listening: the commands land in the first, the read under way is
+    /// the second's.
+    let media: FakeMediaPlayback
+    let pauser: MediaPauser
 
     private var clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
     /// The prompts still waiting for an answer, when the bench holds them
@@ -778,13 +911,20 @@ private final class Bench {
          hasClient: Bool = true,
          microphoneGranted: Bool = true,
          promptsWait: Bool = false,
-         mutesOutput: Bool = true,
+         playing: Bool = true,
+         readsWait: Bool = false,
+         pausesMedia: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation) {
         self.microphoneGranted = microphoneGranted
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
-        engine = FakeSpeechEngine(events)
+        let engine = FakeSpeechEngine(events)
+        self.engine = engine
         client = FakeStreamClient(answer)
+        let media = FakeMediaPlayback(playing: playing, readsWait: readsWait)
+        media.microphoneCloses = { engine.stops + engine.cancels }
+        self.media = media
+        pauser = MediaPauser(playback: media.playback)
         history = DictationHistory(
             defaults: UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
         )
@@ -824,18 +964,8 @@ private final class Bench {
                 return nil
             },
             history: history,
-            silencer: OutputSilencer(
-                silence: { [weak self] in
-                    self?.silenced = true
-                    self?.silenceCount += 1
-                },
-                restore: { [weak self] in
-                    guard let self, silenced else { return }
-                    silenced = false
-                    stopsWhenSoundCameBack.append(engine.stops + engine.cancels)
-                }
-            ),
-            mutesOutput: { mutesOutput },
+            pauser: pauser,
+            pausesMedia: { pausesMedia },
             durations: durations,
             lockedLimit: lockedLimit,
             now: { [weak self] in self?.clock ?? .distantPast }
@@ -868,6 +998,7 @@ private final class Bench {
         coordinator.keyDown(language: language)
         let session = try XCTUnwrap(coordinator.session)
         await settle { engine.starts == starts + 1 }
+        await readAnswered()
         hold(for: 0.1)
         coordinator.keyUp()
         return session
@@ -892,9 +1023,17 @@ private final class Bench {
     /// Releases a press already under way and waits for the cycle to end.
     func finish() async {
         await settle { engine.starts == 1 }
+        await readAnswered()
         hold(for: 1)
         coordinator.keyUp()
         await coordinator.cycle?.value
+    }
+
+    /// Lets the press's read answer, as it does within a real hold — unless
+    /// the test answers it by hand.
+    func readAnswered() async {
+        guard !media.readsWait else { return }
+        await pauser.read?.value
     }
 
     /// Lets the coordinator's task run. Everything here is on the main actor
