@@ -18,13 +18,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// for the life of the app: the hold shortcuts hold a weak reference to
     /// it, and the microphone only opens on a press.
     private let dictation = DictationCoordinator(engine: AppleSpeechEngine())
+    /// The free action's own microphone: its shortcut held speaks the
+    /// instruction instead of typing it. Its own engine, because a dictation
+    /// and an instruction are two microphones that never open together.
+    private lazy var spokenInstruction = SpokenInstructionCoordinator(
+        engine: AppleSpeechEngine(),
+        panel: .freeAction(coordinator)
+    )
     private let settingsController = SettingsWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
+        // A panel gone is a microphone that has nothing left to listen for:
+        // Esc, another shortcut or a paste all end a spoken instruction.
+        coordinator.onDismiss = { [weak self] in self?.spokenInstruction.cancel() }
         setupMainMenu()
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)
+        HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
         // A crash mid-dictation leaves every app silent: the tap outlives
         // its process. The next launch gives the sound back.

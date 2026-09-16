@@ -381,8 +381,8 @@ private struct ShortcutsPane: View {
             } header: {
                 Text(loc("Raccourcis globaux", en: "Global shortcuts"))
             } footer: {
-                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne à appliquer au moment du déclenchement.",
-                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it."))
+                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire.",
+                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
