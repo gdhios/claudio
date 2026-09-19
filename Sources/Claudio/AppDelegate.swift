@@ -95,6 +95,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         streamDeck.stop()
     }
 
+    /// The `claudio://` links: how the plugin, and the download page, send
+    /// someone straight to the tab that matters instead of describing where
+    /// it hides. The scheme is declared in the built app's Info.plist, so a
+    /// `swift run` never receives one; what a link means is decided by the
+    /// parser, and a link Claudio doesn't understand opens nothing.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            switch ClaudioURL.parse(url) {
+            case .settings(let section):
+                settingsController.show(initialSection: section)
+            case nil:
+                continue
+            }
+        }
+    }
+
     // MARK: - The Stream Deck tab
 
     /// Settings' Stream Deck tab, hooked to the real bridge: it shows what
