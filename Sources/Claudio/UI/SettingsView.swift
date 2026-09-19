@@ -56,15 +56,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    @State private var selection: SettingsSection?
+    /// The tab, owned outside the view: whoever opens Settings a second time
+    /// on another tab has to be obeyed by the window already on screen.
+    @ObservedObject private var selection: SettingsSelection
 
-    init(initialSection: SettingsSection = .general) {
-        _selection = State(initialValue: initialSection)
+    init(selection: SettingsSelection) {
+        _selection = ObservedObject(wrappedValue: selection)
     }
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsSection.allCases, selection: $selection) { section in
+            List(SettingsSection.allCases, selection: selection.sidebar) { section in
                 Label {
                     Text(section.title)
                 } icon: {
@@ -75,7 +77,7 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            switch selection ?? .general {
+            switch selection.section {
             case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
