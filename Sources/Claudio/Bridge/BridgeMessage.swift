@@ -179,6 +179,9 @@ enum BridgeOutbound: Equatable, Encodable {
 
 /// Why the server turned a connection away. Both are fatal to it: the
 /// message is there to be read in a log, not acted on.
-enum BridgeErrorCode: String, Codable {
+///
+/// An `Error` as well as a wire value: refusing a handshake is what the
+/// server's door hands back, and it hands back nothing else.
+enum BridgeErrorCode: String, Codable, Error {
     case version, token
 }
