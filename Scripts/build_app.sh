@@ -162,7 +162,43 @@ if [ "${NOTARIZE:-0}" = "1" ]; then
     ditto -c -k --keepParent "$APP" "$SHARE_ZIP"
     echo "✅ $SHARE_ZIP ready to share (unzip into /Applications, double-click)."
 else
+    # Same identity as the published build whenever the certificate is here.
+    # macOS pins the Microphone and Accessibility grants to the signature, not
+    # to the path: signing a local build with anything else makes it a
+    # different app, the grants stop working and their now-dead rows can only
+    # be removed by hand, password each time — once on the way to the local
+    # build, once more on the way back from the next release. Same identity,
+    # same hardened runtime, same entitlements as the notarized path above:
+    # the designated requirement is then identical and the grants hold across
+    # every rebuild. Notarization is what is skipped here, and it has no say
+    # in the requirement.
+    if [ -z "${DEV_ID_IDENTITY:-}" ]; then
+        DEV_ID_IDENTITY=$(security find-identity -v -p codesigning \
+            | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+    fi
+    if [ -n "$DEV_ID_IDENTITY" ]; then
+        echo "→ Developer ID signature (same one the published build carries)…"
+        # No secure timestamp: it costs a network round trip, only notarization
+        # needs it, and it isn't part of the designated requirement.
+        codesign --force --sign "$DEV_ID_IDENTITY" --options runtime --timestamp=none \
+            --entitlements "Scripts/Claudio.entitlements" "$APP"
+        codesign --verify --strict "$APP"
+        # Hardened, the microphone is refused to a signature that doesn't ask
+        # for it, whatever System Settings says. Caught here rather than on the
+        # first press.
+        codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "com.apple.security.device.audio-input" \
+            || { echo "❌ The signature lacks the audio-input entitlement: dictation would be refused."; exit 1; }
+        echo "   Identity: $DEV_ID_IDENTITY"
+        touch "$APP"
+        /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" >/dev/null 2>&1 || true
+        echo "✅ $APP ready. Launch with: open \"$APP\""
+        exit 0
+    fi
+
     echo "→ Local signature…"
+    echo "⚠️  No \"Developer ID Application\" certificate: this build won't match"
+    echo "    the published one, so macOS will ask for the microphone and"
+    echo "    Accessibility again, and the dead rows must be removed by hand."
     # Direct attempt: a self-signed certificate works even flagged
     # CSSMERR_TP_NOT_TRUSTED (which `find-identity -v` wouldn't list).
     if codesign --force --sign "$SIGN_IDENTITY" "$APP" 2>/dev/null; then
