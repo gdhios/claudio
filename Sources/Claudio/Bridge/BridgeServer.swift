@@ -36,6 +36,9 @@ final class BridgeServer {
     private(set) var port: UInt16?
     var onReady: ((UInt16) -> Void)?
     var onClientCountChange: ((Int) -> Void)?
+    /// The listener gave up. Whoever published the way in is the one that
+    /// has to take it back: this file knows nothing of a handshake file.
+    var onFailure: (() -> Void)?
 
     /// How many plugins are actually connected: a connection counts once it
     /// has said `hello`, not before.
@@ -89,9 +92,11 @@ final class BridgeServer {
             // before the listener answers is a plugin knocking on nothing.
             onReady?(port)
         case .failed:
-            // Nothing to publish and nothing to answer with. Before `.ready`
-            // — the ordinary failure — no handshake file was ever written.
+            // Nothing left to answer with. Said out loud, because a failure
+            // after `.ready` leaves a handshake file pointing at a port
+            // nobody is on — and only the facade can take that back.
             stop()
+            onFailure?()
         default:
             break
         }

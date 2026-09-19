@@ -43,6 +43,24 @@ final class StreamDeckBridge {
     }
     var onStatusChange: ((Status) -> Void)?
 
+    /// True once the handshake file names a port that is listening: before
+    /// that there is nothing for a plugin to find.
+    private var isPublished = false
+    private var clientCount = 0
+
+    /// The status from the two facts that decide it. A rule rather than an
+    /// assignment in three places: closing the last connection reports a
+    /// count of zero on the way out, and a bridge being switched off must
+    /// not flash "waiting for the plugin" before it says "off".
+    nonisolated static func status(published: Bool, clients: Int) -> Status {
+        guard published else { return .off }
+        return clients > 0 ? .connected(clients: clients) : .waiting
+    }
+
+    private func refreshStatus() {
+        status = Self.status(published: isPublished, clients: clientCount)
+    }
+
     init(dispatcher: BridgeDispatcher,
          handshake: BridgeHandshakeFile = .init(),
          appVersion: String = StreamDeckBridge.bundleVersion) {
@@ -79,11 +97,17 @@ final class StreamDeckBridge {
             } catch {
                 return stop()
             }
-            status = .waiting
+            isPublished = true
+            refreshStatus()
         }
         server.onClientCountChange = { [weak self] count in
-            self?.status = count > 0 ? .connected(clients: count) : .waiting
+            guard let self else { return }
+            clientCount = count
+            refreshStatus()
         }
+        // The socket can give up on its own, long after it was published:
+        // the handshake file then has to go, and it is this side's.
+        server.onFailure = { [weak self] in self?.stop() }
 
         self.publisher = publisher
         self.server = server
@@ -97,11 +121,17 @@ final class StreamDeckBridge {
 
     /// Says goodbye, closes the socket and takes the handshake file away.
     func stop() {
+        // Off before any of that: closing the last connection announces a
+        // count of zero on the way out, and whoever watches the status has
+        // to see one move, not "waiting" and then "off".
+        isPublished = false
+        clientCount = 0
+        refreshStatus()
+
         server?.stop()
         server = nil
         publisher = nil
         handshake.remove()
-        status = .off
     }
 
     // MARK: - What it watches
