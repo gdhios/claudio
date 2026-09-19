@@ -16,6 +16,11 @@ final class BridgeServer {
     /// How long a fresh connection has to say `hello`. A socket held open
     /// saying nothing is not a plugin.
     static let handshakeTimeout: Duration = .seconds(2)
+    /// How many connections are held at once, those still to say `hello`
+    /// included. A Stream Deck runs one plugin, and its property inspector
+    /// may hold a second: sixteen is far past anyone's use, and it keeps
+    /// something looping on connect from eating the app's descriptors.
+    static let maximumClients = 16
 
     private let token: String
     private let onCommand: (BridgeInbound) -> Void
@@ -122,8 +127,9 @@ final class BridgeServer {
 
     private func accept(_ connection: NWConnection) {
         // Stopped between the listener's handoff and this hop: nothing left
-        // to be a client of.
-        guard listener != nil else {
+        // to be a client of. Past the cap, the answer is the same — turned
+        // away at the door rather than given a timer and a buffer.
+        guard listener != nil, clients.count < Self.maximumClients else {
             connection.cancel()
             return
         }
