@@ -41,10 +41,13 @@ enum BridgeFixtures {
     static func assertEncoding(_ value: some Encodable, matches name: String,
                                file: StaticString = #filePath, line: UInt = #line) throws {
         let encoded = try JSONEncoder().encode(value)
-        let got = normalized(try object(in: encoded))
-        let expected = normalized(try object(name))
-        XCTAssertEqual(got as? NSDictionary, expected as? NSDictionary,
+        XCTAssertEqual(normalized(try object(in: encoded)),
+                       normalized(try object(name)),
                        "\(name).json", file: file, line: line)
+    }
+
+    private static func normalized(_ object: [String: Any]) -> NSDictionary {
+        object.mapValues(normalized) as NSDictionary
     }
 
     /// Numbers are compared on their value, not on their spelling: a `Float`
@@ -52,9 +55,7 @@ enum BridgeFixtures {
     /// Six decimals is far more than a microphone level ever needs. Booleans
     /// and nulls are left alone.
     private static func normalized(_ value: Any) -> Any {
-        if let object = value as? [String: Any] {
-            return object.mapValues(normalized) as NSDictionary
-        }
+        if let object = value as? [String: Any] { return normalized(object) }
         if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
             return NSNumber(value: (number.doubleValue * 1_000_000).rounded() / 1_000_000)
         }

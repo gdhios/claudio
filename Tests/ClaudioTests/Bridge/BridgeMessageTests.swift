@@ -197,6 +197,16 @@ final class BridgeMessageTests: XCTestCase {
         XCTAssertTrue(object["label"] is NSNull)
     }
 
+    /// The state reads back out of the frame it was written into, flat keys
+    /// and all: what the plugin's own parser goes looking for is there.
+    func testAStateFrameReadsBackAsTheStateItCarries() throws {
+        XCTAssertEqual(try BridgeFixtures.decode(BridgeState.self, from: "state-idle"), .idle)
+        XCTAssertEqual(
+            try BridgeFixtures.decode(BridgeState.self, from: "state-dictation-cleaning-locked"),
+            BridgeState(gaze: .veille, activity: .dictation,
+                        phase: "cleaning", label: "Nettoyage…", locked: true))
+    }
+
     func testTheMicrophoneLevel() throws {
         try BridgeFixtures.assertEncoding(BridgeOutbound.level(0.42), matches: "level")
     }

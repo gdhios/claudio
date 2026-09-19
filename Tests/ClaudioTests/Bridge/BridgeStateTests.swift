@@ -93,7 +93,7 @@ final class BridgeStateTests: XCTestCase {
     /// A phase carrying a message sends its name, never the message: the
     /// plugin shows a face, and the sentence belongs to the panel.
     func testAPhaseWithAMessageSendsItsNameOnly() {
-        let failed = BridgeState(correction: correction(.error("le réseau a lâché")),
+        let failed = BridgeState(correction: correction(.error("the network gave up")),
                                  dictation: nil)
         XCTAssertEqual(failed.phase, "error")
         XCTAssertEqual(failed.label, nil)
