@@ -27,8 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let settingsController = SettingsWindowController()
     /// The Stream Deck bridge, and the one place a key press becomes a
-    /// gesture. Built lazily and started only when it is wanted: a Mac
-    /// without the plugin never opens a socket.
+    /// gesture. Only ever started when the plugin is there, or when Settings
+    /// asks for it: a Mac with neither never opens a socket.
     private lazy var streamDeck = StreamDeckBridge(dispatcher: BridgeDispatcher(
         triggerAction: { [weak self] action in self?.coordinator.trigger(action: action) },
         triggerFree: { [weak self] in self?.coordinator.triggerFreeAction() },

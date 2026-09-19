@@ -63,6 +63,10 @@ final class BridgeServer {
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         let websocket = NWProtocolWebSocket.Options()
         websocket.autoReplyPing = true
+        // Refused by the stack rather than buffered whole and thrown away
+        // here. The check on the frame below stays all the same: this is a
+        // setting, not a guarantee.
+        websocket.maximumMessageSize = Self.maximumFrameSize
         parameters.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
 
         let listener = try NWListener(using: parameters)
@@ -150,7 +154,8 @@ final class BridgeServer {
 
     private func received(_ data: Data?, context: NWConnection.ContentContext?,
                           error: NWError?, on client: Client) {
-        guard error == nil, isLive(client) else {
+        guard isLive(client) else { return }  // dropped while this was in flight
+        guard error == nil else {
             drop(client)
             return
         }
@@ -255,7 +260,7 @@ final class BridgeServer {
     /// or bytes that are no frame at all: there is nothing in those to read
     /// a version from, so they are strangers rather than old plugins.
     nonisolated static func admit(firstFrame: Data,
-                                 token: String) -> Result<Void, BridgeErrorCode> {
+                                  token: String) -> Result<Void, BridgeErrorCode> {
         guard let message = try? JSONDecoder().decode(BridgeInbound.self, from: firstFrame),
               case .hello(let version, let sent, _) = message else {
             return .failure(.token)
