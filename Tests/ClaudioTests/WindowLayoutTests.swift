@@ -84,3 +84,32 @@ final class WindowLayoutTests: XCTestCase {
         XCTAssertEqual(got.height, 1000, accuracy: 0.01)
     }
 }
+
+// MARK: - Wire values
+
+/// The raw values travel: the Stream Deck plugin names a layout with the
+/// string it reads here. They are frozen, and listed one by one on purpose —
+/// a loop over `allCases` would follow a rename without a word.
+extension WindowLayoutTests {
+    func testRawValuesAreTheWireNames() {
+        XCTAssertEqual(WindowLayout.leftHalf.rawValue, "leftHalf")
+        XCTAssertEqual(WindowLayout.rightHalf.rawValue, "rightHalf")
+        XCTAssertEqual(WindowLayout.topHalf.rawValue, "topHalf")
+        XCTAssertEqual(WindowLayout.bottomHalf.rawValue, "bottomHalf")
+        XCTAssertEqual(WindowLayout.topLeft.rawValue, "topLeft")
+        XCTAssertEqual(WindowLayout.topRight.rawValue, "topRight")
+        XCTAssertEqual(WindowLayout.bottomLeft.rawValue, "bottomLeft")
+        XCTAssertEqual(WindowLayout.bottomRight.rawValue, "bottomRight")
+        XCTAssertEqual(WindowLayout.maximize.rawValue, "maximize")
+        XCTAssertEqual(WindowLayout.center.rawValue, "center")
+    }
+
+    /// A case added without a line above would slip through the list.
+    func testEveryLayoutIsListedAmongTheWireNames() {
+        XCTAssertEqual(WindowLayout.allCases.count, 10)
+    }
+
+    func testAnUnknownWireNameIsNoLayout() {
+        XCTAssertNil(WindowLayout(rawValue: "nextScreen"))
+    }
+}
