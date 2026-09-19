@@ -29,7 +29,7 @@ struct StreamDeckPane: View {
             HStack(alignment: .top, spacing: 12) {
                 IconBadge(systemName: SettingsSection.streamDeck.symbolName,
                           color: SettingsSection.streamDeck.color)
-                Text(loc("Le plugin Stream Deck pilote Claudio depuis vos touches : actions, dictée, fenêtres, et la tête de Claudio quand il attend.",
+                Text(loc("Le plugin Stream Deck pilote Claudio depuis tes touches : actions, dictée, fenêtres, et la tête de Claudio quand il attend.",
                          en: "The Stream Deck plugin drives Claudio from your keys: actions, dictation, windows, and Claudio's face while he waits."))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -66,8 +66,8 @@ struct StreamDeckPane: View {
         } header: {
             Text(loc("État", en: "Status"))
         } footer: {
-            Text(loc("Installer le plugin suffit : Claudio ouvre alors un point d'écoute local, réservé à lui, que rien d'autre ne peut joindre. L'interrupteur n'est là que pour forcer la main — à couper, ou à garder ouvert pour un plugin rangé ailleurs.",
-                     en: "Installing the plugin is the whole setup: Claudio then opens a local listening point, his own, that nothing else can reach. The switch is only there to force the matter — off, or open for a plugin kept somewhere else."))
+            Text(loc("Installer le plugin suffit : Claudio ouvre alors un point d'écoute local, jamais exposé au réseau. L'interrupteur n'est là que pour forcer la main — à couper, ou à garder ouvert pour un plugin rangé ailleurs.",
+                     en: "Installing the plugin is the whole setup: Claudio then opens a local listening point, never exposed to the network. The switch is only there to force the matter — off, or open for a plugin kept somewhere else."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
