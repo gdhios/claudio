@@ -122,6 +122,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             StreamDeckStatusModel.shared.status = status
         }
         model.refresh = { [weak self] in self?.refreshStreamDeckSettings() }
+        // A window that never closed shows a tab that never reappears: the
+        // look for the plugin is taken again every time Settings comes up,
+        // not only when the tab is built.
+        settingsController.selection.onShown = { [weak self] in self?.refreshStreamDeckSettings() }
         model.applyChoice = { [weak self] choice in self?.applyStreamDeckChoice(choice) }
         refreshStreamDeckSettings()
     }

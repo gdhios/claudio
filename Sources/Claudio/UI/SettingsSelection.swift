@@ -9,6 +9,20 @@ import SwiftUI
 final class SettingsSelection: ObservableObject {
     @Published var section: SettingsSection = .general
 
+    /// Called each time Settings is brought up. A pane that reads this Mac
+    /// gets a fresh look even when the window never closed: the Stream Deck
+    /// tab looks for the plugin's folder, and a plugin installed while that
+    /// tab sat there would otherwise keep being reported absent.
+    var onShown: (() -> Void)?
+
+    /// Settings is being brought up — on a named tab, or wherever it was
+    /// left. Named means named: the tab moves whether the window is being
+    /// built or has been open for an hour.
+    func broughtUp(on section: SettingsSection?) {
+        if let section { self.section = section }
+        onShown?()
+    }
+
     /// What the sidebar binds to. Two-way, because clicking a row is what
     /// moves the tab the rest of the time; and a sidebar that ends up with
     /// nothing selected — a ⌘-click on the selected row — leaves the tab

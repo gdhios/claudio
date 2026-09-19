@@ -35,6 +35,36 @@ final class SettingsSelectionTests: XCTestCase {
         XCTAssertEqual(selection.sidebar.wrappedValue, .prompts)
     }
 
+    /// Settings brought up on a named tab: the tab moves, and the panes that
+    /// read this Mac are told to look again. The Stream Deck tab is the one
+    /// that needs it — the plugin may have been installed in the meantime,
+    /// and a window that never closed would keep saying "plugin absent".
+    func testBringingSettingsUpOnATabMovesItAndAsksForAFreshLook() {
+        let selection = SettingsSelection()
+        var looks = 0
+        selection.onShown = { looks += 1 }
+
+        selection.broughtUp(on: .streamDeck)
+        XCTAssertEqual(selection.section, .streamDeck)
+        XCTAssertEqual(looks, 1)
+
+        selection.broughtUp(on: .streamDeck)
+        XCTAssertEqual(looks, 2)
+    }
+
+    /// Brought up with nothing named — the menu's own entry: the tab stays
+    /// where it was, and the fresh look is asked for all the same.
+    func testBringingSettingsUpWithNoTabNamedLeavesItWhereItWas() {
+        let selection = SettingsSelection()
+        selection.section = .dictation
+        var looks = 0
+        selection.onShown = { looks += 1 }
+
+        selection.broughtUp(on: nil)
+        XCTAssertEqual(selection.section, .dictation)
+        XCTAssertEqual(looks, 1)
+    }
+
     /// A sidebar can end up with nothing selected — a ⌘-click on the row
     /// that was selected. The tab stays where it was rather than the window
     /// emptying itself.

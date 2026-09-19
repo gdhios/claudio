@@ -12,6 +12,7 @@ final class SettingsWindowController {
     /// Opens Settings where it was left. The menu's own entry: someone
     /// reopening Settings means to come back, not to be sent to the top.
     func show() {
+        selection.broughtUp(on: nil)
         present()
     }
 
@@ -20,7 +21,7 @@ final class SettingsWindowController {
     /// the tab moves whether the window is being built or has been open for
     /// an hour, which is the case the plugin's own way out depends on.
     func show(initialSection: SettingsSection) {
-        selection.section = initialSection
+        selection.broughtUp(on: initialSection)
         present()
     }
 
