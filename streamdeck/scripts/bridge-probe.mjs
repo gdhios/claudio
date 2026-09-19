@@ -70,12 +70,22 @@ function send(frame) {
   socket.send(JSON.stringify(frame));
 }
 
+/** Whether the bridge ever answered: it tells the two failures apart. */
+let opened = false;
+
 socket.addEventListener("open", () => {
+  opened = true;
   send({ type: "hello", v: PROTOCOL_VERSION, token, plugin: "probe" });
   for (const frame of pending.splice(0)) send(frame);
 });
 socket.addEventListener("message", (event) => console.log(`← ${event.data}`));
 socket.addEventListener("error", () => {
+  // Claudio closing its side is no failure of the probe's: it quit, or the
+  // bridge was switched off in Settings. A socket that never opened is.
+  if (opened) {
+    console.log("— Claudio closed the bridge.");
+    process.exit(0);
+  }
   console.error(`Nothing listening on 127.0.0.1:${port}.`);
   process.exit(1);
 });
