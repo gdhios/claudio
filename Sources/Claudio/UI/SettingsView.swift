@@ -353,6 +353,7 @@ private struct ShortcutsPane: View {
     private static let dictationRows = "dictationRows"
 
     @State private var windowShortcutsEnabled = AppSettings.windowShortcutsEnabled
+    @State private var dictationEnabled = AppSettings.dictationEnabled()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -403,6 +404,11 @@ private struct ShortcutsPane: View {
             }
 
             Section {
+                Toggle(loc("Activer la dictée", en: "Enable dictation"),
+                       isOn: $dictationEnabled)
+                    .onChange(of: dictationEnabled) {
+                        HotkeySetup.setDictationEnabled(dictationEnabled)
+                    }
                 HStack(spacing: 10) {
                     IconBadge(systemName: SettingsSection.dictation.symbolName,
                               color: SettingsSection.dictation.color, size: 22)
@@ -412,6 +418,7 @@ private struct ShortcutsPane: View {
                     DictationShortcutField(shortcut: .dictate)
                 }
                 .id(Self.dictationRows)
+                .disabled(!dictationEnabled)
                 HStack(spacing: 10) {
                     IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
                     Text(loc("Dicter dans l'autre langue",
@@ -419,11 +426,12 @@ private struct ShortcutsPane: View {
                     Spacer()
                     DictationShortcutField(shortcut: .dictateOtherLanguage)
                 }
+                .disabled(!dictationEnabled)
             } header: {
                 Text(SettingsSection.dictation.title)
             } footer: {
-                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
-                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab."))
+                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée. Décochée, la dictée rend les deux touches à tes autres outils.",
+                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab. Switched off, dictation releases both keys and leaves them to your other tools."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

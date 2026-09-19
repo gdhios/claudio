@@ -699,6 +699,21 @@ final class DictationCoordinatorTests: XCTestCase {
 
     // MARK: - Presses that paste nothing
 
+    /// Dictation switched off in the Settings: a press that still gets
+    /// through opens no panel and no microphone. The shortcuts are
+    /// unregistered too, but the coordinator refuses on its own so a lone
+    /// key or a stale registration can't dictate behind the switch.
+    func testADisabledDictationHearsNothing() {
+        let bench = Bench(enabled: false)
+
+        bench.coordinator.keyDown(language: .frFR)
+
+        XCTAssertNil(bench.coordinator.session)
+        XCTAssertEqual(bench.engine.starts, 0)
+        XCTAssertEqual(bench.panels, 0)
+        XCTAssertTrue(bench.pasted.isEmpty)
+    }
+
     /// Esc at any phase: the microphone is cancelled, the cycle is dropped,
     /// nothing is pasted. The clipboard is untouched because the only path
     /// that writes it is the paste, which never ran.
@@ -984,6 +999,7 @@ private final class Bench {
          playing: Bool = true,
          readsWait: Bool = false,
          pausesMedia: Bool = true,
+         enabled: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation) {
         self.microphoneGranted = microphoneGranted
@@ -1036,6 +1052,7 @@ private final class Bench {
             history: history,
             pauser: pauser,
             pausesMedia: { pausesMedia },
+            isEnabled: { enabled },
             durations: durations,
             lockedLimit: lockedLimit,
             now: { [weak self] in self?.clock ?? .distantPast }

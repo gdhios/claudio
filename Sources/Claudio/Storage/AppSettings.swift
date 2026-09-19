@@ -149,6 +149,19 @@ enum AppSettings {
 
     // MARK: - Dictation
 
+    private static let dictationEnabledKey = "dictationEnabled"
+
+    /// Master switch for dictation, on by default. Off, the shortcuts are
+    /// unregistered and the lone key is let go, so those keys fall back to
+    /// whatever they did before Claudio.
+    static func dictationEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: dictationEnabledKey) as? Bool ?? true
+    }
+
+    static func setDictationEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: dictationEnabledKey)
+    }
+
     private static let dictationPrimaryLanguageKey = "dictationPrimaryLanguage"
     private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
     private static let dictationModelKey = "dictationModel"

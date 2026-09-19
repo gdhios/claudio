@@ -52,6 +52,8 @@ final class DictationCoordinator {
     private let history: DictationHistory
     private let pauser: MediaPauser
     private let pausesMedia: @MainActor () -> Bool
+    /// Whether dictation is switched on at all.
+    private let isEnabled: @MainActor () -> Bool
     private let durations: MessageDurations
     /// `longestLockedDictation`, unless a test can't wait five minutes.
     private let lockedLimit: Duration
@@ -85,6 +87,7 @@ final class DictationCoordinator {
          history: DictationHistory = .shared,
          pauser: MediaPauser = MediaPauser(),
          pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
+         isEnabled: @escaping @MainActor () -> Bool = { AppSettings.dictationEnabled() },
          durations: MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          now: @escaping @MainActor () -> Date = Date.init) {
@@ -98,6 +101,7 @@ final class DictationCoordinator {
         self.history = history
         self.pauser = pauser
         self.pausesMedia = pausesMedia
+        self.isEnabled = isEnabled
         self.durations = durations
         self.lockedLimit = lockedLimit
         self.now = now
@@ -111,6 +115,11 @@ final class DictationCoordinator {
     /// two has its own, which is why it arrives with the language rather
     /// than being read from the settings here.
     func keyDown(language: DictationLanguage, output: DictationOutput = .cleanup) {
+        // Switched off in the Settings. The shortcuts are unregistered with
+        // it, so this catches what still gets through: a lone key, or a
+        // registration that outlived the switch.
+        guard isEnabled() else { return }
+
         // Either shortcut ends a locked dictation, in the language it was
         // started in. The release that follows finds nothing listening.
         if let session, session.isLocked, session.phase == .listening {
