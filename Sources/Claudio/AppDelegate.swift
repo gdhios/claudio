@@ -26,6 +26,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel: .freeAction(coordinator)
     )
     private let settingsController = SettingsWindowController()
+    /// The Stream Deck bridge, and the one place a key press becomes a
+    /// gesture. Built lazily and started only when it is wanted: a Mac
+    /// without the plugin never opens a socket.
+    private lazy var streamDeck = StreamDeckBridge(dispatcher: BridgeDispatcher(
+        triggerAction: { [weak self] action in self?.coordinator.trigger(action: action) },
+        triggerFree: { [weak self] in self?.coordinator.triggerFreeAction() },
+        triggerPalette: { [weak self] in self?.coordinator.triggerPalette() },
+        dictationDown: { [weak self] language, output in
+            // The plugin names one of the two shortcuts, not a locale: the
+            // key dictates in whatever Settings has for that one, and
+            // changing the language there changes what the key does.
+            let shortcut: DictationShortcut = switch language {
+            case .primary: .dictate
+            case .secondary: .dictateOtherLanguage
+            }
+            self?.dictation.keyDown(language: shortcut.language, output: output)
+        },
+        dictationUp: { [weak self] in self?.dictation.keyUp() },
+        dictationCancel: { [weak self] in self?.dictation.escape() },
+        applyLayout: { WindowMover.apply($0) },
+        nextScreen: { WindowMover.moveToNextScreen() },
+        openSettings: { [weak self] in self?.settingsController.show(initialSection: .general) }
+    ))
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
@@ -37,6 +60,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
+        // The Stream Deck keys, which are shortcuts by another road. Hooked
+        // up whether or not the bridge runs, so Settings can switch it on
+        // later without anything else to arrange; the plugin sitting in its
+        // folder is what opens the socket on a fresh launch.
+        streamDeck.attach(correction: coordinator, dictation: dictation)
+        if AppSettings.streamDeckBridgeEnabled(
+            pluginInstalled: StreamDeckPluginLocator().isInstalled) {
+            streamDeck.start()
+        }
         // Earlier builds muted the other apps with a tap that outlives a
         // crash, and every app with it: a launch gives the sound back.
         LeftoverMuteTaps.remove()
@@ -57,6 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         dictation.dismiss()
         spokenInstruction.cancel()
+        // And the handshake file goes with the app: one left behind points
+        // the plugin at a port nobody answers.
+        streamDeck.stop()
     }
 
     /// Invisible main menu (app .accessory): without an Edit menu, macOS
