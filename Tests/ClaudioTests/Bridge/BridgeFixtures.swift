@@ -35,30 +35,15 @@ enum BridgeFixtures {
         return try XCTUnwrap(parsed as? [String: Any], "the frame is not a JSON object")
     }
 
-    /// Encoding `value` gives the fixture's frame. Compared as parsed
-    /// objects, never as strings: key order and whitespace are nobody's
-    /// business, the fields are.
+    /// Encoding `value` gives the fixture's frame, field for field. Compared
+    /// as parsed objects rather than as strings — key order and whitespace
+    /// are nobody's business — but with no tolerance anywhere: the numbers
+    /// have to land on the fixture's own, not near it.
     static func assertEncoding(_ value: some Encodable, matches name: String,
                                file: StaticString = #filePath, line: UInt = #line) throws {
         let encoded = try JSONEncoder().encode(value)
-        XCTAssertEqual(normalized(try object(in: encoded)),
-                       normalized(try object(name)),
+        XCTAssertEqual(try object(in: encoded) as NSDictionary,
+                       try object(name) as NSDictionary,
                        "\(name).json", file: file, line: line)
-    }
-
-    private static func normalized(_ object: [String: Any]) -> NSDictionary {
-        object.mapValues(normalized) as NSDictionary
-    }
-
-    /// Numbers are compared on their value, not on their spelling: a `Float`
-    /// leaves through a `Double`, so 0.42 comes back as 0.41999998688697815.
-    /// Six decimals is far more than a microphone level ever needs. Booleans
-    /// and nulls are left alone.
-    private static func normalized(_ value: Any) -> Any {
-        if let object = value as? [String: Any] { return normalized(object) }
-        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
-            return NSNumber(value: (number.doubleValue * 1_000_000).rounded() / 1_000_000)
-        }
-        return value
     }
 }

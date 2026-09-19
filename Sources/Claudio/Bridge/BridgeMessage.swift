@@ -159,7 +159,10 @@ enum BridgeOutbound: Equatable, Encodable {
         case .state(let state):
             try container.encode("state", forKey: .type)
             // Flat, unlike the welcome's: the state's own fields sit next to
-            // `type` rather than under a key of their own.
+            // `type` rather than under a key of their own. The state asks the
+            // same encoder for a keyed container of its own while this one is
+            // still alive, which JSONEncoder answers with the same storage at
+            // the same coding path — so the two sets of keys land in one object.
             try state.encode(to: encoder)
         case .level(let value):
             try container.encode("level", forKey: .type)

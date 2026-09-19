@@ -152,6 +152,9 @@ final class BridgeMessageTests: XCTestCase {
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(.idle), matches: "state-idle")
     }
 
+    /// The label is the fixture's own wire data, quoted verbatim — not a
+    /// string this test displays, so it goes through no `loc`. The app's
+    /// language never enters into it: both sides of the comparison are fixed.
     func testAStreamingCorrection() throws {
         let state = BridgeState(gaze: .veille, activity: .correction,
                                 phase: "streaming", label: "Correction…", locked: false)
@@ -173,6 +176,7 @@ final class BridgeMessageTests: XCTestCase {
                                           matches: "state-dictation-listening")
     }
 
+    /// Same here: the label is the fixture's wire data, quoted verbatim.
     func testALockedDictationBeingCleanedUp() throws {
         let state = BridgeState(gaze: .veille, activity: .dictation,
                                 phase: "cleaning", label: "Nettoyage…", locked: true)
@@ -198,7 +202,8 @@ final class BridgeMessageTests: XCTestCase {
     }
 
     /// The state reads back out of the frame it was written into, flat keys
-    /// and all: what the plugin's own parser goes looking for is there.
+    /// and all: what the plugin's own parser goes looking for is there. The
+    /// label, again, is the fixture's wire data quoted verbatim.
     func testAStateFrameReadsBackAsTheStateItCarries() throws {
         XCTAssertEqual(try BridgeFixtures.decode(BridgeState.self, from: "state-idle"), .idle)
         XCTAssertEqual(

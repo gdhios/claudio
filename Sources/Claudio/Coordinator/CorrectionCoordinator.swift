@@ -10,14 +10,24 @@ final class CorrectionCoordinator {
     /// ending on it — a microphone left open behind a closed panel would go
     /// on listening, and the other apps would stay quiet.
     var onDismiss: (() -> Void)?
-    /// Called whenever the correction under way changes, the end of one
-    /// included. What watches from outside — the Stream Deck bridge — can't
-    /// poll for a panel, and reads the session through this.
+    /// Called when the correction under way changes, the end of one included.
+    /// What watches from outside — the Stream Deck bridge — can't poll for a
+    /// panel, and reads the session through this.
+    ///
+    /// A broadcast, and nothing more: it fires mid-mutation — before
+    /// `streamTask` is assigned, before `onDismiss` runs — so the callback
+    /// must never synchronously call back into the coordinator. It reports
+    /// identity alone: a phase moving inside a session that is still the same
+    /// one doesn't fire it, and whoever needs that observes the session's own
+    /// `@Published` properties.
     var onSessionChange: ((CorrectionSession?) -> Void)?
 
     private var panel: ResultPanel?
     private(set) var session: CorrectionSession? {
-        didSet { onSessionChange?(session) }
+        didSet {
+            guard oldValue !== session else { return }  // a dismissal over nothing says nothing
+            onSessionChange?(session)
+        }
     }
     private var streamTask: Task<Void, Never>?
     private var previousApp: NSRunningApplication?
