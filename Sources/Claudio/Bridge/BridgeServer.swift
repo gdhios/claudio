@@ -239,10 +239,17 @@ final class BridgeServer {
         guard let data = try? JSONEncoder().encode(message) else { return }
         let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
         let context = NWConnection.ContentContext(identifier: "bridge", metadata: [metadata])
-        client.connection.send(
+        // The connection is what the closing path holds, not the client:
+        // `stop()` lets go of every client before the `bye` has gone out,
+        // and a socket nobody cancels stays open until the app quits.
+        let connection = client.connection
+        connection.send(
             content: data, contentContext: context, isComplete: true,
             completion: .contentProcessed { [weak self, weak client] _ in
                 guard thenClose else { return }
+                connection.cancel()
+                // Bookkeeping, for a client still on the list — a refusal
+                // rather than a stop. Its own cancel above is what closes.
                 Task { @MainActor in
                     guard let self, let client else { return }
                     self.drop(client)
