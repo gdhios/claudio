@@ -10,9 +10,15 @@ final class CorrectionCoordinator {
     /// ending on it — a microphone left open behind a closed panel would go
     /// on listening, and the other apps would stay quiet.
     var onDismiss: (() -> Void)?
+    /// Called whenever the correction under way changes, the end of one
+    /// included. What watches from outside — the Stream Deck bridge — can't
+    /// poll for a panel, and reads the session through this.
+    var onSessionChange: ((CorrectionSession?) -> Void)?
 
     private var panel: ResultPanel?
-    private var session: CorrectionSession?
+    private(set) var session: CorrectionSession? {
+        didSet { onSessionChange?(session) }
+    }
     private var streamTask: Task<Void, Never>?
     private var previousApp: NSRunningApplication?
     private var clipboardSnapshot: PasteboardSnapshot?

@@ -938,6 +938,28 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.engine.startedLocales.map(\.identifier), ["fr-FR", "en-US"])
         XCTAssertTrue(bench.pasted.isEmpty)
     }
+
+    // MARK: - Watching from outside
+
+    /// The Stream Deck bridge hangs on this: a dictation appearing and going
+    /// is what it has to show on a key, and it can't poll for it. The session
+    /// announced is the one the coordinator holds, both ways.
+    func testTheSessionIsAnnouncedWhenItStartsAndWhenItGoes() async throws {
+        let bench = Bench()
+        var announced: [DictationSession?] = []
+        bench.coordinator.onSessionChange = { announced.append($0) }
+        XCTAssertTrue(announced.isEmpty)
+
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        XCTAssertIdentical(announced.last ?? nil, session)
+
+        let beforeTheEnd = announced.count
+        bench.coordinator.dismiss()
+        XCTAssertGreaterThan(announced.count, beforeTheEnd)
+        XCTAssertNil(announced.last ?? nil)
+        XCTAssertNil(bench.coordinator.session)
+    }
 }
 
 // MARK: - The bench

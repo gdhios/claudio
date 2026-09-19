@@ -66,8 +66,15 @@ final class DictationCoordinator {
     /// cancelled by whatever ends the dictation first.
     private var lockTimer: Task<Void, Never>?
 
+    /// Called whenever the dictation under way changes, the end of one
+    /// included. What watches from outside — the Stream Deck bridge — can't
+    /// poll for a panel, and reads the session through this.
+    var onSessionChange: ((DictationSession?) -> Void)?
+
     /// The dictation under way, `nil` between two.
-    private(set) var session: DictationSession?
+    private(set) var session: DictationSession? {
+        didSet { onSessionChange?(session) }
+    }
     /// The task that listens then finishes: cancelled by Esc and by the next
     /// press.
     private(set) var cycle: Task<Void, Never>?
