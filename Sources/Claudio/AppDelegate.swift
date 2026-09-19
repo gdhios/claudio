@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         dictationCancel: { [weak self] in self?.dictation.escape() },
         applyLayout: { WindowMover.apply($0) },
         nextScreen: { WindowMover.moveToNextScreen() },
-        openSettings: { [weak self] in self?.settingsController.show(initialSection: .general) }
+        openSettings: { [weak self] in self?.settingsController.show(initialSection: .streamDeck) }
     ))
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // later without anything else to arrange; the plugin sitting in its
         // folder is what opens the socket on a fresh launch.
         streamDeck.attach(correction: coordinator, dictation: dictation)
+        wireStreamDeckSettings()
         if AppSettings.streamDeckBridgeEnabled(
             pluginInstalled: StreamDeckPluginLocator().isInstalled) {
             streamDeck.start()
@@ -92,6 +93,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // And the handshake file goes with the app: one left behind points
         // the plugin at a port nobody answers.
         streamDeck.stop()
+    }
+
+    // MARK: - The Stream Deck tab
+
+    /// Settings' Stream Deck tab, hooked to the real bridge: it shows what
+    /// the bridge reports and gets to switch it on or off. Hooked whether or
+    /// not the bridge runs — the tab is where a stopped bridge is started.
+    private func wireStreamDeckSettings() {
+        let model = StreamDeckStatusModel.shared
+        streamDeck.onStatusChange = { status in
+            StreamDeckStatusModel.shared.status = status
+        }
+        model.refresh = { [weak self] in self?.refreshStreamDeckSettings() }
+        model.applyChoice = { [weak self] choice in self?.applyStreamDeckChoice(choice) }
+        refreshStreamDeckSettings()
+    }
+
+    /// What the tab reads every time it opens: the plugin may have been
+    /// installed — or removed — since launch, and the bridge may have given
+    /// up on its own meanwhile.
+    private func refreshStreamDeckSettings() {
+        let model = StreamDeckStatusModel.shared
+        model.pluginInstalled = StreamDeckPluginLocator().isInstalled
+        model.choice = AppSettings.streamDeckBridgeChoice()
+        model.status = streamDeck.status
+    }
+
+    /// The switch, applied for real: the choice is written down, then the
+    /// bridge is brought in line with it. Back to automatic included, where
+    /// the plugin's presence decides again — and may close the socket.
+    private func applyStreamDeckChoice(_ choice: Bool?) {
+        AppSettings.setStreamDeckBridgeChoice(choice)
+        let installed = StreamDeckPluginLocator().isInstalled
+        StreamDeckStatusModel.shared.pluginInstalled = installed
+        if AppSettings.streamDeckBridgeEnabled(pluginInstalled: installed) {
+            streamDeck.start()
+        } else {
+            streamDeck.stop()
+        }
     }
 
     /// Invisible main menu (app .accessory): without an Edit menu, macOS
