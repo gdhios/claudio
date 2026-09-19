@@ -118,9 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// not the bridge runs — the tab is where a stopped bridge is started.
     private func wireStreamDeckSettings() {
         let model = StreamDeckStatusModel.shared
-        streamDeck.onStatusChange = { status in
-            StreamDeckStatusModel.shared.status = status
-        }
+        streamDeck.onStatusChange = { status in model.status = status }
         model.refresh = { [weak self] in self?.refreshStreamDeckSettings() }
         // A window that never closed shows a tab that never reappears: the
         // look for the plugin is taken again every time Settings comes up,
@@ -144,9 +142,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// bridge is brought in line with it. Back to automatic included, where
     /// the plugin's presence decides again — and may close the socket.
     private func applyStreamDeckChoice(_ choice: Bool?) {
+        let model = StreamDeckStatusModel.shared
         AppSettings.setStreamDeckBridgeChoice(choice)
         let installed = StreamDeckPluginLocator().isInstalled
-        StreamDeckStatusModel.shared.pluginInstalled = installed
+        model.pluginInstalled = installed
         if AppSettings.streamDeckBridgeEnabled(pluginInstalled: installed) {
             streamDeck.start()
         } else {

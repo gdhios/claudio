@@ -17,13 +17,21 @@ enum ClaudioURL: Equatable {
         guard url.scheme?.lowercased() == "claudio" else { return nil }
         guard url.host()?.lowercased() == "settings" else { return nil }
 
-        let name = url.pathComponents.first { $0 != "/" }
-        guard let name else { return .settings(.general) }
-        guard url.pathComponents.filter({ $0 != "/" }).count == 1 else { return nil }
-        let wanted = name.lowercased()
-        guard let section = SettingsSection.allCases.first(where: {
-            $0.rawValue.lowercased() == wanted
-        }) else { return nil }
-        return .settings(section)
+        // The root counts as a path component of its own: what is named
+        // after the host is what is left once it is dropped.
+        let parts = url.pathComponents.filter { $0 != "/" }
+        switch parts.count {
+        case 0:
+            return .settings(.general)
+        case 1:
+            let wanted = parts[0].lowercased()
+            guard let section = SettingsSection.allCases.first(where: {
+                $0.rawValue.lowercased() == wanted
+            }) else { return nil }
+            return .settings(section)
+        default:
+            // A link half understood is a link not understood.
+            return nil
+        }
     }
 }
