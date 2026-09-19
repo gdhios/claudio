@@ -16,10 +16,10 @@ final class SettingsWindowController {
         present()
     }
 
-    /// Opens Settings on a named tab — a `claudio://` link, the plugin
-    /// asking for its switch, a first launch with no key. Named means named:
-    /// the tab moves whether the window is being built or has been open for
-    /// an hour, which is the case the plugin's own way out depends on.
+    /// Opens Settings on a named tab — a `claudio://` link, or the plugin
+    /// asking for its switch. Named means named: the tab moves whether the
+    /// window is being built or has been open for an hour, which is the case
+    /// the plugin's own way out depends on.
     func show(initialSection: SettingsSection) {
         selection.broughtUp(on: initialSection)
         present()
