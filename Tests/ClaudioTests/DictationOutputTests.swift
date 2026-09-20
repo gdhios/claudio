@@ -9,14 +9,17 @@ import XCTest
 final class DictationOutputTests: XCTestCase {
 
     private var previousLanguage: AppLanguage = .system
+    private var previousPrompt: String?
 
     override func setUp() {
         super.setUp()
         previousLanguage = AppSettings.language
+        previousPrompt = AppSettings.dictationSystemPrompt
     }
 
     override func tearDown() {
         AppSettings.language = previousLanguage
+        AppSettings.dictationSystemPrompt = previousPrompt
         super.tearDown()
     }
 
@@ -60,19 +63,61 @@ final class DictationOutputTests: XCTestCase {
                        Array(DictationCleanup.systemPrompt(keeping: ["Okonoma"]).utf8))
     }
 
-    /// Speak French, paste corrected English: the preamble drops the
-    /// hesitations, the action translates, and the answer is the
-    /// translation alone — one call, not two.
-    func testTranslatingComposesThePreambleThenTheTranslationAction() {
+    /// Speak French, paste corrected English: a short transcript preamble,
+    /// then the translation action. One call, and one instruction.
+    func testTranslatingComposesTheTranscriptPreambleThenTheAction() {
         AppSettings.language = .french
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
 
-        XCTAssertTrue(prompt.hasPrefix(DictationCleanup.systemPrompt), prompt)
+        XCTAssertTrue(prompt.hasPrefix(DictationOutput.transcriptPreamble), prompt)
         XCTAssertTrue(prompt.hasSuffix(ClaudioAction.translateEN.system), prompt)
-        // The preamble's own work survives the composition.
-        XCTAssertTrue(prompt.contains("Retire les hésitations"), prompt)
-        // And the second step is what comes out, not the transcript.
-        XCTAssertTrue(prompt.contains("ne réponds qu'avec leur résultat"), prompt)
+        // The transcript is still tidied on the way through.
+        XCTAssertTrue(prompt.contains("hésitations"), prompt)
+    }
+
+    /// The bug this replaced: the cleanup prompt was glued in front of the
+    /// action, so a translation carried "keep the transcript's language" and
+    /// "never rephrase" above the instruction to translate and rephrase. The
+    /// model obeyed whichever it felt like — Guillaume got French roughly
+    /// one time in two, same keystroke. A transforming output must carry no
+    /// rule it is about to break.
+    func testATransformingOutputCarriesNoneOfTheCleanupsContradictions() {
+        AppSettings.language = .french
+        for output in DictationOutput.allCases where output != .cleanup {
+            let prompt = output.systemPrompt(keeping: [])
+            // The cleanup's own wording, not the actions': an action saying
+            // "keep the text's language" about its own job is right, and the
+            // prompt structurer does say it.
+            XCTAssertFalse(prompt.contains("Conserve la langue de la transcription"),
+                           output.rawValue)
+            XCTAssertFalse(prompt.contains("Ne reformule jamais"), output.rawValue)
+            XCTAssertFalse(prompt.contains("Réponds uniquement avec le texte mis au propre"),
+                           output.rawValue)
+            XCTAssertFalse(prompt.contains(DictationCleanup.defaultSystemPrompt),
+                           output.rawValue)
+        }
+    }
+
+    /// No arbitration paragraph left to write: there is nothing to arbitrate
+    /// between any more. Its absence is the fix, so it is pinned.
+    func testNothingArbitratesBetweenTwoPromptsAnyMore() {
+        AppSettings.language = .french
+        let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
+        XCTAssertFalse(prompt.contains("Deuxième étape"), prompt)
+        XCTAssertFalse(prompt.contains("ce sont elles qui l'emportent"), prompt)
+    }
+
+    /// The action prompts speak of a text inside <texte_source> tags, because
+    /// that is how the correction cycle sends a selection. A dictation sends
+    /// its transcript the same way, so the prompt is used in the conditions
+    /// it was written for. The cleanup keeps sending it raw, as it always has.
+    func testOnlyATransformingOutputWrapsTheTranscript() {
+        XCTAssertEqual(DictationOutput.cleanup.userMessage(for: "bonjour"), "bonjour")
+        for output in DictationOutput.allCases where output != .cleanup {
+            let message = output.userMessage(for: "bonjour")
+            XCTAssertTrue(message.contains("<texte_source>"), output.rawValue)
+            XCTAssertTrue(message.contains("bonjour"), output.rawValue)
+        }
     }
 
     /// "Turn a rough idea into a clear prompt" is the simple action, not the
@@ -97,22 +142,26 @@ final class DictationOutputTests: XCTestCase {
         XCTAssertTrue(prompt.hasSuffix("« Okonoma »."), prompt)
     }
 
-    /// The preamble is the one Settings would send: a cleanup prompt edited
-    /// there still leads, and the output is added behind it.
-    func testTheOutputIsAddedBehindTheEditedPreamble() {
+    /// A cleanup prompt edited in Settings is a cleanup prompt: it leads the
+    /// cleanup, and it has no say over a translation. Letting it through was
+    /// a second way for a rule like "keep the language" to reach an output
+    /// whose whole job is to change it.
+    func testAnEditedCleanupPromptSteersTheCleanupAndNothingElse() {
         AppSettings.language = .french
-        let prompt = DictationOutput.makePrompt.systemPrompt(keeping: [],
-                                                             preamble: "Ponctue seulement.")
-        XCTAssertTrue(prompt.hasPrefix("Ponctue seulement.\n\n"), prompt)
-        XCTAssertTrue(prompt.hasSuffix(ClaudioAction.makePrompt.system), prompt)
+        AppSettings.dictationSystemPrompt = "Ponctue seulement, et garde le français."
+
+        XCTAssertTrue(DictationOutput.cleanup.systemPrompt(keeping: [])
+            .hasPrefix("Ponctue seulement, et garde le français."))
+        XCTAssertFalse(DictationOutput.translateEN.systemPrompt(keeping: [])
+            .contains("garde le français"))
     }
 
-    /// The second step carries its own paragraph in English too: without it
-    /// the model reads two contradictory system prompts glued together.
-    func testTheSecondStepIsSaidInEnglishAsWell() {
+    /// The transcript preamble is said in English too.
+    func testTheTranscriptPreambleIsSaidInEnglishAsWell() {
         AppSettings.language = .english
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
-        XCTAssertTrue(prompt.contains("answer with their result only"), prompt)
+        XCTAssertTrue(prompt.contains("voice dictation"), prompt)
+        XCTAssertTrue(prompt.hasSuffix(ClaudioAction.translateEN.system), prompt)
     }
 
     // MARK: - Where the text is going
@@ -123,7 +172,7 @@ final class DictationOutputTests: XCTestCase {
     func testEveryOutputIsToldWhichAppTheTextIsGoingInto() {
         AppSettings.language = .french
         for output in DictationOutput.allCases {
-            let prompt = output.systemPrompt(keeping: [], pastedInto: "Slack")
+            let prompt = output.systemPrompt(keeping: [], landingIn: DictationDestination(name: "Slack", bundleID: nil))
             XCTAssertTrue(prompt.contains("Ce texte sera collé dans Slack."), output.rawValue)
         }
     }
@@ -133,7 +182,7 @@ final class DictationOutputTests: XCTestCase {
     func testTheDestinationSitsBetweenTheCompositionAndTheVocabulary() {
         AppSettings.language = .french
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"],
-                                                              pastedInto: "Mail")
+                                                              landingIn: DictationDestination(name: "Mail", bundleID: nil))
 
         XCTAssertTrue(prompt.hasPrefix(DictationOutput.translateEN.systemPrompt(keeping: [])),
                       prompt)
@@ -146,7 +195,7 @@ final class DictationOutputTests: XCTestCase {
     func testANamelessAppAddsNothingToAnyOutput() {
         AppSettings.language = .french
         for output in DictationOutput.allCases {
-            let prompt = output.systemPrompt(keeping: ["Okonoma"], pastedInto: "  ")
+            let prompt = output.systemPrompt(keeping: ["Okonoma"], landingIn: DictationDestination(name: "  ", bundleID: nil))
             XCTAssertEqual(Array(prompt.utf8),
                            Array(output.systemPrompt(keeping: ["Okonoma"]).utf8), output.rawValue)
             XCTAssertFalse(prompt.contains("collé dans"), output.rawValue)
