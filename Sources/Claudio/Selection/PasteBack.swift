@@ -15,6 +15,10 @@ struct PasteTarget {
     /// cleaned up for — a Slack message, an email — is known here and nowhere
     /// else by the time the model is asked.
     var appName: String?
+    /// That app's bundle identifier, snapshot like the name. The name is what
+    /// the model is told; the identifier is what says whether the app is a
+    /// place for prose at all — it is stable where a localized name is not.
+    var appBundleID: String?
 }
 
 /// The one path that puts a text into another app: activate it, write the
@@ -33,7 +37,8 @@ enum PasteBack {
         let app = frontmostApp()
         return PasteTarget(app: app,
                            clipboard: Constants.restoreClipboardAfterPaste ? PasteboardSnapshot.capture() : nil,
-                           appName: app?.localizedName)
+                           appName: app?.localizedName,
+                           appBundleID: app?.bundleIdentifier)
     }
 
     /// Pastes into the target, and says whether anything could receive the

@@ -343,7 +343,9 @@ final class DictationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(bench.client.calls, 1)
         XCTAssertEqual(bench.client.systems, [DictationOutput.translateEN.systemPrompt(keeping: [])])
-        XCTAssertEqual(bench.client.texts, ["bonjour"])
+        // Tagged, like a selection sent to the same action: its prompt speaks
+        // of a text inside <texte_source>, so it is given one.
+        XCTAssertEqual(bench.client.texts, [ClaudioRequest.wrappingSource("bonjour")])
         XCTAssertEqual(bench.pasted, ["Hello."])
     }
 
@@ -410,7 +412,7 @@ final class DictationCoordinatorTests: XCTestCase {
         await bench.dictate()
 
         XCTAssertEqual(bench.client.systems,
-                       [DictationCleanup.systemPrompt(keeping: [], pastedInto: "Slack")])
+                       [DictationCleanup.systemPrompt(keeping: [], landingIn: DictationDestination(name: "Slack", bundleID: nil))])
         XCTAssertEqual(bench.pasted, ["Bonjour."])
     }
 
@@ -424,7 +426,7 @@ final class DictationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(bench.client.systems,
                        [DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"],
-                                                                 pastedInto: "Mail")])
+                                                                 landingIn: DictationDestination(name: "Mail", bundleID: nil))])
     }
 
     /// "Raw" asks no model anything, so there is nothing to tell: the
