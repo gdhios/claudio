@@ -6,7 +6,8 @@ import SwiftUI
 /// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
 /// panel-free-unheard, panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
-/// palette-libre, settings, settings-dictation, settings-shortcuts-lone-key.
+/// palette-libre, settings, settings-dictation, settings-shortcuts-lone-key,
+/// settings-streamdeck.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -79,6 +80,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             // `PreviewRun.isActive`: nothing is read from, or written to,
             // this machine's preferences.
             settingsController.show(initialSection: .dictation)
+        } else if mode == "settings-streamdeck" {
+            // A frozen bridge: waiting for a plugin, and no plugin in the
+            // folder. Set by hand rather than read off this Mac — the shot
+            // has to be the same on every machine, and nothing here opens a
+            // socket or looks in a folder.
+            StreamDeckStatusModel.shared.status = .waiting
+            StreamDeckStatusModel.shared.pluginInstalled = false
+            settingsController.show(initialSection: .streamDeck)
         } else if mode == "settings-about" {
             settingsController.show(initialSection: .about)
         } else if mode == "barre-de-menus" {

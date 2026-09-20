@@ -52,6 +52,8 @@ final class DictationCoordinator {
     private let history: DictationHistory
     private let pauser: MediaPauser
     private let pausesMedia: @MainActor () -> Bool
+    /// Whether dictation is switched on at all.
+    private let isEnabled: @MainActor () -> Bool
     private let durations: MessageDurations
     /// `longestLockedDictation`, unless a test can't wait five minutes.
     private let lockedLimit: Duration
@@ -64,8 +66,25 @@ final class DictationCoordinator {
     /// cancelled by whatever ends the dictation first.
     private var lockTimer: Task<Void, Never>?
 
+    /// Called when the dictation under way changes, the end of one included.
+    /// What watches from outside — the Stream Deck bridge — can't poll for a
+    /// panel, and reads the session through this.
+    ///
+    /// A broadcast, and nothing more: it fires mid-mutation — before the panel
+    /// is made, before the cycle starts — so the callback must never
+    /// synchronously call back into the coordinator. It reports identity
+    /// alone: a phase moving inside a session that is still the same one
+    /// doesn't fire it, and whoever needs that observes the session's own
+    /// `@Published` properties.
+    var onSessionChange: ((DictationSession?) -> Void)?
+
     /// The dictation under way, `nil` between two.
-    private(set) var session: DictationSession?
+    private(set) var session: DictationSession? {
+        didSet {
+            guard oldValue !== session else { return }  // a dismissal over nothing says nothing
+            onSessionChange?(session)
+        }
+    }
     /// The task that listens then finishes: cancelled by Esc and by the next
     /// press.
     private(set) var cycle: Task<Void, Never>?
@@ -85,6 +104,7 @@ final class DictationCoordinator {
          history: DictationHistory = .shared,
          pauser: MediaPauser = MediaPauser(),
          pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
+         isEnabled: @escaping @MainActor () -> Bool = { AppSettings.dictationEnabled() },
          durations: MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          now: @escaping @MainActor () -> Date = Date.init) {
@@ -98,6 +118,7 @@ final class DictationCoordinator {
         self.history = history
         self.pauser = pauser
         self.pausesMedia = pausesMedia
+        self.isEnabled = isEnabled
         self.durations = durations
         self.lockedLimit = lockedLimit
         self.now = now
@@ -111,6 +132,11 @@ final class DictationCoordinator {
     /// two has its own, which is why it arrives with the language rather
     /// than being read from the settings here.
     func keyDown(language: DictationLanguage, output: DictationOutput = .cleanup) {
+        // Switched off in the Settings. The shortcuts are unregistered with
+        // it, so this catches what still gets through: a lone key, or a
+        // registration that outlived the switch.
+        guard isEnabled() else { return }
+
         // Either shortcut ends a locked dictation, in the language it was
         // started in. The release that follows finds nothing listening.
         if let session, session.isLocked, session.phase == .listening {

@@ -287,6 +287,26 @@ enum HotkeySetup {
         // The same two on a modifier key held alone, which the library can't
         // register: the key is watched instead, and only while one is set.
         loneKeyMonitor = LoneKeyMonitor(coordinator: coordinator)
+        // Apply the stored on/off state, as the window shortcuts do above:
+        // the handlers are live by default, so dictation turned off in a
+        // past session must be unregistered now.
+        setDictationEnabled(AppSettings.dictationEnabled())
+    }
+
+    /// Registers or unregisters the two dictation shortcuts as a group and
+    /// persists the choice. Disabling truly releases the keys, so another
+    /// tool can take them back. The lone-key monitor is left in place: it
+    /// only watches events and consumes none, so unhooking it would free
+    /// nothing — what stops it dictating is the coordinator, which refuses
+    /// every press while the switch is off.
+    static func setDictationEnabled(_ enabled: Bool) {
+        AppSettings.setDictationEnabled(enabled)
+        let names = DictationShortcut.allCases.map(\.name)
+        if enabled {
+            KeyboardShortcuts.enable(names)
+        } else {
+            KeyboardShortcuts.disable(names)
+        }
     }
 
     /// Registers or unregisters the window shortcuts as a group and persists

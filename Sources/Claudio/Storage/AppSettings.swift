@@ -149,6 +149,19 @@ enum AppSettings {
 
     // MARK: - Dictation
 
+    private static let dictationEnabledKey = "dictationEnabled"
+
+    /// Master switch for dictation, on by default. Off, the shortcuts are
+    /// unregistered and the lone key is let go, so those keys fall back to
+    /// whatever they did before Claudio.
+    static func dictationEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: dictationEnabledKey) as? Bool ?? true
+    }
+
+    static func setDictationEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: dictationEnabledKey)
+    }
+
     private static let dictationPrimaryLanguageKey = "dictationPrimaryLanguage"
     private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
     private static let dictationModelKey = "dictationModel"
@@ -297,6 +310,39 @@ enum AppSettings {
             NotificationCenter.default.post(name: dictationLoneKeysDidChange, object: defaults)
         }
     }
+
+    // MARK: - Stream Deck bridge
+
+    /// Public because the pane and its tests name it: it is the one place an
+    /// explicit choice is stored, and a missing key is itself a value.
+    static let streamDeckBridgeKey = "streamDeckBridgeEnabled"
+
+    /// nil = the user never chose; the bridge then follows the plugin's presence.
+    static func streamDeckBridgeChoice(defaults: UserDefaults = .standard) -> Bool? {
+        defaults.object(forKey: streamDeckBridgeKey) as? Bool
+    }
+
+    /// `nil` removes the key rather than storing a third value: a `false`
+    /// left behind would keep the bridge off even after the plugin is
+    /// installed, which is the one thing automatic is meant to spare.
+    static func setStreamDeckBridgeChoice(_ choice: Bool?, defaults: UserDefaults = .standard) {
+        if let choice {
+            defaults.set(choice, forKey: streamDeckBridgeKey)
+        } else {
+            defaults.removeObject(forKey: streamDeckBridgeKey)
+        }
+    }
+
+    /// Whether the bridge listens. Installing the plugin is the whole setup —
+    /// nothing to switch on — and an explicit choice outranks it in both
+    /// directions: no socket for whoever said no, a socket for whoever keeps
+    /// their plugin somewhere this can't see.
+    static func streamDeckBridgeEnabled(pluginInstalled: Bool,
+                                        defaults: UserDefaults = .standard) -> Bool {
+        streamDeckBridgeChoice(defaults: defaults) ?? pluginInstalled
+    }
+
+    // MARK: - Dictation vocabulary
 
     /// The personal vocabulary, as typed in Settings: one entry per line,
     /// read by `DictationVocabulary`. Empty by default; blank removes the key.

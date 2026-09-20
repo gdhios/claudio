@@ -699,6 +699,21 @@ final class DictationCoordinatorTests: XCTestCase {
 
     // MARK: - Presses that paste nothing
 
+    /// Dictation switched off in the Settings: a press that still gets
+    /// through opens no panel and no microphone. The shortcuts are
+    /// unregistered too, but the coordinator refuses on its own so a lone
+    /// key or a stale registration can't dictate behind the switch.
+    func testADisabledDictationHearsNothing() {
+        let bench = Bench(enabled: false)
+
+        bench.coordinator.keyDown(language: .frFR)
+
+        XCTAssertNil(bench.coordinator.session)
+        XCTAssertEqual(bench.engine.starts, 0)
+        XCTAssertEqual(bench.panels, 0)
+        XCTAssertTrue(bench.pasted.isEmpty)
+    }
+
     /// Esc at any phase: the microphone is cancelled, the cycle is dropped,
     /// nothing is pasted. The clipboard is untouched because the only path
     /// that writes it is the paste, which never ran.
@@ -923,6 +938,53 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.engine.startedLocales.map(\.identifier), ["fr-FR", "en-US"])
         XCTAssertTrue(bench.pasted.isEmpty)
     }
+
+    // MARK: - Watching from outside
+
+    /// The Stream Deck bridge hangs on this: a dictation appearing and going
+    /// is what it has to show on a key, and it can't poll for it. The session
+    /// announced is the one the coordinator holds, both ways — and exactly
+    /// once each way. The press starts by dismissing whatever was there,
+    /// which on an idle coordinator is nothing and announces nothing.
+    func testTheSessionIsAnnouncedOnceWhenItStartsAndOnceWhenItGoes() async throws {
+        let bench = Bench()
+        var announced: [DictationSession?] = []
+        bench.coordinator.onSessionChange = { announced.append($0) }
+        XCTAssertTrue(announced.isEmpty)
+
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        XCTAssertEqual(announced.count, 1)
+        XCTAssertIdentical(announced.last ?? nil, session)
+
+        bench.coordinator.dismiss()
+        XCTAssertEqual(announced.count, 2)
+        XCTAssertNil(announced.last ?? nil)
+        XCTAssertNil(bench.coordinator.session)
+
+        // Nothing left to close: the second dismissal has no news.
+        bench.coordinator.dismiss()
+        XCTAssertEqual(announced.count, 2)
+    }
+
+    /// A press during a dictation starts a fresh one: the key hears the first
+    /// go and the second arrive, never a gap that isn't there.
+    func testARestartAnnouncesTheEndOfOneAndTheStartOfTheNext() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        let first = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { bench.engine.starts == 1 }
+
+        var announced: [DictationSession?] = []
+        bench.coordinator.onSessionChange = { announced.append($0) }
+        bench.coordinator.keyDown(language: .enUS)
+        let second = try XCTUnwrap(bench.coordinator.session)
+
+        XCTAssertEqual(announced.count, 2)
+        XCTAssertNil(announced.first ?? nil)
+        XCTAssertIdentical(announced.last ?? nil, second)
+        XCTAssertFalse(first === second)
+    }
 }
 
 // MARK: - The bench
@@ -984,6 +1046,7 @@ private final class Bench {
          playing: Bool = true,
          readsWait: Bool = false,
          pausesMedia: Bool = true,
+         enabled: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation) {
         self.microphoneGranted = microphoneGranted
@@ -1036,6 +1099,7 @@ private final class Bench {
             history: history,
             pauser: pauser,
             pausesMedia: { pausesMedia },
+            isEnabled: { enabled },
             durations: durations,
             lockedLimit: lockedLimit,
             now: { [weak self] in self?.clock ?? .distantPast }

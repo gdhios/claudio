@@ -15,7 +15,11 @@ struct ClaudioMascot: View {
     /// only the *silhouette* of the eye reads. Shifting a pupil inside it
     /// doesn't say "he's looking elsewhere," it says "his eyes are
     /// crooked." So each state changes shape, not direction.
-    enum Gaze: Equatable {
+    ///
+    /// The rawValue travels: the Stream Deck plugin draws the same four
+    /// faces and names them with these strings. Cases can be added, never
+    /// renamed.
+    enum Gaze: String, Equatable, Codable {
         /// Open eye, centered pupil. He's waiting, available.
         case repos
         /// Closed eyes. He's focusing while the answer comes in.

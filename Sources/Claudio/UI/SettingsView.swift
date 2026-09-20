@@ -9,6 +9,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case ollama
     case shortcuts
     case dictation
+    case streamDeck
     case prompts
     case about
 
@@ -21,6 +22,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
         case .dictation: loc("Dictée", en: "Dictation")
+        case .streamDeck: loc("Stream Deck", en: "Stream Deck")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
         }
@@ -33,6 +35,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
+        case .streamDeck: "rectangle.grid.3x2.fill"
         case .prompts: "text.quote"
         case .about: "info"
         }
@@ -45,6 +48,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
+        case .streamDeck: .teal
         case .prompts: .orange
         case .about: .blue
         }
@@ -52,15 +56,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    @State private var selection: SettingsSection?
+    /// The tab, owned outside the view: whoever opens Settings a second time
+    /// on another tab has to be obeyed by the window already on screen.
+    @ObservedObject private var selection: SettingsSelection
 
-    init(initialSection: SettingsSection = .general) {
-        _selection = State(initialValue: initialSection)
+    init(selection: SettingsSelection) {
+        _selection = ObservedObject(wrappedValue: selection)
     }
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsSection.allCases, selection: $selection) { section in
+            List(SettingsSection.allCases, selection: selection.sidebar) { section in
                 Label {
                     Text(section.title)
                 } icon: {
@@ -71,12 +77,13 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            switch selection ?? .general {
+            switch selection.section {
             case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
             case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
+            case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
             case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
             case .about: AboutPane().navigationTitle(SettingsSection.about.title)
             }
@@ -353,6 +360,7 @@ private struct ShortcutsPane: View {
     private static let dictationRows = "dictationRows"
 
     @State private var windowShortcutsEnabled = AppSettings.windowShortcutsEnabled
+    @State private var dictationEnabled = AppSettings.dictationEnabled()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -403,6 +411,11 @@ private struct ShortcutsPane: View {
             }
 
             Section {
+                Toggle(loc("Activer la dictée", en: "Enable dictation"),
+                       isOn: $dictationEnabled)
+                    .onChange(of: dictationEnabled) {
+                        HotkeySetup.setDictationEnabled(dictationEnabled)
+                    }
                 HStack(spacing: 10) {
                     IconBadge(systemName: SettingsSection.dictation.symbolName,
                               color: SettingsSection.dictation.color, size: 22)
@@ -412,6 +425,7 @@ private struct ShortcutsPane: View {
                     DictationShortcutField(shortcut: .dictate)
                 }
                 .id(Self.dictationRows)
+                .disabled(!dictationEnabled)
                 HStack(spacing: 10) {
                     IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
                     Text(loc("Dicter dans l'autre langue",
@@ -419,11 +433,12 @@ private struct ShortcutsPane: View {
                     Spacer()
                     DictationShortcutField(shortcut: .dictateOtherLanguage)
                 }
+                .disabled(!dictationEnabled)
             } header: {
                 Text(SettingsSection.dictation.title)
             } footer: {
-                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée.",
-                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab."))
+                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée. Décochée, la dictée rend les deux touches à tes autres outils.",
+                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab. Switched off, dictation releases both keys and leaves them to your other tools."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
