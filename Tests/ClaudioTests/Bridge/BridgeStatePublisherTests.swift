@@ -179,6 +179,15 @@ final class BridgeStatePublisherTests: XCTestCase {
     /// A real dictation: the engine reports thirty times a second, and the
     /// keys are drawn eight times at most. The dropped readings are gone,
     /// never sent late.
+    ///
+    /// Bracketed, not counted — the two bounds together are the cap. Eight is
+    /// the ceiling the interval sets, a second of readings at one per 125 ms,
+    /// and not a quota the publisher owes: coalescing can only take frames
+    /// away, because readings that arrive before the deferred refresh has run
+    /// merge into one. This run sends exactly eight; a slower turn would send
+    /// fewer and still be right, which is why the upper bound is `<=`. The
+    /// lower bound is what keeps the ceiling honest — dropping everything
+    /// satisfies `<= 8` and is no cap at all.
     func testThirtyReadingsInASecondAreCappedAtEight() async {
         let session = dictating()
         publisher.dictationSessionChanged(session)
