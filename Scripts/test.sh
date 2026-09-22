@@ -27,17 +27,35 @@ esac
 
 [ "$(uname)" = "Darwin" ] || { echo "❌ Claudio is a macOS app: this protocol runs on macOS."; exit 1; }
 
+# Where SwiftPM builds. A file provider reinstates com.apple.FinderInfo on
+# .build while the build is still running, and codesign then refuses the test
+# bundle it has just linked — "resource fork, Finder information, or similar
+# detritus not allowed" — before a single test runs. Clearing the attributes
+# first doesn't hold, the provider puts them back mid-build; building outside
+# the synced tree does. The directory is keyed on this checkout's own path, so
+# incremental builds survive and two worktrees never share one. CI syncs
+# nothing and caches .build, so it keeps the default.
+if [ -n "${CI:-}" ]; then
+    SCRATCH=".build"
+else
+    SCRATCH="${TMPDIR:-/tmp}"
+    SCRATCH="${SCRATCH%/}/claudio-build-$(pwd -P | shasum | cut -c1-12)"
+fi
+echo "Build directory: $SCRATCH"
+
 # ── Level 1: unit tests ────────────────────────────────────────────────
 echo "── Level 1 · Unit tests (swift test) ──"
-swift test
+swift test --scratch-path "$SCRATCH"
 echo "✅ Unit tests green."
 if [ -z "$LEVEL" ]; then exit 0; fi
 
 # ── Level 2: the app starts and renders its screens ───────────────────────────────
 echo ""
 echo "── Level 2 · Offline UI previews ──"
-swift build
-BIN=".build/debug/Claudio"
+swift build --scratch-path "$SCRATCH"
+BIN="$SCRATCH/debug/Claudio"
+# The shots stay put wherever the build went: nothing signs them, and this is
+# the path CI publishes them from.
 SHOTS=".build/previews"
 mkdir -p "$SHOTS"
 
