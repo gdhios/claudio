@@ -6,7 +6,7 @@ What Claudio must never break: the captured text leaves in a well-formed request
 
 | Level | Command | Duration | When |
 |---|---|---|---|
-| 1 · Unit | `swift test` | seconds | every change; CI on every push and PR |
+| 1 · Unit | `Scripts/test.sh` | seconds | every change; CI on every push and PR |
 | 2 · UI smoke | `Scripts/test.sh --smoke` | ~2 min | CI on every push and PR, PNGs published as artifacts |
 | 3 · End to end | `Scripts/test.sh --release` | +30 s, a few cents | at release time only |
 
@@ -18,6 +18,8 @@ What Claudio must never break: the captured text leaves in a well-formed request
 ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "a text with some mistake"
 ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "Translate to Spanish"
 ```
+
+- **Build directory**: level 1 goes through `Scripts/test.sh` rather than a bare `swift test`, because a working copy inside a synced folder cannot be built in place: a file provider reinstates Finder info on `.build` mid-build and `codesign` then refuses the test bundle ("resource fork, Finder information, or similar detritus not allowed"). The script builds outside the working copy and prints where; CI keeps `.build` and its cache. The rendered PNGs stay in `.build/previews` either way. `Scripts/build_app.sh` is unaffected: it clears the attributes on the assembled `.app` right before signing it.
 
 ## What protects each critical path
 
