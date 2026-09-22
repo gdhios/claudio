@@ -4,7 +4,10 @@ import CoreGraphics
 /// subdivides a rectangle and knows nothing about screens, displays or the
 /// Accessibility API. The mover feeds it the usable area and reads back a
 /// target frame, both in AX coordinates (top-left origin, y growing downward).
-enum WindowLayout: CaseIterable {
+///
+/// The rawValue is a wire value: the Stream Deck plugin names a layout with
+/// it. Cases can be added, never renamed.
+enum WindowLayout: String, CaseIterable {
     case leftHalf, rightHalf, topHalf, bottomHalf
     case topLeft, topRight, bottomLeft, bottomRight
     case maximize

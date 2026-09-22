@@ -9,6 +9,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case ollama
     case shortcuts
     case dictation
+    case streamDeck
     case prompts
     case about
 
@@ -21,6 +22,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
         case .dictation: loc("Dictée", en: "Dictation")
+        case .streamDeck: loc("Stream Deck", en: "Stream Deck")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
         }
@@ -33,6 +35,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
+        case .streamDeck: "rectangle.grid.3x2.fill"
         case .prompts: "text.quote"
         case .about: "info"
         }
@@ -45,6 +48,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
+        case .streamDeck: .teal
         case .prompts: .orange
         case .about: .blue
         }
@@ -52,15 +56,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    @State private var selection: SettingsSection?
+    /// The tab, owned outside the view: whoever opens Settings a second time
+    /// on another tab has to be obeyed by the window already on screen.
+    @ObservedObject private var selection: SettingsSelection
 
-    init(initialSection: SettingsSection = .general) {
-        _selection = State(initialValue: initialSection)
+    init(selection: SettingsSelection) {
+        _selection = ObservedObject(wrappedValue: selection)
     }
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsSection.allCases, selection: $selection) { section in
+            List(SettingsSection.allCases, selection: selection.sidebar) { section in
                 Label {
                     Text(section.title)
                 } icon: {
@@ -71,12 +77,13 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            switch selection ?? .general {
+            switch selection.section {
             case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
             case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
+            case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
             case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
             case .about: AboutPane().navigationTitle(SettingsSection.about.title)
             }

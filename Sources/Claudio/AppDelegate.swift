@@ -26,6 +26,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel: .freeAction(coordinator)
     )
     private let settingsController = SettingsWindowController()
+    /// The Stream Deck bridge, and the one place a key press becomes a
+    /// gesture. Only ever started when the plugin is there, or when Settings
+    /// asks for it: a Mac with neither never opens a socket.
+    private lazy var streamDeck = StreamDeckBridge(dispatcher: BridgeDispatcher(
+        triggerAction: { [weak self] action in self?.coordinator.trigger(action: action) },
+        triggerFree: { [weak self] in self?.coordinator.triggerFreeAction() },
+        triggerPalette: { [weak self] in self?.coordinator.triggerPalette() },
+        dictationDown: { [weak self] language, output in
+            // The plugin names one of the two shortcuts, not a locale: the
+            // key dictates in whatever Settings has for that one, and
+            // changing the language there changes what the key does.
+            let shortcut: DictationShortcut = switch language {
+            case .primary: .dictate
+            case .secondary: .dictateOtherLanguage
+            }
+            self?.dictation.keyDown(language: shortcut.language, output: output)
+        },
+        dictationUp: { [weak self] in self?.dictation.keyUp() },
+        dictationCancel: { [weak self] in self?.dictation.escape() },
+        applyLayout: { WindowMover.apply($0) },
+        nextScreen: { WindowMover.moveToNextScreen() },
+        openSettings: { [weak self] in self?.settingsController.show(initialSection: .streamDeck) }
+    ))
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
@@ -37,6 +60,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
+        // The Stream Deck keys, which are shortcuts by another road. Hooked
+        // up whether or not the bridge runs, so Settings can switch it on
+        // later without anything else to arrange; the plugin sitting in its
+        // folder is what opens the socket on a fresh launch.
+        streamDeck.attach(correction: coordinator, dictation: dictation)
+        wireStreamDeckSettings()
+        if AppSettings.streamDeckBridgeEnabled(
+            pluginInstalled: StreamDeckPluginLocator().isInstalled) {
+            streamDeck.start()
+        }
         // Earlier builds muted the other apps with a tap that outlives a
         // crash, and every app with it: a launch gives the sound back.
         LeftoverMuteTaps.remove()
@@ -57,6 +90,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         dictation.dismiss()
         spokenInstruction.cancel()
+        // And the handshake file goes with the app: one left behind points
+        // the plugin at a port nobody answers.
+        streamDeck.stop()
+    }
+
+    /// The `claudio://` links: how the plugin, and the download page, send
+    /// someone straight to the tab that matters instead of describing where
+    /// it hides. The scheme is declared in the built app's Info.plist, so a
+    /// `swift run` never receives one; what a link means is decided by the
+    /// parser, and a link Claudio doesn't understand opens nothing.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            switch ClaudioURL.parse(url) {
+            case .settings(let section):
+                settingsController.show(initialSection: section)
+            case nil:
+                continue
+            }
+        }
+    }
+
+    // MARK: - The Stream Deck tab
+
+    /// Settings' Stream Deck tab, hooked to the real bridge: it shows what
+    /// the bridge reports and gets to switch it on or off. Hooked whether or
+    /// not the bridge runs — the tab is where a stopped bridge is started.
+    private func wireStreamDeckSettings() {
+        let model = StreamDeckStatusModel.shared
+        streamDeck.onStatusChange = { status in model.status = status }
+        model.refresh = { [weak self] in self?.refreshStreamDeckSettings() }
+        // A window that never closed shows a tab that never reappears: the
+        // look for the plugin is taken again every time Settings comes up,
+        // not only when the tab is built.
+        settingsController.selection.onShown = { [weak self] in self?.refreshStreamDeckSettings() }
+        model.applyChoice = { [weak self] choice in self?.applyStreamDeckChoice(choice) }
+        refreshStreamDeckSettings()
+    }
+
+    /// What the tab reads every time it opens: the plugin may have been
+    /// installed — or removed — since launch, and the bridge may have given
+    /// up on its own meanwhile.
+    private func refreshStreamDeckSettings() {
+        let model = StreamDeckStatusModel.shared
+        model.pluginInstalled = StreamDeckPluginLocator().isInstalled
+        model.choice = AppSettings.streamDeckBridgeChoice()
+        model.status = streamDeck.status
+    }
+
+    /// The switch, applied for real: the choice is written down, then the
+    /// bridge is brought in line with it. Back to automatic included, where
+    /// the plugin's presence decides again — and may close the socket.
+    private func applyStreamDeckChoice(_ choice: Bool?) {
+        let model = StreamDeckStatusModel.shared
+        AppSettings.setStreamDeckBridgeChoice(choice)
+        let installed = StreamDeckPluginLocator().isInstalled
+        model.pluginInstalled = installed
+        if AppSettings.streamDeckBridgeEnabled(pluginInstalled: installed) {
+            streamDeck.start()
+        } else {
+            streamDeck.stop()
+        }
     }
 
     /// Invisible main menu (app .accessory): without an Edit menu, macOS
