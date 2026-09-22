@@ -32,6 +32,13 @@ final class CorrectionCoordinator {
     private var streamTask: Task<Void, Never>?
     private var previousApp: NSRunningApplication?
     private var clipboardSnapshot: PasteboardSnapshot?
+    /// How long a panel that has nothing left to say stays up. Injected so a
+    /// test can watch one close itself without waiting a second and a half.
+    private let durations: DictationCoordinator.MessageDurations
+
+    init(durations: DictationCoordinator.MessageDurations = .standard) {
+        self.durations = durations
+    }
 
     // MARK: - Triggering
 
@@ -103,6 +110,7 @@ final class CorrectionCoordinator {
 
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             session.phase = .noSelection
+            autoDismiss(session)
             return
         }
         session.originalText = text
@@ -328,6 +336,24 @@ final class CorrectionCoordinator {
         }
         self.panel = panel
         panel.present()
+    }
+
+    /// The panel has said all it had to say — "No selection found", so far —
+    /// and takes itself off the screen after a beat. Esc and the next
+    /// shortcut still cut it short: both go through `dismiss()`, and the
+    /// guards here are what make the sleeping task harmless afterwards.
+    ///
+    /// The phase is held as well as the session: `retry()` and the palette
+    /// carry on inside the same session, so a close armed in an earlier phase
+    /// would take away a panel that is streaming by the time it fires.
+    private func autoDismiss(_ session: CorrectionSession) {
+        guard let delay = session.phase.autoDismissDelay(durations) else { return }
+        let phase = session.phase
+        Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, self.session === session, session.phase == phase else { return }
+            self.dismiss()
+        }
     }
 
     func dismiss() {
