@@ -309,6 +309,13 @@ final class DictationCoordinator {
         let raw = vocabulary.applyingReplacements(to: heard)
         session.transcript = raw
 
+        // Written down before the model is asked anything. Closing the panel
+        // while the cleanup was under way used to take the whole dictation
+        // with it: the words were said, they existed, and nothing had kept
+        // them. The cleaned-up text joins this entry when it comes.
+        let recordedAt = now()
+        history.record(raw: raw, cleaned: nil, language: session.language, at: recordedAt)
+
         var cleaned: String?
         if session.model != .raw {
             session.phase = .cleaning
@@ -325,9 +332,10 @@ final class DictationCoordinator {
             guard self.session === session, !Task.isCancelled else { return }
         }
 
-        // Recorded before the paste: whether or not the text made it into
+        // The other half of the entry, now that there is one. Before the
+        // paste, as the transcript was: whether or not the text made it into
         // the app, it was said, and the history keeps it.
-        history.record(raw: raw, cleaned: cleaned, language: session.language)
+        if let cleaned { history.complete(cleaned: cleaned, at: recordedAt) }
 
         // Nowhere to paste: Claudio itself was frontmost when the key went
         // down — the cursor in its own prompt editor, say. The keystroke

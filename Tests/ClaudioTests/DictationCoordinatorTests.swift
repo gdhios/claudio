@@ -263,6 +263,38 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(entry?.language, DictationLanguage.frFR.rawValue)
     }
 
+    /// The dictation Guillaume kept losing: the words were said, the model
+    /// was still working on them, and closing the panel took them away. The
+    /// transcript now enters the history before the model is asked anything,
+    /// so what survives is what was spoken — cleaned up or not.
+    func testClosingThePanelWhileTheModelWorksKeepsWhatWasSaid() async {
+        let bench = Bench(cleanupParks: true)
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+        await bench.readAnswered()
+        bench.hold(for: 1)
+        bench.coordinator.keyUp()
+        await bench.settle { bench.client.calls == 1 }
+        XCTAssertEqual(bench.coordinator.session?.phase, .cleaning)
+
+        bench.coordinator.dismiss()  // the panel's close button, or Esc
+
+        let entry = bench.history.recents.entries.first
+        XCTAssertEqual(bench.history.recents.entries.count, 1)
+        XCTAssertEqual(entry?.raw, "bonjour")
+        XCTAssertNil(entry?.cleaned, "nothing came back from the model")
+    }
+
+    /// The other half of the same change: recording the transcript early
+    /// must not leave a second line behind once the cleanup answers. The
+    /// cleaned text joins the entry already there.
+    func testADictationThatGoesThroughLeavesOneEntry() async {
+        let bench = Bench()
+        await bench.dictate()
+        XCTAssertEqual(bench.history.recents.entries.count, 1)
+        XCTAssertEqual(bench.history.recents.entries.first?.cleaned, "Bonjour.")
+    }
+
     // MARK: - The vocabulary
 
     /// Recognition leans towards the speaker's own words from the first one
@@ -1050,12 +1082,13 @@ private final class Bench {
          pausesMedia: Bool = true,
          enabled: Bool = true,
          durations: DictationCoordinator.MessageDurations = .standard,
-         lockedLimit: Duration = DictationCoordinator.longestLockedDictation) {
+         lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
+         cleanupParks: Bool = false) {
         self.microphoneGranted = microphoneGranted
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
         let engine = FakeSpeechEngine(events)
         self.engine = engine
-        client = FakeStreamClient(answer)
+        client = FakeStreamClient(answer, parks: cleanupParks)
         let media = FakeMediaPlayback(playing: playing, readsWait: readsWait)
         media.microphoneCloses = { engine.stops + engine.cancels }
         self.media = media
@@ -1279,8 +1312,19 @@ private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
     private(set) var texts: [String] = []
     private(set) var systems: [String] = []
     private(set) var budgets: [Int] = []
+    /// A model that doesn't answer straight away: the call parks until the
+    /// test lets it go, or until the dictation that made it is cancelled.
+    /// That is the window a dictation used to be lost in — the transcript
+    /// exists, the cleaned-up text doesn't yet.
+    private let parks: Bool
+    private var released = false
 
-    init(_ answer: Result<String, Error>) { self.answer = answer }
+    init(_ answer: Result<String, Error>, parks: Bool = false) {
+        self.answer = answer
+        self.parks = parks
+    }
+
+    func release() { released = true }
 
     func streamCompletion(of text: String,
                           system: String,
@@ -1290,6 +1334,7 @@ private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
         texts.append(text)
         systems.append(system)
         budgets.append(maxTokens)
+        while parks, !released, !Task.isCancelled { await Task.yield() }
         let cleaned = try answer.get()
         let middle = cleaned.index(cleaned.startIndex, offsetBy: cleaned.count / 2)
         await onDelta(String(cleaned[..<middle]))

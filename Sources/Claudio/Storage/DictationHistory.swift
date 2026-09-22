@@ -54,6 +54,20 @@ struct RecentDictations: Equatable, Sendable {
         return RecentDictations(Array(kept.prefix(limit)))
     }
 
+    /// Fills in the cleaned-up text of a dictation already recorded, found
+    /// by the date it was stored under. Nothing matches — it was cleared, or
+    /// fifty dictations pushed it off the end — and nothing changes: a late
+    /// answer never brings back an entry someone got rid of. A blank cleanup
+    /// is no cleanup, as in `adding`.
+    func completing(_ date: Date, cleaned: String) -> RecentDictations {
+        let cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty,
+              let index = entries.firstIndex(where: { $0.date == date }) else { return self }
+        var kept = entries
+        kept[index].cleaned = cleaned
+        return RecentDictations(kept)
+    }
+
     func cleared() -> RecentDictations { RecentDictations() }
 }
 
@@ -94,6 +108,17 @@ final class DictationHistory {
                                                      raw: raw,
                                                      cleaned: cleaned),
                                      limit: limit)
+        guard updated != recents else { return }
+        recents = updated
+        persist()
+    }
+
+    /// The cleaned-up text of a dictation recorded earlier, at the date it
+    /// was recorded under. The transcript enters the history before the
+    /// model is asked anything — a panel closed mid-cleanup used to take the
+    /// whole dictation with it — so this is how the two halves meet again.
+    func complete(cleaned: String, at date: Date) {
+        let updated = recents.completing(date, cleaned: cleaned)
         guard updated != recents else { return }
         recents = updated
         persist()

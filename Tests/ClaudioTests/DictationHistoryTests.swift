@@ -134,6 +134,51 @@ final class DictationHistoryTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: "dictationHistory"))
     }
 
+    /// A transcript is recorded before the model is asked anything, so the
+    /// cleaned-up text has to find its way back to the entry already there
+    /// rather than start a second one.
+    @MainActor
+    func testTheCleanedTextJoinsTheEntryAlreadyRecorded() {
+        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+
+        let history = DictationHistory(defaults: defaults)
+        history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
+        history.complete(cleaned: "Bonjour.", at: noon)
+
+        XCTAssertEqual(history.recents.entries.count, 1)
+        XCTAssertEqual(history.recents.entries.first?.raw, "bonjour")
+        XCTAssertEqual(history.recents.entries.first?.cleaned, "Bonjour.")
+        XCTAssertEqual(DictationHistory(defaults: defaults).recents.entries.first?.cleaned,
+                       "Bonjour.")
+    }
+
+    /// The dictation it belonged to is long gone — cleared, or pushed off
+    /// the end by fifty others. A late answer then writes nothing at all.
+    @MainActor
+    func testCompletingADictationThatIsNoLongerThereWritesNothing() {
+        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+
+        let history = DictationHistory(defaults: defaults)
+        history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
+        history.complete(cleaned: "Bonsoir.", at: noon.addingTimeInterval(3600))
+
+        XCTAssertEqual(history.recents.entries.count, 1)
+        XCTAssertNil(history.recents.entries.first?.cleaned)
+    }
+
+    /// A model that answered nothing leaves the transcript as it is: an
+    /// empty cleanup is no cleanup, exactly as `record` treats it.
+    @MainActor
+    func testAnEmptyCleanupLeavesTheTranscriptAlone() {
+        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+
+        let history = DictationHistory(defaults: defaults)
+        history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
+        history.complete(cleaned: "   ", at: noon)
+
+        XCTAssertNil(history.recents.entries.first?.cleaned)
+    }
+
     @MainActor
     func testEmptyStorageStartsEmpty() {
         let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
