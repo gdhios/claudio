@@ -85,12 +85,18 @@ enum PaletteCatalog {
     }
 
     /// Rows shown for a given query: the matched actions, then the custom
-    /// action, last of what transforms the selection. It's always there: it's
-    /// the escape hatch for when the catalog doesn't cover what's wanted, and
-    /// it takes the typed text as its instruction. "What's playing?" comes
-    /// after them all, so the ranks they have always had keep launching them
-    /// — 9 is still the custom action — and it goes without one past the
-    /// ninth: its own shortcut is there to launch it.
+    /// action. It's always there: it's the escape hatch for when the catalog
+    /// doesn't cover what's wanted, and it takes the typed text as its
+    /// instruction.
+    ///
+    /// Where "What's playing?" goes depends on whether anything is typed.
+    /// Nothing typed, the palette is a menu: it comes after everything that
+    /// transforms the selection, so the ranks they have always had keep
+    /// launching them — 9 is still the custom action — and it goes without
+    /// one past the ninth, its own shortcut being there to launch it. Typed,
+    /// the palette is a search: what the query finds comes first and the
+    /// escape hatch last, so "What's playing?" found by "musique" takes the
+    /// top, where Enter launches it.
     ///
     /// With nothing selected, only what works without a selection: every
     /// action — the custom one included — would have nothing to transform.
@@ -113,7 +119,8 @@ enum PaletteCatalog {
                                         : loc("Envoyé tel quel comme instruction", en: "Sent as-is as the instruction"),
             trailing: instruction.isEmpty ? ClaudioRequest.freeShortcutDescription : freeBadge
         )
-        return catalog + [free] + whatsPlaying
+        return instruction.isEmpty ? catalog + [free] + whatsPlaying
+                                   : catalog + whatsPlaying + [free]
     }
 
     /// "What's playing?", when the query finds it: in its labels, or in the

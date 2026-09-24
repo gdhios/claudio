@@ -68,16 +68,18 @@ final class PaletteCatalogTests: XCTestCase {
         XCTAssertEqual(libre?.request?.needsInstruction, true)
     }
 
-    /// "What's playing?" transforms no selection: it comes after everything
-    /// that does, the custom action included, so the ranks they had keep
-    /// launching them. It shows whatever its own shortcut is bound to on the
-    /// right, and sends no request — it opens a panel of its own.
+    /// Nothing typed, "What's playing?" — which transforms no selection —
+    /// comes after everything that does, the custom action included, so the
+    /// ranks they had keep launching them. Spaces are nothing typed. It
+    /// shows whatever its own shortcut is bound to on the right, and sends
+    /// no request: it opens a panel of its own.
     @MainActor
-    func testWhatsPlayingComesAfterEverythingThatTransformsTheSelection() throws {
+    func testWithNothingTypedWhatsPlayingComesAfterEverythingThatTransformsTheSelection() throws {
         let rows = PaletteCatalog.rows(matching: "")
         XCTAssertEqual(rows.map(\.kind),
                        ClaudioAction.allCases.map { .request(.catalog($0)) }
                            + [.request(.free(instruction: "")), .whatsPlaying])
+        XCTAssertEqual(PaletteCatalog.rows(matching: "   ").map(\.kind), rows.map(\.kind))
         let row = try XCTUnwrap(rows.first { $0.kind == .whatsPlaying })
         XCTAssertEqual(row.title, "Qu'est-ce que j'écoute ?")
         XCTAssertEqual(row.detail, "Le morceau en cours, raconté par Claude")
@@ -94,6 +96,28 @@ final class PaletteCatalogTests: XCTestCase {
             XCTAssertTrue(PaletteCatalog.rows(matching: query).contains { $0.kind == .whatsPlaying }, query)
         }
         XCTAssertFalse(PaletteCatalog.rows(matching: "trad").contains { $0.kind == .whatsPlaying })
+    }
+
+    /// Typed, the query is a search: what it finds comes first and the
+    /// escape hatch last, as for the catalog. "What's playing?" found this
+    /// way takes the top, where Enter launches it; a query that finds an
+    /// action and not it leaves it out.
+    @MainActor
+    func testATypedQueryPutsWhatsPlayingAmongTheMatchesBeforeTheCustomAction() {
+        XCTAssertEqual(PaletteCatalog.rows(matching: "musique").map(\.kind),
+                       [.whatsPlaying, .request(.free(instruction: "musique"))])
+        XCTAssertEqual(PaletteCatalog.rows(matching: "trad").map(\.kind),
+                       [.request(.catalog(.translateFR)), .request(.catalog(.translateEN)),
+                        .request(.free(instruction: "trad"))])
+
+        let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour"
+        session.phase = .choosingAction
+        session.paletteQuery = "musique"
+        // Enter launches the selected row, which typing brings back to the top.
+        XCTAssertEqual(session.paletteSelection, 0)
+        XCTAssertEqual(session.selectedPaletteRow?.kind, .whatsPlaying)
+        XCTAssertEqual(session.paletteIndex(forRank: 1, withCommand: true), 0)
     }
 
     @MainActor

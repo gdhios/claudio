@@ -33,8 +33,9 @@ final class ClaudioCatalogTests: XCTestCase {
     /// promised on screen would become untypeable. Every row that transforms
     /// the selection — the catalog and the custom action — has one; only
     /// "What's playing?", which transforms nothing, has a shortcut of its own
-    /// and comes after them, may fall past the ninth and go without. Adding
-    /// one row too many means rethinking the display, not just adding a case.
+    /// and comes after them while nothing is typed, may fall past the ninth
+    /// and go without. Adding one row too many means rethinking the display,
+    /// not just adding a case.
     @MainActor
     func testEveryRowThatTransformsTheSelectionFitsInRanks1To9() {
         let rows = PaletteCatalog.rows(matching: "")

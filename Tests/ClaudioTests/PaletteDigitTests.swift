@@ -88,8 +88,9 @@ final class PaletteDigitTests: XCTestCase {
     /// The rank in front of a row is the key that launches it. Ten rows
     /// don't fit on nine digits: 9 still launches the custom action, as it
     /// always has, and the tenth — "What's playing?", which has a shortcut
-    /// of its own and comes first when nothing is selected — shows no rank
-    /// rather than a "10" no key can type.
+    /// of its own, comes first when nothing is selected, and rises among the
+    /// matches as soon as a search finds it — shows no rank rather than a
+    /// "10" no key can type.
     @MainActor
     func testEveryRankShownLaunchesItsRow() {
         let session = palette()
