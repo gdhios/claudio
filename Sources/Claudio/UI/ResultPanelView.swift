@@ -56,7 +56,11 @@ final class CorrectionSession: ObservableObject {
     /// Palette input: filters the catalog, and serves as the instruction if it's
     /// the custom-action row that gets launched.
     @Published var paletteQuery = "" {
-        didSet { paletteSelection = 0 }  // the filter changed, so does the list
+        // The filter changed, so does the list. Only then: the field also
+        // hands its text back, unchanged, when Return ends the editing, and
+        // going back to the top on that write made ↓ then Enter launch the
+        // first row instead of the highlighted one.
+        didSet { if paletteQuery != oldValue { paletteSelection = 0 } }
     }
     @Published var paletteSelection = 0
     var originalText = ""

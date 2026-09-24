@@ -120,6 +120,23 @@ final class PaletteCatalogTests: XCTestCase {
         XCTAssertEqual(session.paletteIndex(forRank: 1, withCommand: true), 0)
     }
 
+    /// The field hands its text back to the session when Return ends the
+    /// editing, unchanged. That write must leave the row picked with ↓ where
+    /// it is: taking the selection back to the top on it made ↓ then Enter
+    /// launch the first row, whichever one was highlighted.
+    @MainActor
+    func testTheFieldWritingBackTheSameQueryKeepsTheSelection() {
+        let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour"
+        session.phase = .choosingAction
+        session.movePaletteSelection(by: 99)
+        XCTAssertEqual(session.selectedPaletteRow?.kind, .whatsPlaying)
+
+        session.paletteQuery = session.paletteQuery
+
+        XCTAssertEqual(session.selectedPaletteRow?.kind, .whatsPlaying)
+    }
+
     @MainActor
     func testTheSelectionStaysWithinTheList() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
