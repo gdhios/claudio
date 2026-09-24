@@ -77,8 +77,25 @@ extension PaletteCatalog {
 /// Nor is "What's playing?": it transforms no selection. A color no action
 /// wears, in the panel's header and in front of its shortcut in Settings.
 extension ListeningSession {
-    static let symbolName = "music.note"
-    static let tint = Color.mint
+    nonisolated static let symbolName = "music.note"
+    nonisolated static let tint = Color.mint
+}
+
+/// Same pair for a palette row, whatever it launches.
+extension PaletteRow.Kind {
+    var symbolName: String {
+        switch self {
+        case .request(let origin): origin.symbolName
+        case .whatsPlaying: ListeningSession.symbolName
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .request(let origin): origin.tint
+        case .whatsPlaying: ListeningSession.tint
+        }
+    }
 }
 
 /// Colored icon dot, styled after System Settings.

@@ -30,11 +30,16 @@ final class ClaudioCatalogTests: XCTestCase {
     }
 
     /// The palette numbers its rows 1 through 9: beyond that, the ranks
-    /// promised on screen would become untypeable. Adding one action too many
-    /// means rethinking the display, not just adding a case.
+    /// promised on screen would become untypeable. Every row that transforms
+    /// the selection — the catalog and the custom action — has one; only
+    /// "What's playing?", which transforms nothing, has a shortcut of its own
+    /// and comes after them, may fall past the ninth and go without. Adding
+    /// one row too many means rethinking the display, not just adding a case.
     @MainActor
-    func testThePaletteFitsInRanks1To9() {
-        XCTAssertLessThanOrEqual(PaletteCatalog.rows(matching: "").count, 9)
+    func testEveryRowThatTransformsTheSelectionFitsInRanks1To9() {
+        let rows = PaletteCatalog.rows(matching: "")
+        XCTAssertEqual(rows.last?.kind, .whatsPlaying)
+        XCTAssertLessThanOrEqual(rows.dropLast().count, 9)
     }
 
     /// Every action must arrive on screen whole: an empty label would make a

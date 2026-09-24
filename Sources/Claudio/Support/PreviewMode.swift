@@ -6,7 +6,7 @@ import SwiftUI
 /// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
 /// panel-free-unheard, panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
-/// palette-libre, listening, listening-streaming, listening-nothing,
+/// palette-libre, palette-noselection, listening, listening-streaming, listening-nothing,
 /// listening-nokey, settings, settings-dictation, settings-shortcuts-lone-key,
 /// settings-streamdeck.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
@@ -296,16 +296,18 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             en: "Takako Mamiya is a Japanese city pop singer. LOVE TRIP, released in 1982, is her only album: long overlooked, it became a cult favourite with the online revival of city pop.")
     }
 
-    /// Palette: the real panel, stopped at the choosing phase.
+    /// Palette: the real panel, stopped at the choosing phase — on a
+    /// selection, or on nothing at all, where only what works without one is
+    /// offered.
     private func showPalettePreview() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
-        session.originalText = sampleText
+        if mode != "palette-noselection" { session.originalText = sampleText }
         switch mode {
         case "palette-filtre":
             session.paletteQuery = "trad"
         case "palette-libre":
             session.paletteQuery = sampleInstruction
-        default:  // "palette"
+        default:  // "palette", "palette-noselection"
             break
         }
         session.phase = .choosingAction

@@ -194,6 +194,14 @@ extension ClaudioRequest {
     }
 }
 
+extension ListeningSession {
+    /// Same for "What's playing?", which isn't one either.
+    @MainActor
+    static var shortcutDescription: String {
+        KeyboardShortcuts.getShortcut(for: .whatsPlaying)?.description ?? ""
+    }
+}
+
 extension WindowLayout {
     /// Global shortcut that snaps the frontmost window to this layout.
     var shortcutName: KeyboardShortcuts.Name {

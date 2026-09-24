@@ -47,8 +47,8 @@ final class PaletteCatalogTests: XCTestCase {
 
     @MainActor
     func testTheFreeRowIsAlwaysPresent() {
-        // Full catalog + the free row.
-        XCTAssertEqual(PaletteCatalog.rows(matching: "").count, ClaudioAction.allCases.count + 1)
+        // Full catalog + "What's playing?" + the free row.
+        XCTAssertEqual(PaletteCatalog.rows(matching: "").count, ClaudioAction.allCases.count + 2)
 
         // No action matches: only the free row remains, which reuses the
         // input as its instruction.
@@ -56,21 +56,50 @@ final class PaletteCatalogTests: XCTestCase {
         XCTAssertEqual(orphelines.count, 1)
         XCTAssertEqual(orphelines[0].title, "Traduis en espagnol")
         XCTAssertEqual(orphelines[0].origin, .free(instruction: "Traduis en espagnol"))
-        XCTAssertFalse(orphelines[0].request.needsInstruction)
+        XCTAssertEqual(orphelines[0].request?.needsInstruction, false)
     }
 
     @MainActor
     func testTheFreeRowWithNoInstructionStaysPendingToSendLater() {
-        let libre = PaletteCatalog.rows(matching: "").last
+        let libre = PaletteCatalog.rows(matching: "").last { $0.origin != nil }
         XCTAssertEqual(libre?.origin, .free(instruction: ""))
         // With no instruction, the request can't be sent: the panel switches
         // to the input field instead of dispatching an empty instruction.
-        XCTAssertEqual(libre?.request.needsInstruction, true)
+        XCTAssertEqual(libre?.request?.needsInstruction, true)
+    }
+
+    /// "What's playing?" transforms no selection: it comes after everything
+    /// that does, the custom action included, so the ranks they had keep
+    /// launching them. It shows whatever its own shortcut is bound to on the
+    /// right, and sends no request — it opens a panel of its own.
+    @MainActor
+    func testWhatsPlayingComesAfterEverythingThatTransformsTheSelection() throws {
+        let rows = PaletteCatalog.rows(matching: "")
+        XCTAssertEqual(rows.map(\.kind),
+                       ClaudioAction.allCases.map { .request(.catalog($0)) }
+                           + [.request(.free(instruction: "")), .whatsPlaying])
+        let row = try XCTUnwrap(rows.first { $0.kind == .whatsPlaying })
+        XCTAssertEqual(row.title, "Qu'est-ce que j'écoute ?")
+        XCTAssertEqual(row.detail, "Le morceau en cours, raconté par Claude")
+        XCTAssertEqual(row.trailing, ListeningSession.shortcutDescription)
+        XCTAssertNil(row.origin)
+        XCTAssertNil(row.request)
+    }
+
+    /// Found the way the actions are: every word typed starts a word of its
+    /// labels, or of the few a listener would reach for.
+    @MainActor
+    func testWhatsPlayingIsFoundByWhatOneListensTo() {
+        for query in ["écoute", "ECOUTE", "morceau", "musique", "mus", "chanson", "qu'est-ce que"] {
+            XCTAssertTrue(PaletteCatalog.rows(matching: query).contains { $0.kind == .whatsPlaying }, query)
+        }
+        XCTAssertFalse(PaletteCatalog.rows(matching: "trad").contains { $0.kind == .whatsPlaying })
     }
 
     @MainActor
     func testTheSelectionStaysWithinTheList() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour"
         session.movePaletteSelection(by: -1)
         XCTAssertEqual(session.paletteSelection, 0)
 
@@ -82,6 +111,7 @@ final class PaletteCatalogTests: XCTestCase {
     @MainActor
     func testFilteringResetsTheSelectionToTheTop() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour"
         session.movePaletteSelection(by: 3)
         XCTAssertEqual(session.paletteSelection, 3)
 

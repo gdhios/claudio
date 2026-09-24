@@ -62,8 +62,20 @@ final class CorrectionSession: ObservableObject {
     var originalText = ""
     var maxTokensMultiplier = 1
 
+    /// Whether the capture found anything to work on. Only ever false past
+    /// the capture for a palette: every other request stops at `noSelection`.
+    var hasSelection: Bool { !originalText.isEmpty }
+
+    /// Where the session goes when the capture comes back empty. The palette
+    /// still opens, on what works without a selection: opening it asks a
+    /// question rather than giving an order. Every other request had the
+    /// selection for material, and says there was none.
+    var phaseWithoutSelection: Phase { opensPalette ? .choosingAction : .noSelection }
+
     /// Palette rows for the current input.
-    var paletteRows: [PaletteRow] { PaletteCatalog.rows(matching: paletteQuery) }
+    var paletteRows: [PaletteRow] {
+        PaletteCatalog.rows(matching: paletteQuery, hasSelection: hasSelection)
+    }
 
     /// Highlighted row, clamped: the filter can shorten the list below
     /// the current index between two keystrokes.

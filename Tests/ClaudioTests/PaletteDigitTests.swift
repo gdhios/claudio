@@ -80,8 +80,32 @@ final class PaletteDigitTests: XCTestCase {
 
     @MainActor private func palette() -> CorrectionSession {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        session.originalText = "Bonjour"
         session.phase = .choosingAction
         return session
+    }
+
+    /// The rank in front of a row is the key that launches it. Ten rows
+    /// don't fit on nine digits: 9 still launches the custom action, as it
+    /// always has, and the tenth — "What's playing?", which has a shortcut
+    /// of its own and comes first when nothing is selected — shows no rank
+    /// rather than a "10" no key can type.
+    @MainActor
+    func testEveryRankShownLaunchesItsRow() {
+        let session = palette()
+        let rows = session.paletteRows
+        for index in rows.indices {
+            guard let rank = PaletteCatalog.rank(ofIndex: index) else {
+                XCTAssertEqual(index, rows.count - 1, "only the last row may go without a rank")
+                XCTAssertEqual(rows[index].kind, .whatsPlaying)
+                continue
+            }
+            XCTAssertEqual(session.paletteIndex(forRank: rank, withCommand: false), index)
+            XCTAssertEqual(session.paletteIndex(forRank: rank, withCommand: true), index)
+        }
+        XCTAssertEqual(session.paletteIndex(forRank: 9, withCommand: false), 8)
+        XCTAssertEqual(rows[8].origin, .free(instruction: ""))
+        XCTAssertNil(PaletteCatalog.rank(ofIndex: 9))
     }
 
     @MainActor

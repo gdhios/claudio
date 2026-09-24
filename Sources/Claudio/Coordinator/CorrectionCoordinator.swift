@@ -5,6 +5,11 @@ import SwiftUI
 @MainActor
 final class CorrectionCoordinator {
     var openSettings: (() -> Void)?
+    /// The palette's "What's playing?" row. Not a request about the
+    /// selection: it opens a panel of its own, which is the one to take this
+    /// panel off the screen — the app hangs `ListeningCoordinator.trigger()`
+    /// here.
+    var openWhatsPlaying: (() -> Void)?
     /// Called whenever the panel leaves the screen, for whatever reason:
     /// Esc, another shortcut, a paste. A spoken instruction hangs its own
     /// ending on it — a microphone left open behind a closed panel would go
@@ -109,7 +114,9 @@ final class CorrectionCoordinator {
         showPanel(for: session)
 
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            session.phase = .noSelection
+            // "No selection found", which closes itself — or, for the
+            // palette, what works without a selection, which waits.
+            session.phase = session.phaseWithoutSelection
             autoDismiss(session)
             return
         }
@@ -179,9 +186,18 @@ final class CorrectionCoordinator {
     func launchPaletteRow(at index: Int) {
         guard let session, session.phase == .choosingAction else { return }
         let rows = session.paletteRows
+        // An empty list — nothing selected, and a query nothing matches —
+        // leaves Enter with nothing to launch.
         guard rows.indices.contains(index) else { return }
         session.paletteSelection = index
-        choose(rows[index].request)
+        switch rows[index].kind {
+        case .request(let origin):
+            choose(PaletteRow.request(for: origin))
+        case .whatsPlaying:
+            // This session ends here, closed by the panel that takes over:
+            // nothing of it is touched past this call.
+            openWhatsPlaying?()
+        }
     }
 
     /// Arrows: only consumes the key when the palette is open, otherwise

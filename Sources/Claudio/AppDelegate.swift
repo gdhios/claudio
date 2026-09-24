@@ -79,6 +79,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.coordinator.dismiss()
             self?.dictation.dismiss()
         }
+        // The palette's "What's playing?" row. Its own panel closes the
+        // palette's through `onOpen` above, before the new session exists:
+        // the `onDismiss` that follows finds nothing of it to take away.
+        coordinator.openWhatsPlaying = { [weak self] in self?.listening.trigger() }
         setupMainMenu()
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)

@@ -19,10 +19,19 @@ final class ListeningSession: ObservableObject {
         case error(String)
     }
 
-    /// What the menu and Settings call the action.
+    /// What the menu, Settings and the palette call the action.
     static var menuTitle: String { loc("Qu'est-ce que j'écoute ?", en: "What's playing?") }
     /// What the panel's header calls it: the name of the macOS widget it reads.
     static var panelTitle: String { loc("À l'écoute", en: "Now playing") }
+    /// The palette row's second line: what it does, in one breath.
+    static var paletteDetail: String {
+        loc("Le morceau en cours, raconté par Claude", en: "The track playing, told by Claude")
+    }
+    /// Never shown: the words the palette also finds the row by, those
+    /// someone after the track would type and its labels don't hold.
+    static var searchTerms: String {
+        loc("musique chanson titre artiste album son", en: "music song title artist album listening")
+    }
 
     /// The model the notes come from, for the panel's footer.
     let model: ModelChoice

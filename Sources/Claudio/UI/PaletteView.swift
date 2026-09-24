@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The action palette: the whole catalog in view, filterable as you
-/// type, and a last row that reuses the input as a custom instruction
+/// type, and a row that reuses the input as a custom instruction
 /// when nothing fits. The same frame as the result panel: it's the
 /// same object, transformed once the action is chosen.
 struct PaletteView: View {
@@ -32,12 +32,18 @@ struct PaletteView: View {
         }
     }
 
+    /// The selection, quoted under the question. With nothing selected
+    /// there's nothing to quote: the line says why the list is short instead.
     private var question: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(loc("Que faire de la sélection ?", en: "What should Claudio do with it?"))
+            Text(session.hasSelection
+                 ? loc("Que faire de la sélection ?", en: "What should Claudio do with it?")
+                 : loc("Rien n'est sélectionné", en: "Nothing is selected"))
                 .font(.system(size: textSize.points(12), weight: .medium))
                 .foregroundStyle(.white.opacity(0.88))
-            Text(session.originalText)
+            Text(session.hasSelection
+                 ? session.originalText
+                 : loc("Voici ce qui marche sans sélection.", en: "Here's what works without one."))
                 .font(.system(size: textSize.points(10)))
                 .foregroundStyle(.white.opacity(0.32))
                 .lineLimit(1)
@@ -50,9 +56,18 @@ struct PaletteView: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Only possible with nothing selected: with a selection, the
+            // custom action is always there to take whatever was typed.
+            if session.paletteRows.isEmpty {
+                Text(loc("Rien ne correspond.", en: "Nothing matches."))
+                    .font(.system(size: textSize.points(11)))
+                    .foregroundStyle(.white.opacity(0.38))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+            }
             ForEach(Array(session.paletteRows.enumerated()), id: \.element.id) { index, row in
                 PaletteRowView(row: row,
-                               number: index + 1,
+                               number: PaletteCatalog.rank(ofIndex: index),
                                isSelected: index == session.paletteSelection,
                                textSize: textSize)
                     .contentShape(Rectangle())
@@ -67,11 +82,16 @@ struct PaletteView: View {
     }
 
     /// The field does two jobs at once: it filters the catalog, and whatever
-    /// stays written in it becomes the instruction if it's the last row that gets launched.
+    /// stays written in it becomes the instruction if it's the custom
+    /// action's row that gets launched.
     private var field: some View {
         HStack(spacing: 10) {
+            // With nothing selected, an instruction would have nothing to
+            // apply to: the field only filters.
             TextField("", text: $session.paletteQuery,
-                      prompt: Text(loc("Filtrer, ou écrire une consigne…", en: "Filter, or write an instruction…"))
+                      prompt: Text(session.hasSelection
+                                   ? loc("Filtrer, ou écrire une consigne…", en: "Filter, or write an instruction…")
+                                   : loc("Filtrer…", en: "Filter…"))
                         .foregroundStyle(.white.opacity(0.3)))
                 .textFieldStyle(.plain)
                 .font(.system(size: textSize.bodyPoints))
@@ -118,7 +138,9 @@ struct PaletteView: View {
 /// a color: the only colors in the list are the actions' icons.
 private struct PaletteRowView: View {
     let row: PaletteRow
-    let number: Int
+    /// The digit that launches the row, `nil` past the ninth: no badge is
+    /// better than one no key can type.
+    let number: Int?
     let isSelected: Bool
     /// The action's label follows the size setting; the rank, icon and
     /// shortcut stay fixed: they're landmarks, not reading material.
@@ -126,22 +148,27 @@ private struct PaletteRowView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("\(number)")
-                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                .foregroundStyle(isSelected ? ClaudioTheme.panelBackground : .white.opacity(0.42))
-                .frame(width: 22, height: 20)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isSelected ? Color.white.opacity(0.88) : Color.white.opacity(0.045))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .strokeBorder(.white.opacity(isSelected ? 0 : 0.08))
-                )
+            if let number {
+                Text("\(number)")
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(isSelected ? ClaudioTheme.panelBackground : .white.opacity(0.42))
+                    .frame(width: 22, height: 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(isSelected ? Color.white.opacity(0.88) : Color.white.opacity(0.045))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(.white.opacity(isSelected ? 0 : 0.08))
+                    )
+            } else {
+                // The badge's room, kept: the icons stay in one column.
+                Color.clear.frame(width: 22, height: 20)
+            }
 
-            Image(systemName: row.origin.symbolName)
+            Image(systemName: row.kind.symbolName)
                 .font(.system(size: 12.5))
-                .foregroundStyle(row.origin.tint.opacity(isSelected ? 1 : 0.75))
+                .foregroundStyle(row.kind.tint.opacity(isSelected ? 1 : 0.75))
                 .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 1) {

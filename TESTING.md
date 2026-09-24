@@ -29,7 +29,7 @@ ANTHROPIC_API_KEY=sk-ant-… .build/release/Claudio --selftest "Le chat dort." "
 | SSE parsing (text, billed tokens, truncation, in-stream errors) | incomplete text, wrong cost, silent error | `AnthropicClientTests` on transcripts — level 1; live at level 3 |
 | Streaming display (fragment buffer) | text lost on screen, stuttering panel | `StreamBufferTests` — level 1 |
 | Paste: never a partial or empty result | the selection is overwritten with half a result | `StreamBufferTests` (`canPaste`) — level 1 |
-| Palette (filtering, ranks 1–9, free line always present) | an action becomes unreachable from the keyboard | `PaletteCatalogTests`, `PaletteDigitTests`, `ClaudioCatalogTests` — level 1 |
+| Palette (filtering, ranks 1–9, free line present whenever something is selected, only what works without a selection when nothing is) | an action becomes unreachable from the keyboard | `PaletteCatalogTests`, `PaletteDigitTests`, `PaletteWithoutSelectionTests`, `ClaudioCatalogTests` — level 1 |
 | Cost counter (rates, totals, daily reset) | wrong figure displayed | `CostLedgerTests` — level 1 |
 | Storage keys and IDs (raw values of actions, models, text sizes) | settings lost on update, API errors | `ClaudioCatalogTests`, `PanelTextSizeTests` — level 1 |
 | Auto-update (version comparison, `version.json` format) | update offered in a loop, or never again | `UpdateCheckerTests` — level 1 |
@@ -53,6 +53,7 @@ On the local build of the committed work (`Scripts/build_app.sh`):
 9. Music while dictating: with Spotify or Music playing, hold the dictation shortcut — playback pauses, and resumes once the key is released. Paused beforehand, it **stays paused** after the dictation. Same with a tapped dictation ended by the next press, and with Esc.
 10. Dictation on a lone key (Accessibility): in Settings → Shortcuts → Dictate, click the field, press right ⌥ and let go — the field shows “Right ⌥” (“⌥ droite” in French). In Notes, hold right ⌥, speak, release: the text is pasted, and the combination set before (⌃A, say) no longer dictates. Type ⌥⇧L with right ⌥ (“|” on AZERTY): the character is typed, no panel opens, the music keeps playing. Left ⌥ alone does nothing. Tap right ⌥ once: it listens hands-free; press it again: the text is pasted.
 11. What's playing? (the real player, which no test reads): with a track playing in Spotify or Music, ⌃⌥⌘S — the panel opens at once, shows the title, the artist and “album · player”, then Claude's notes stream in under them. Paused, the card says “paused” and the notes still come. ⌘C copies “Title — Artist” and closes the panel. With nothing playing: “Nothing playing”, and the panel closes itself. With a correction panel open, ⌃⌥⌘S replaces it; with the listening panel open, ⌃⌥⌘I replaces it.
+12. The palette without a selection (Accessibility): click an empty spot so nothing is selected, ⌃⌥⌘K — the palette opens on “What's playing?” alone, with no quote of a selection. Enter or 1 closes it and opens the listening panel; typing “zzz” empties the list and Enter does nothing. ⌃⌥⌘I with nothing selected still says “No selection found” and closes itself. With a selection, 9 still launches the custom action, and “What's playing?” comes last, without a rank.
 
 ## Adding a feature means extending the net
 
