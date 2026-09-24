@@ -89,18 +89,22 @@ enum BridgeInbound: Equatable, Decodable {
     }
 }
 
-/// What a key launches: a catalog entry, the custom action, or the palette.
+/// What a key launches: a catalog entry, the custom action, the palette, or
+/// "What's playing?" — which reads the player, not the selection.
 enum BridgeActionID: Equatable {
     case catalog(ClaudioAction)
     case free
     case palette
+    case whatsPlaying
 
     /// The name on the wire is the action's own rawValue, so a key and a
-    /// shortcut name the same thing.
+    /// shortcut name the same thing. The three that are no catalog entry
+    /// have names of their own: added, never renamed.
     init?(wireName: String) {
         switch wireName {
         case "free": self = .free
         case "palette": self = .palette
+        case "whatsPlaying": self = .whatsPlaying
         default:
             guard let action = ClaudioAction(rawValue: wireName) else { return nil }
             self = .catalog(action)

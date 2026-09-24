@@ -13,6 +13,7 @@ final class BridgeDispatcherTests: XCTestCase {
         case action(ClaudioAction)
         case free
         case palette
+        case whatsPlaying
         case dictationDown(BridgeDictationLanguage, DictationOutput)
         case dictationUp
         case dictationCancel
@@ -27,6 +28,7 @@ final class BridgeDispatcherTests: XCTestCase {
         triggerAction: { [unowned self] in calls.append(.action($0)) },
         triggerFree: { [unowned self] in calls.append(.free) },
         triggerPalette: { [unowned self] in calls.append(.palette) },
+        triggerWhatsPlaying: { [unowned self] in calls.append(.whatsPlaying) },
         dictationDown: { [unowned self] in calls.append(.dictationDown($0, $1)) },
         dictationUp: { [unowned self] in calls.append(.dictationUp) },
         dictationCancel: { [unowned self] in calls.append(.dictationCancel) },
@@ -54,6 +56,12 @@ final class BridgeDispatcherTests: XCTestCase {
     func testTheCustomActionAndThePaletteAreNotCatalogEntries() {
         assertDispatch(.action(.free), calls: [.free])
         assertDispatch(.action(.palette), calls: [.palette])
+    }
+
+    /// The listening panel, not a correction: the key reaches the listening
+    /// coordinator and asks nothing of the selection.
+    func testWhatsPlayingOpensTheListeningPanel() {
+        assertDispatch(.action(.whatsPlaying), calls: [.whatsPlaying])
     }
 
     // MARK: - Dictation

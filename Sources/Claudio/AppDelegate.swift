@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         triggerAction: { [weak self] action in self?.coordinator.trigger(action: action) },
         triggerFree: { [weak self] in self?.coordinator.triggerFreeAction() },
         triggerPalette: { [weak self] in self?.coordinator.triggerPalette() },
+        triggerWhatsPlaying: { [weak self] in self?.listening.trigger() },
         dictationDown: { [weak self] language, output in
             // The plugin names one of the two shortcuts, not a locale: the
             // key dictates in whatever Settings has for that one, and

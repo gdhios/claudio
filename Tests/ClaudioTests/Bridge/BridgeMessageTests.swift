@@ -61,6 +61,12 @@ final class BridgeMessageTests: XCTestCase {
         XCTAssertEqual(try decoded("action-palette"), .action(.palette))
     }
 
+    /// "What's playing?" reads the player, not the selection: it is no
+    /// catalog entry, and it rides the Action key's frame all the same.
+    func testWhatsPlayingIsNoCatalogEntryAndArrivesByItsOwnName() throws {
+        XCTAssertEqual(try decoded("action-whats-playing"), .action(.whatsPlaying))
+    }
+
     // MARK: - Dictation
 
     /// The key going down carries what the dictation will be: the language
@@ -110,6 +116,8 @@ final class BridgeMessageTests: XCTestCase {
 
     func testAnUnknownActionIsRefused() {
         assertRejects(#"{"type":"action","id":"rewriteInLatin"}"#)
+        // The fixture's file name is not the wire name.
+        assertRejects(#"{"type":"action","id":"whats-playing"}"#)
     }
 
     func testAnUnknownLayoutIsRefused() {

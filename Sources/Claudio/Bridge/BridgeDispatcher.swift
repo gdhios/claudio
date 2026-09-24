@@ -8,6 +8,7 @@ struct BridgeDispatcher {
     var triggerAction: (ClaudioAction) -> Void
     var triggerFree: () -> Void
     var triggerPalette: () -> Void
+    var triggerWhatsPlaying: () -> Void
     /// The press carries what it dictates — the shortcut slot and what the
     /// words become — as a keyboard shortcut does.
     var dictationDown: (BridgeDictationLanguage, DictationOutput) -> Void
@@ -30,6 +31,8 @@ struct BridgeDispatcher {
             triggerFree()
         case .action(.palette):
             triggerPalette()
+        case .action(.whatsPlaying):
+            triggerWhatsPlaying()
         case .dictationDown(let language, let output):
             dictationDown(language, output)
         case .dictationUp:

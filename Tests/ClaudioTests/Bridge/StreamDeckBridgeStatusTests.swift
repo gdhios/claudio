@@ -52,6 +52,7 @@ private extension BridgeDispatcher {
     /// started would do with them.
     static var doingNothing: BridgeDispatcher {
         BridgeDispatcher(triggerAction: { _ in }, triggerFree: {}, triggerPalette: {},
+                         triggerWhatsPlaying: {},
                          dictationDown: { _, _ in }, dictationUp: {}, dictationCancel: {},
                          applyLayout: { _ in }, nextScreen: {}, openSettings: {})
     }
