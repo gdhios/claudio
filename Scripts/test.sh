@@ -87,10 +87,11 @@ preview_shot() {
 
 # The screens everything passes through: panel (result, streaming, error,
 # free instruction typed, spoken or unheard, dictation listening held or
-# locked, cleaning up and stopped), palette (plain and filtered), Settings
-# (API key, engine per action, local server, shortcuts, dictation on a lone
-# key, dictation, Stream Deck).
-for mode in panel panel-streaming panel-error panel-noselection panel-free panel-free-listening panel-free-unheard panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre settings settings-prompts settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck; do
+# locked, cleaning up and stopped), palette (plain and filtered), "What's
+# playing?" (notes done, streaming over a paused track, nothing playing, no
+# key), Settings (API key, engine per action, local server, shortcuts,
+# dictation on a lone key, dictation, Stream Deck).
+for mode in panel panel-streaming panel-error panel-noselection panel-free panel-free-listening panel-free-unheard panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre listening listening-streaming listening-nothing listening-nokey settings settings-prompts settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck; do
     preview_shot "$mode"
 done
 echo "✅ Critical screens build and render ($SHOTS/)."

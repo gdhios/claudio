@@ -401,11 +401,19 @@ private struct ShortcutsPane: View {
                     Spacer()
                     KeyboardShortcuts.Recorder("", name: .freeAction)
                 }
+                // Outside the catalog too, and needs no selection at all.
+                HStack(spacing: 10) {
+                    IconBadge(systemName: ListeningSession.symbolName,
+                              color: ListeningSession.tint, size: 22)
+                    Text(ListeningSession.menuTitle)
+                    Spacer()
+                    KeyboardShortcuts.Recorder("", name: .whatsPlaying)
+                }
             } header: {
                 Text(loc("Raccourcis globaux", en: "Global shortcuts"))
             } footer: {
-                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire.",
-                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it."))
+                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire. « Qu'est-ce que j'écoute ? » se passe de sélection : Claudio lit le morceau en cours et Claude te le présente.",
+                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it. “What's playing?” needs no selection: Claudio reads the track playing and Claude tells you about it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

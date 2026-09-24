@@ -14,6 +14,10 @@ import Foundation
 enum NowPlaying {
     /// Loads MediaRemote inside `osascript` and reads the flag. Prints `true`
     /// or `false`, and nothing at all on a macOS without the class or the flag.
+    ///
+    /// Only the flag, and not the whole track "What's playing?" reads: this
+    /// one sits on the way into every dictation, and the less it asks, the
+    /// less there is to go wrong there.
     static let script = """
         ObjC.import('Foundation');
         $.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework/').load;

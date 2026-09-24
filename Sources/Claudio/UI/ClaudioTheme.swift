@@ -74,6 +74,13 @@ extension PaletteCatalog {
     static let tint = ClaudioTheme.accent
 }
 
+/// Nor is "What's playing?": it transforms no selection. A color no action
+/// wears, in the panel's header and in front of its shortcut in Settings.
+extension ListeningSession {
+    static let symbolName = "music.note"
+    static let tint = Color.mint
+}
+
 /// Colored icon dot, styled after System Settings.
 struct IconBadge: View {
     let systemName: String

@@ -73,6 +73,20 @@ extension ClaudioMascot.Gaze {
     }
 }
 
+extension ClaudioMascot.Gaze {
+    /// And for "What's playing?": available while the player answers, eyes
+    /// closed while Claude writes, done once he has, blank when there is
+    /// nothing to say or no way to say it.
+    init(_ phase: ListeningSession.Phase) {
+        switch phase {
+        case .reading:                          self = .repos
+        case .streaming:                        self = .veille
+        case .done:                             self = .fait
+        case .nothing, .missingKey, .error:     self = .vide
+        }
+    }
+}
+
 // MARK: - Grid and colors
 
 /// The master file's grid: 512 to a side, framed on the bust.

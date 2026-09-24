@@ -48,6 +48,13 @@ extension KeyboardShortcuts.Name {
         "actionPalette",
         initial: .init(.k, modifiers: [.control, .option, .command])
     )
+    /// "What's playing?": S as in "son" (sound), in the actions' family, on
+    /// a letter none of them takes and at the same physical position on
+    /// AZERTY and QWERTY. The name is a storage key: it stays.
+    static let whatsPlaying = Self(
+        "whatsPlaying",
+        initial: .init(.s, modifiers: [.control, .option, .command])
+    )
 
     /// Dictation, held down: the space bar, the one key a thumb finds without
     /// looking — which is what a push-to-talk shortcut is. It also keeps the
@@ -262,6 +269,14 @@ enum HotkeySetup {
         }
         KeyboardShortcuts.onKeyUp(for: .freeAction) { [weak coordinator] in
             coordinator?.keyUp()
+        }
+    }
+
+    /// "What's playing?", on the key coming up like the actions: it drives
+    /// its own coordinator, since it has no selection to capture.
+    static func installListening(coordinator: ListeningCoordinator) {
+        KeyboardShortcuts.onKeyUp(for: .whatsPlaying) { [weak coordinator] in
+            coordinator?.trigger()
         }
     }
 

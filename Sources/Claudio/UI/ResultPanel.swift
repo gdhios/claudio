@@ -103,6 +103,29 @@ final class ResultPanel: NSPanel {
         return panel
     }
 
+    /// Same panel, hosting "What's playing?": nothing was captured and
+    /// nothing gets pasted — a track's card and Claude's notes, with the
+    /// track to copy.
+    @MainActor
+    static func make(session: ListeningSession,
+                     textSize: PanelTextSize = AppSettings.panelTextSize,
+                     onCopy: @escaping () -> Void = {},
+                     onRetry: @escaping () -> Void = {},
+                     onOpenSettings: @escaping () -> Void = {},
+                     onClose: @escaping () -> Void = {}) -> ResultPanel {
+        let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
+        panel.host(ListeningPanelView(
+            session: session,
+            textSize: textSize,
+            onCopy: onCopy,
+            onRetry: onRetry,
+            onOpenSettings: onOpenSettings,
+            onClose: onClose,
+            onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
+        ))
+        return panel
+    }
+
     /// Puts a SwiftUI view into the panel: forced dark appearance (the panel
     /// keeps its theme whatever the system does) and a size that follows the
     /// window.

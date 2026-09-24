@@ -6,7 +6,8 @@ import SwiftUI
 /// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
 /// panel-free-unheard, panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
-/// palette-libre, settings, settings-dictation, settings-shortcuts-lone-key,
+/// palette-libre, listening, listening-streaming, listening-nothing,
+/// listening-nokey, settings, settings-dictation, settings-shortcuts-lone-key,
 /// settings-streamdeck.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
@@ -94,6 +95,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             showMenuBarPreview()
         } else if mode.hasPrefix("panel-listening") || mode.hasPrefix("panel-dictation") {
             showDictationPreview()
+        } else if mode.hasPrefix("listening") {
+            showListeningPreview()
         } else if mode.hasPrefix("palette") {
             showPalettePreview()
         } else {
@@ -251,6 +254,46 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     private var tidiedText: String {
         loc("Bonjour, je voulais te dire que la réunion de ",
             en: "Hi, I wanted to tell you that Wednesday's meeting ")
+    }
+
+    /// "What's playing?": the card with Claude's notes, finished or still
+    /// coming in over a paused track, then the two ways it stops short. The
+    /// session is filled by hand: no coordinator is built, so nothing reads
+    /// this Mac's player and nothing is asked of the network.
+    private func showListeningPreview() {
+        let session = ListeningSession()
+        switch mode {
+        case "listening-streaming":
+            session.track = sampleTrack(playing: false)
+            session.notes = String(sampleNotes.prefix(sampleNotes.count * 2 / 3))
+            session.phase = .streaming
+        case "listening-nothing":
+            session.phase = .nothing
+        case "listening-nokey":
+            session.track = sampleTrack(playing: true)
+            session.phase = .missingKey
+        default:  // "listening"
+            session.track = sampleTrack(playing: true)
+            session.notes = sampleNotes
+            session.phase = .done
+        }
+        let panel = ResultPanel.make(session: session, textSize: textSize)
+        self.panel = panel
+        panel.present()
+    }
+
+    /// A track whose metadata isn't in the Latin alphabet: the card shows it
+    /// as the player gives it.
+    private func sampleTrack(playing: Bool) -> NowPlayingTrack {
+        NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP",
+                        appName: "Spotify", bundleID: "com.spotify.client",
+                        isPlaying: playing, duration: 245)
+    }
+
+    /// Notes of the kind the prompt asks for: who, where from, one fact.
+    private var sampleNotes: String {
+        loc("Takako Mamiya est une chanteuse japonaise de city pop. LOVE TRIP, paru en 1982, est son seul album : longtemps confidentiel, il est devenu culte avec le regain d'intérêt pour la city pop sur internet.",
+            en: "Takako Mamiya is a Japanese city pop singer. LOVE TRIP, released in 1982, is her only album: long overlooked, it became a cult favourite with the online revival of city pop.")
     }
 
     /// Palette: the real panel, stopped at the choosing phase.

@@ -17,7 +17,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Dictation's own coordinator, on Apple's engine. Built here and kept
     /// for the life of the app: the hold shortcuts hold a weak reference to
     /// it, and the microphone only opens on a press.
-    private let dictation = DictationCoordinator(engine: AppleSpeechEngine())
+    ///
+    /// Its panel takes the listening one off the screen first: every panel
+    /// opens in the same spot, and the one that is key takes the keyboard.
+    private lazy var dictation = DictationCoordinator(
+        engine: AppleSpeechEngine(),
+        panel: { [weak self] session, coordinator in
+            self?.listening.dismiss()
+            return DictationCoordinator.systemPanel(for: session, coordinator: coordinator)
+        }
+    )
+    /// "What's playing?": the player read through `osascript`, Claude's
+    /// notes in a panel of its own. Nothing is captured, so no Accessibility.
+    private let listening = ListeningCoordinator()
     /// The free action's own microphone: its shortcut held speaks the
     /// instruction instead of typing it. Its own engine, because a dictation
     /// and an instruction are two microphones that never open together.
@@ -54,12 +66,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
         // A panel gone is a microphone that has nothing left to listen for:
         // Esc, another shortcut or a paste all end a spoken instruction.
-        coordinator.onDismiss = { [weak self] in self?.spokenInstruction.cancel() }
+        // Every correction also starts with this dismissal, which is what
+        // takes the listening panel away before the selection is captured:
+        // left key, it would catch the simulated ⌘C.
+        coordinator.onDismiss = { [weak self] in
+            self?.spokenInstruction.cancel()
+            self?.listening.dismiss()
+        }
+        listening.openSettings = { [weak self] in self?.settingsController.show() }
+        // One panel on screen, the other way round.
+        listening.onOpen = { [weak self] in
+            self?.coordinator.dismiss()
+            self?.dictation.dismiss()
+        }
         setupMainMenu()
         setupStatusItem()
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
+        HotkeySetup.installListening(coordinator: listening)
         // The Stream Deck keys, which are shortcuts by another road. Hooked
         // up whether or not the bridge runs, so Settings can switch it on
         // later without anything else to arrange; the plugin sitting in its
@@ -207,6 +232,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         free.target = self
         menu.addItem(free)
 
+        // Not a transformation of the selection: it reads what plays, and
+        // Claude says a few words about it.
+        let whatsPlaying = NSMenuItem(title: ListeningSession.menuTitle,
+                                      action: #selector(whatsPlayingFromMenu), keyEquivalent: "")
+        whatsPlaying.target = self
+        menu.addItem(whatsPlaying)
+
         // No dictation entry: this menu lists titles without their
         // shortcuts, and dictation is a key held down — a click could only
         // ever open the microphone without a way to close it. Its shortcuts
@@ -322,13 +354,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Pastes the dictation again at the cursor of the app in front, or
-    /// copies it when that app is Claudio. Either panel still on screen has
-    /// the keyboard, so both close before the keystroke.
+    /// copies it when that app is Claudio. Any panel still on screen has the
+    /// keyboard, so they all close before the keystroke.
     @objc private func recentDictationFromMenu(_ sender: NSMenuItem) {
         guard let text = sender.representedObject as? String else { return }
         let paster = RecentDictationPaster(closePanels: { [weak self] in
             self?.coordinator.dismiss()
             self?.dictation.dismiss()
+            self?.listening.dismiss()
         })
         Task { await paster.paste(text) }
     }
@@ -403,6 +436,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func paletteFromMenu() {
         afterMenuCloses { $0.triggerPalette() }
+    }
+
+    /// Nothing to capture here, but the same beat all the same: the panel
+    /// takes the keyboard once the menu is gone and the app in front is
+    /// back, exactly as it does from the shortcut.
+    @objc private func whatsPlayingFromMenu() {
+        afterMenuCloses { [weak self] _ in self?.listening.trigger() }
     }
 
     /// Lets the menu close and the previous app regain focus before
