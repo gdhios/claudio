@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
@@ -211,9 +212,11 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.phase = .askingInstruction
         case "panel-free-answer-track":
             // A request made on nothing selected, answered, with the track
-            // that went out with it named under the answer. Set by hand:
-            // nothing reads this Mac's player.
+            // that went out with it named under the answer, and its Galette
+            // buttons. Set by hand: nothing reads this Mac's player, nor
+            // looks for Galette on it.
             session = CorrectionSession(request: .free(instruction: shareInstruction))
+            session.galette = previewGalette
             session.beginStreaming(sending: sampleTrack(playing: true))
             session.finishStreaming(with: sharedTrackMessage, truncated: false)
         default:  // "panel"
@@ -284,9 +287,11 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     /// "What's playing?": the card with Claude's notes, finished or still
     /// coming in over a paused track, then the two ways it stops short. The
     /// session is filled by hand: no coordinator is built, so nothing reads
-    /// this Mac's player and nothing is asked of the network.
+    /// this Mac's player, nothing is asked of the network, and Galette is
+    /// there on every machine.
     private func showListeningPreview() {
         let session = ListeningSession()
+        session.galette = previewGalette
         switch mode {
         case "listening-streaming":
             session.track = sampleTrack(playing: false)
@@ -313,6 +318,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP",
                         appName: "Spotify", bundleID: "com.spotify.client",
                         isPlaying: playing, duration: 245)
+    }
+
+    /// Galette as if installed, so its buttons show on every machine: the
+    /// generic app icon stands in for its own, and no player is a browser.
+    private var previewGalette: GaletteApp {
+        GaletteApp(icon: NSWorkspace.shared.icon(for: .applicationBundle), browsers: [])
     }
 
     /// Notes of the kind the prompt asks for: who, where from, one fact.

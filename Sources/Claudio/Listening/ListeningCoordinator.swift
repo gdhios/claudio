@@ -185,7 +185,8 @@ final class ListeningCoordinator {
                 coordinator?.dismiss()
                 coordinator?.openSettings?()
             },
-            onClose: { [weak coordinator] in coordinator?.dismiss() }
+            onClose: { [weak coordinator] in coordinator?.dismiss() },
+            onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) }
         )
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
         panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }

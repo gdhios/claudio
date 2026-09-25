@@ -66,7 +66,8 @@ final class ResultPanel: NSPanel {
                      onSubmitInstruction: @escaping () -> Void = {},
                      onLaunchPaletteRow: @escaping (Int) -> Void = { _ in },
                      onOpenSettings: @escaping () -> Void = {},
-                     onClose: @escaping () -> Void = {}) -> ResultPanel {
+                     onClose: @escaping () -> Void = {},
+                     onOpenInGalette: @escaping (GaletteLink) -> Void = { _ in }) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
         let view = ResultPanelView(
             session: session,
@@ -78,6 +79,7 @@ final class ResultPanel: NSPanel {
             onLaunchPaletteRow: onLaunchPaletteRow,
             onOpenSettings: onOpenSettings,
             onClose: onClose,
+            onOpenInGalette: onOpenInGalette,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         )
         panel.host(view)
@@ -105,14 +107,15 @@ final class ResultPanel: NSPanel {
 
     /// Same panel, hosting "What's playing?": nothing was captured and
     /// nothing gets pasted — a track's card and Claude's notes, with the
-    /// track to copy.
+    /// track to copy, or to open in Galette.
     @MainActor
     static func make(session: ListeningSession,
                      textSize: PanelTextSize = AppSettings.panelTextSize,
                      onCopy: @escaping () -> Void = {},
                      onRetry: @escaping () -> Void = {},
                      onOpenSettings: @escaping () -> Void = {},
-                     onClose: @escaping () -> Void = {}) -> ResultPanel {
+                     onClose: @escaping () -> Void = {},
+                     onOpenInGalette: @escaping (GaletteLink) -> Void = { _ in }) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
         panel.host(ListeningPanelView(
             session: session,
@@ -121,6 +124,7 @@ final class ResultPanel: NSPanel {
             onRetry: onRetry,
             onOpenSettings: onOpenSettings,
             onClose: onClose,
+            onOpenInGalette: onOpenInGalette,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         ))
         return panel

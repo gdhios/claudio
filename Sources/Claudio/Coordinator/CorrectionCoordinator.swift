@@ -404,7 +404,8 @@ final class CorrectionCoordinator {
                 coordinator?.dismiss()
                 coordinator?.openSettings?()
             },
-            onClose: { [weak coordinator] in coordinator?.dismiss() }
+            onClose: { [weak coordinator] in coordinator?.dismiss() },
+            onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) }
         )
         panel.onEnter = { [weak coordinator] in coordinator?.confirm() }
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }

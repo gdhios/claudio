@@ -161,3 +161,17 @@ struct PanelPillButtonStyle: ButtonStyle {
             )
     }
 }
+
+/// A button that sits beside a text rather than in the footer: a
+/// `StatusPill`'s size, a little brighter, and it answers the press.
+struct SmallPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(Color.white.opacity(configuration.isPressed ? 0.18 : 0.1), in: Capsule())
+            .contentShape(Capsule())
+    }
+}

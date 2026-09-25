@@ -275,6 +275,7 @@ struct ResultPanelView: View {
     let onLaunchPaletteRow: (Int) -> Void
     let onOpenSettings: () -> Void
     let onClose: () -> Void
+    var onOpenInGalette: (GaletteLink) -> Void = { _ in }
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var textHeight: CGFloat = 0
@@ -450,9 +451,12 @@ struct ResultPanelView: View {
                     }
                 }
             }
-            // Out of the scroll, so a long answer never hides it.
+            // Out of the scroll, so a long answer never hides it, nor its
+            // Galette buttons.
             if let track = session.sentTrack {
-                SentTrackLine(track: track, textSize: textSize)
+                SentTrackLine(track: track, textSize: textSize,
+                              galette: GaletteButtons(galette: session.galette, links: session.galetteLinks,
+                                                      onOpen: onOpenInGalette))
             }
         }
     }

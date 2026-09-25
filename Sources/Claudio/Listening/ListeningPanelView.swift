@@ -13,6 +13,7 @@ struct ListeningPanelView: View {
     let onRetry: () -> Void
     let onOpenSettings: () -> Void
     let onClose: () -> Void
+    var onOpenInGalette: (GaletteLink) -> Void = { _ in }
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var notesHeight: CGFloat = 0
@@ -121,9 +122,25 @@ struct ListeningPanelView: View {
         }
     }
 
-    /// The track as its player names it: the title, the artist, then where
-    /// it comes from — the album and the app playing it.
+    /// The track as its player names it, then the way to it in Galette when
+    /// this Mac has Galette — from the moment the card is up.
     private func card(_ track: NowPlayingTrack) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            trackText(track)
+            if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
+                                            onOpen: onOpenInGalette) {
+                buttons
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, session.phase == .reading ? 12 : 2)
+    }
+
+    /// The title, the artist, then where the track comes from — the album
+    /// and the app playing it.
+    private func trackText(_ track: NowPlayingTrack) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(track.title)
@@ -153,9 +170,6 @@ struct ListeningPanelView: View {
         .fixedSize(horizontal: false, vertical: true)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, session.phase == .reading ? 12 : 2)
     }
 
     /// "Album · app", with whichever of the two the player gave.
