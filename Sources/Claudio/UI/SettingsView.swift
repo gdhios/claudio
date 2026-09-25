@@ -129,8 +129,8 @@ private struct GeneralPane: View {
                     }
                 }
                 .onChange(of: language) { AppSettings.language = language }
-                Text(loc("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné.",
-                         en: "Applies to Claudio's own labels. What Claude sends back always follows the language of the selected text."))
+                Text(loc("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné, ou dans celle de ta demande quand rien n'est sélectionné.",
+                         en: "Applies to Claudio's own labels. What Claude sends back always follows the language of the selected text, or of your request when nothing is selected."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -412,8 +412,8 @@ private struct ShortcutsPane: View {
             } header: {
                 Text(loc("Raccourcis globaux", en: "Global shortcuts"))
             } footer: {
-                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire. « Qu'est-ce que j'écoute ? » se passe de sélection : Claudio lit le morceau en cours et Claude te le présente.",
-                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it. “What's playing?” needs no selection: Claudio reads the track playing and Claude tells you about it."))
+                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire. Sans sélection, elle devient une demande à Claudio, et Entrée colle sa réponse au curseur. Avec ou sans sélection, elle emporte le morceau en cours s'il y en a un, même en pause ; les autres actions, jamais. « Qu'est-ce que j'écoute ? » se passe aussi de sélection : Claudio lit le morceau en cours et Claude te le présente.",
+                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it. With nothing selected, it becomes a request to Claudio, and Enter pastes the answer at the cursor. Selection or not, it takes the current track along if there is one, even paused; the other actions never do. “What's playing?” needs no selection either: Claudio reads the track playing and Claude tells you about it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
