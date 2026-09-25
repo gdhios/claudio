@@ -99,6 +99,47 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.clientRequests, [])
         XCTAssertEqual(bench.client.calls, 0)
     }
+
+    // MARK: - Galette
+
+    /// With Galette on the Mac, the card offers the artist, then the album.
+    /// Galette is looked for once, as the panel opens.
+    func testWithGaletteTheCardOffersTheArtistThenTheAlbum() async throws {
+        let bench = Bench(galetteInstalled: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        XCTAssertEqual(bench.galette.lookups, 1)
+
+        await bench.runs()
+        XCTAssertEqual(session.galetteLinks, [.artist(name: "間宮貴子"),
+                                              .album(artist: "間宮貴子", title: "LOVE TRIP")])
+        XCTAssertEqual(bench.galette.lookups, 1)
+    }
+
+    /// Without Galette, no button — and nothing on the card says it's missing.
+    func testWithoutGaletteTheCardOffersNothing() async throws {
+        let bench = Bench()
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        XCTAssertEqual(session.track, .sample)
+        XCTAssertNil(session.galette)
+        XCTAssertEqual(session.galetteLinks, [])
+    }
+
+    /// A button hands its link to Galette, and the panel, its job done,
+    /// closes.
+    func testAGaletteButtonOpensItsLinkThenClosesThePanel() async throws {
+        let bench = Bench(galetteInstalled: true)
+        bench.coordinator.trigger()
+        await bench.runs()
+
+        let album = GaletteLink.album(artist: "間宮貴子", title: "LOVE TRIP")
+        bench.coordinator.openInGalette(album)
+        XCTAssertEqual(bench.galette.opened, [album.url])
+        XCTAssertNil(bench.coordinator.session)
+    }
 }
 
 // MARK: - The bench
@@ -119,6 +160,8 @@ private final class Bench {
     static let notes = "Takako Mamiya est une chanteuse japonaise de city pop. Love Trip est son seul album."
 
     let client: FakeNotesClient
+    /// Galette, missing unless the test installs it.
+    let galette: FakeGalette
     var coordinator: ListeningCoordinator { built }
     private var built: ListeningCoordinator!
 
@@ -142,11 +185,13 @@ private final class Bench {
     init(track: NowPlayingTrack? = .sample,
          answer: Result<String, Error> = .success(Bench.notes),
          hasClient: Bool = true,
-         readsWait: Bool = false) {
+         readsWait: Bool = false,
+         galetteInstalled: Bool = false) {
         self.track = track
         self.readsWait = readsWait
         let client = FakeNotesClient(answer)
         self.client = client
+        galette = FakeGalette(installed: galetteInstalled)
         built = ListeningCoordinator(
             source: NowPlayingSource { [weak self] in
                 guard let self else { return nil }
@@ -163,7 +208,8 @@ private final class Bench {
                 self?.panels += 1
                 return nil
             },
-            durations: .init(empty: .milliseconds(50), failure: .milliseconds(50))
+            durations: .init(empty: .milliseconds(50), failure: .milliseconds(50)),
+            galette: galette.service
         )
     }
 

@@ -6,8 +6,8 @@ import AppKit
 /// is pasted: no selection, no Accessibility, a card and a text.
 ///
 /// Everything that touches the outside world arrives through `init`: the
-/// player, the model, the panel, how long a message stays up. The whole
-/// cycle is then playable without `osascript`, a network or a screen.
+/// player, the model, the panel, how long a message stays up, Galette. The
+/// whole cycle is then playable without `osascript`, a network or a screen.
 @MainActor
 final class ListeningCoordinator {
     /// Puts the session on screen and hands back the panel to keep. `nil`
@@ -25,6 +25,7 @@ final class ListeningCoordinator {
     private let client: DictationCoordinator.ClientFactory
     private let makePanel: PanelMaker
     private let durations: DictationCoordinator.MessageDurations
+    private let galette: GaletteService
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -36,11 +37,13 @@ final class ListeningCoordinator {
     init(source: NowPlayingSource = .system,
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = ListeningCoordinator.systemPanel,
-         durations: DictationCoordinator.MessageDurations = .standard) {
+         durations: DictationCoordinator.MessageDurations = .standard,
+         galette: GaletteService = .system) {
         self.source = source
         self.client = client
         self.makePanel = panel
         self.durations = durations
+        self.galette = galette
     }
 
     // MARK: - The cycle
@@ -53,6 +56,8 @@ final class ListeningCoordinator {
         // into `dismiss()`, which must then find nothing of this one to close.
         onOpen?()
         let session = ListeningSession()
+        // Looked for with each panel: the card only offers what this Mac has.
+        session.galette = galette.find()
         self.session = session
         panel = makePanel(session, self)
         cycle = Task { [weak self] in
@@ -134,6 +139,14 @@ final class ListeningCoordinator {
             guard self?.session === session, session.justCopied else { return }
             self?.dismiss()
         }
+    }
+
+    /// A Galette button on the card: the track goes to Galette, and the
+    /// panel, its job done, closes.
+    func openInGalette(_ link: GaletteLink) {
+        guard session != nil else { return }
+        galette.open(link.url)
+        dismiss()
     }
 
     /// "Nothing playing" has said its piece and takes itself off the screen.

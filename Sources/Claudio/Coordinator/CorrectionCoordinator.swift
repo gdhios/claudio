@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Everything that touches the outside world arrives through `init`: the
 /// permission and the paste, the selection, the player, the model, the
-/// panel, the history. The whole cycle is then playable without
+/// panel, Galette, the history. The whole cycle is then playable without
 /// Accessibility, a pasteboard, `osascript`, a network or a screen.
 @MainActor
 final class CorrectionCoordinator {
@@ -62,6 +62,7 @@ final class CorrectionCoordinator {
     private let source: NowPlayingSource
     private let makeClient: DictationCoordinator.ClientFactory
     private let makePanel: PanelMaker
+    private let galette: GaletteService
     private let history: TransformHistory
 
     init(durations: DictationCoordinator.MessageDurations = .standard,
@@ -70,6 +71,7 @@ final class CorrectionCoordinator {
          source: NowPlayingSource = .system,
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = CorrectionCoordinator.systemPanel,
+         galette: GaletteService = .system,
          history: TransformHistory = .shared) {
         self.durations = durations
         self.pasting = pasting
@@ -77,6 +79,7 @@ final class CorrectionCoordinator {
         self.source = source
         self.makeClient = client
         self.makePanel = panel
+        self.galette = galette
         self.history = history
     }
 
@@ -138,9 +141,11 @@ final class CorrectionCoordinator {
 
         // Asked at the same moment as the selection, and on the side: a
         // tenth of a second, which never holds the panel up. A catalog
-        // action never sends the track, so it never asks for it either.
+        // action never sends the track, so it never asks for it either —
+        // nor looks for Galette, which only ever opens a track sent.
         if request.receivesTrack {
             trackRead = Task { [source] in await source.current() }
+            session.galette = galette.find()
         }
         streamTask = Task { [weak self] in
             await self?.runCorrection(session: session)
@@ -362,6 +367,13 @@ final class CorrectionCoordinator {
                 self?.dismiss()
             }
         }
+    }
+
+    /// A Galette button on the line naming the track: it goes to Galette,
+    /// and the panel stays — an answer not pasted yet must not go with it.
+    func openInGalette(_ link: GaletteLink) {
+        guard session != nil else { return }
+        galette.open(link.url)
     }
 
     func pasteResult() {

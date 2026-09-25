@@ -47,6 +47,9 @@ final class CorrectionSession: ObservableObject {
     /// action, nothing playing, nothing sent yet. The line under the answer
     /// names this one — what was sent, not what plays now.
     @Published private(set) var sentTrack: NowPlayingTrack?
+    /// Galette, when the panel found it as it opened — only for a request
+    /// that may send the track. `nil` without Galette.
+    @Published var galette: GaletteApp?
     /// Instruction currently being typed — or said, when the shortcut is
     /// held: both gestures fill the same field (custom action).
     @Published var instruction = ""
@@ -152,6 +155,13 @@ final class CorrectionSession: ObservableObject {
     }
 
     var canPaste: Bool { phase == .done && !correctedText.isEmpty }
+
+    /// The Galette buttons on the line naming the track sent: none without
+    /// Galette, before a track went out, or for one that gives nothing to open.
+    var galetteLinks: [GaletteLink] {
+        guard let galette, let sentTrack else { return [] }
+        return galette.links(for: sentTrack)
+    }
 
     /// Usable instruction: the "Run" button and ⏎ stay inert without it.
     var trimmedInstruction: String {

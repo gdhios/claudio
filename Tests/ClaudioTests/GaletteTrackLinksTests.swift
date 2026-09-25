@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Claudio
 
@@ -69,6 +70,17 @@ final class GaletteTrackLinksTests: XCTestCase {
         let track = NowPlayingTrack(title: "Brothers Gonna Work It Out (Full Album)",
                                     artist: "HK Disco Club", appName: "Zen", bundleID: "app.zen-browser.zen")
         XCTAssertEqual(GaletteLink.links(for: track, playerIsBrowser: true), [])
+    }
+
+    /// A player is a browser when its bundle id is among the apps that open
+    /// `https://` links, as found with Galette: no list of browsers to keep.
+    func testAPlayerIsABrowserWhenItOpensWebLinks() {
+        let galette = GaletteApp(icon: NSImage(), browsers: ["app.zen-browser.zen", "com.apple.Safari"])
+        XCTAssertEqual(galette.links(for: .youTubeInZen), [.artist(name: "The Chemical Brothers")])
+
+        var elsewhere = NowPlayingTrack.youTubeInZen
+        elsewhere.bundleID = "com.example.player"
+        XCTAssertEqual(galette.links(for: elsewhere), [.artist(name: "HK Disco Club")])
     }
 
     // MARK: - The artist in a title

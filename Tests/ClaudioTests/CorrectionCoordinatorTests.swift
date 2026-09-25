@@ -228,16 +228,55 @@ final class CorrectionCoordinatorTests: XCTestCase {
     }
 
     /// A catalog action never hears of the track: the player isn't even
-    /// asked, and the panel names nothing.
+    /// asked, nor Galette looked for, and the panel names nothing.
     func testACatalogActionNeverReadsTheTrack() async throws {
-        let bench = Bench(selection: "Bonjour", track: .sample)
+        let bench = Bench(selection: "Bonjour", track: .sample, galetteInstalled: true)
         bench.coordinator.trigger(action: .translateEN)
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
 
         XCTAssertEqual(bench.reads, 0)
+        XCTAssertEqual(bench.galette.lookups, 0)
         XCTAssertEqual(bench.client.texts, [ClaudioAction.translateEN.request.userMessage(forText: "Bonjour")])
         XCTAssertNil(session.sentTrack)
+        XCTAssertEqual(session.galetteLinks, [])
+    }
+
+    /// With Galette on the Mac, the line naming the track sent offers it in
+    /// Galette — once it went out, not before. A button leaves the panel up:
+    /// an answer not pasted yet must not go with it.
+    func testWithGaletteTheTrackSentOffersItsButtonsAndAClickKeepsThePanel() async throws {
+        let bench = Bench(selection: nil, track: .sample, galetteInstalled: true)
+        bench.coordinator.triggerFreeAction()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(bench.galette.lookups, 1)
+        XCTAssertEqual(session.galetteLinks, [])
+
+        session.instruction = "écris un message pour partager ce que j'écoute"
+        bench.coordinator.confirm()
+        await bench.runs()
+        XCTAssertEqual(session.galetteLinks, [.artist(name: "間宮貴子"),
+                                              .album(artist: "間宮貴子", title: "LOVE TRIP")])
+
+        let artist = GaletteLink.artist(name: "間宮貴子")
+        bench.coordinator.openInGalette(artist)
+        XCTAssertEqual(bench.galette.opened, [artist.url])
+        XCTAssertTrue(bench.coordinator.session === session)
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(bench.pasted, [])
+    }
+
+    /// Without Galette the line names the track and offers nothing more.
+    func testWithoutGaletteTheTrackSentOffersNothing() async throws {
+        let bench = Bench(selection: nil, track: .sample)
+        bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertNil(session.galette)
+        XCTAssertEqual(session.galetteLinks, [])
     }
 
     /// The palette asks the player as it opens, since it may become the
@@ -324,6 +363,8 @@ private final class Bench {
         """
 
     let client: FakeAnswerClient
+    /// Galette, missing unless the test installs it.
+    let galette: FakeGalette
     var coordinator: CorrectionCoordinator { built }
     private var built: CorrectionCoordinator!
 
@@ -353,12 +394,14 @@ private final class Bench {
          readsWait: Bool = false,
          allowed: Bool = true,
          hasClient: Bool = true,
-         answers: [Result<String, Error>] = [.success(Bench.answer)]) {
+         answers: [Result<String, Error>] = [.success(Bench.answer)],
+         galetteInstalled: Bool = false) {
         self.selection = selection
         self.track = track
         self.readsWait = readsWait
         let client = FakeAnswerClient(answers)
         self.client = client
+        galette = FakeGalette(installed: galetteInstalled)
         history = TransformHistory(defaults: UserDefaults(suiteName: "ClaudioTests.correction.\(UUID().uuidString)")!)
         built = CorrectionCoordinator(
             durations: .init(empty: .milliseconds(20), failure: .milliseconds(20)),
@@ -388,6 +431,7 @@ private final class Bench {
                 self?.panels += 1
                 return nil
             },
+            galette: galette.service,
             history: history
         )
     }

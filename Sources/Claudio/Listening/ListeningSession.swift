@@ -44,9 +44,19 @@ final class ListeningSession: ObservableObject {
     /// they come, with no buffering to spare the layout.
     @Published var notes = ""
     @Published var justCopied = false
+    /// Galette, when the panel found it as it opened: the card then offers to
+    /// open the track in it. `nil` without Galette.
+    @Published var galette: GaletteApp?
 
     init(model: ModelChoice = ListeningNotes.model) {
         self.model = model
+    }
+
+    /// The card's Galette buttons, in order: none without Galette, before
+    /// the track is read, or for a track that gives nothing to open.
+    var galetteLinks: [GaletteLink] {
+        guard let galette, let track else { return [] }
+        return galette.links(for: track)
     }
 
     /// Claude is being asked: whatever an earlier attempt wrote goes.
