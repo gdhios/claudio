@@ -74,6 +74,42 @@ struct ClaudioRequest: Sendable {
         """
     }
 
+    /// What one call sends, once the selection and the track playing are
+    /// known: the prompt, the message, and the track that went out in it.
+    struct Prompt: Equatable, Sendable {
+        let system: String
+        let userMessage: String
+        /// `nil` when no track went out. The panel names this one and no
+        /// other, so the message and the line under the answer can't disagree.
+        let track: NowPlayingTrack?
+    }
+
+    /// Only the custom action hears about the track playing, with or without
+    /// a selection — "add the title I'm listening to at the end". A catalog
+    /// action transforms the selection and nothing else. The palette's filler
+    /// counts: it may still become a custom action.
+    var receivesTrack: Bool {
+        if case .free = origin { return true }
+        return false
+    }
+
+    /// What this request sends for `text` — empty when nothing was selected —
+    /// and the track playing, if any. With nothing selected the custom action
+    /// has no text to apply its task to: it is answered rather than applied,
+    /// under a prompt of its own, its instruction tagged in place of the text.
+    func prompt(forText text: String, track: NowPlayingTrack? = nil) -> Prompt {
+        let track = receivesTrack ? track : nil
+        // After the text or the request, never in place of either: it is
+        // context, and both prompts present it as such.
+        let context = track.map { "\n\n" + $0.promptBlock(tag: FreeRequest.trackTag) } ?? ""
+        if text.isEmpty, case .free(let instruction) = origin {
+            return Prompt(system: FreeRequest.system,
+                          userMessage: FreeRequest.userMessage(instruction: instruction) + context,
+                          track: track)
+        }
+        return Prompt(system: system, userMessage: userMessage(forText: text) + context, track: track)
+    }
+
     /// The instruction is still missing: the request isn't sendable as is.
     /// True only for the custom action waiting on its instruction.
     var needsInstruction: Bool {
@@ -108,7 +144,10 @@ extension ClaudioRequest {
 
     /// Custom action: the user's instruction becomes the task, inserted into
     /// the catalog prompts' template (bare output, tagged text, language and
-    /// formatting preserved) so the result stays pasteable as is.
+    /// formatting preserved) so the result stays pasteable as is. The track
+    /// playing may follow the text: one line of the method presents it, and
+    /// lets through what it says. With nothing selected this prompt isn't
+    /// sent at all — `prompt(forText:track:)` sends `FreeRequest`'s instead.
     /// `panelTitle` is only overridden for the palette's filler.
     static func free(instruction: String,
                      model: ModelChoice = .claude(.haiku45),
@@ -126,7 +165,9 @@ extension ClaudioRequest {
         - Rends la sortie lisible : sépare les paragraphes par une ligne vide, et quand la tâche \
         produit une énumération ou plusieurs points, mets-les en puces — une par ligne, chacune \
         commençant par « - ».
-        - N'invente aucune information absente du texte.
+        - Un bloc <morceau_en_cours> peut suivre : c'est ce que l'utilisateur écoute ; ne t'en sers \
+        que si la tâche en parle.
+        - N'invente aucune information absente du texte ou de ce bloc.
 
         Règles impératives :
         - Réponds uniquement avec le texte transformé, rien d'autre : ni préambule, ni explication, \

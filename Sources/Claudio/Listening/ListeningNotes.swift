@@ -12,18 +12,10 @@ enum ListeningNotes {
     /// Three short sentences fit many times over; a runaway answer doesn't.
     static let maxTokens = 400
 
-    /// The track as the player described it, tagged. Only the fields it
-    /// gave: a line saying a field is unknown would invite a guess. Whether
-    /// it's paused isn't sent — it changes nothing to what the track is.
+    /// The track as the player described it, tagged: only the fields it
+    /// gave, and not whether it's paused.
     static func userMessage(for track: NowPlayingTrack) -> String {
-        let fields: [(label: String, value: String?)] = [
-            ("titre", track.title),
-            ("artiste", track.artist),
-            ("album", track.album),
-            ("lecteur", track.appName),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        return (["<morceau>"] + lines + ["</morceau>"]).joined(separator: "\n")
+        track.promptBlock(tag: "morceau")
     }
 
     /// Written once, in French like every prompt in the app; only its last

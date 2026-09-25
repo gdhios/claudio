@@ -2,7 +2,8 @@ import Foundation
 
 /// `Claudio --selftest [text] [instruction]`: tests the streaming client from
 /// the CLI, without the UI. With an instruction, the free-action path runs
-/// instead of the catalog correction.
+/// instead of the catalog correction — and with an empty text, the request
+/// the free action sends when nothing is selected.
 /// Non-zero exit code if the call fails: that's what lets
 /// `Scripts/test.sh --release` use it as a release gate.
 enum SelfTest {
@@ -40,14 +41,18 @@ enum SelfTest {
         print("→ Text:   \(sample)")
         print("---")
 
+        // What the app would send for this text, built the same way. No
+        // track: nothing here reads the player.
+        let prompt = request.prompt(forText: sample)
+
         // Semaphore + Task.detached: the work stays off the main thread
         // (blocked by wait()), no hop to the MainActor on this path.
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             do {
                 let result = try await client.streamCompletion(
-                    of: request.userMessage(forText: sample),
-                    system: request.system,
+                    of: prompt.userMessage,
+                    system: prompt.system,
                     maxTokens: request.maxTokens(forText: sample)
                 ) { piece in
                     print(piece, terminator: "")
