@@ -43,6 +43,10 @@ final class CorrectionSession: ObservableObject {
     @Published var correctedText = ""
     @Published var truncated = false
     @Published var justCopied = false
+    /// The track the request went out with, `nil` when none did: a catalog
+    /// action, nothing playing, nothing sent yet. The line under the answer
+    /// names this one — what was sent, not what plays now.
+    @Published private(set) var sentTrack: NowPlayingTrack?
     /// Instruction currently being typed — or said, when the shortcut is
     /// held: both gestures fill the same field (custom action).
     @Published var instruction = ""
@@ -188,13 +192,15 @@ final class CorrectionSession: ObservableObject {
     /// long enough to let the layout pass happen in between.
     static let streamFlushInterval: Duration = .milliseconds(60)
 
-    /// Opens a response: buffer cleared, text reset.
-    func beginStreaming() {
+    /// Opens a response: buffer cleared, text reset. `track` is the one the
+    /// request went out with, `nil` when none did.
+    func beginStreaming(sending track: NowPlayingTrack? = nil) {
         streamBuffer = ""
         flushScheduled = false
         correctedText = ""
         truncated = false
         justCopied = false
+        sentTrack = track
         phase = .streaming
     }
 
@@ -433,6 +439,10 @@ struct ResultPanelView: View {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
+            }
+            // Out of the scroll, so a long answer never hides it.
+            if let track = session.sentTrack {
+                SentTrackLine(track: track, textSize: textSize)
             }
         }
     }

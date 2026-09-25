@@ -4,9 +4,9 @@ import SwiftUI
 /// Orchestrates the full cycle: capture, stream, panel, paste.
 ///
 /// Everything that touches the outside world arrives through `init`: the
-/// permission and the paste, the selection, the model, the panel, the
-/// history. The whole cycle is then playable without Accessibility, a
-/// pasteboard, a network or a screen.
+/// permission and the paste, the selection, the player, the model, the
+/// panel, the history. The whole cycle is then playable without
+/// Accessibility, a pasteboard, `osascript`, a network or a screen.
 @MainActor
 final class CorrectionCoordinator {
     /// Puts the session on screen and hands back the panel to keep. `nil`
@@ -46,6 +46,11 @@ final class CorrectionCoordinator {
     /// Captures, then streams: cancelled by Esc, by the next shortcut, and
     /// by whatever sends the request again.
     private(set) var streamTask: Task<Void, Never>?
+    /// The track playing, read alongside the capture for what may send it —
+    /// the custom action, and the palette, which may become one. Awaited
+    /// only when the request goes out, long after it has answered when the
+    /// request was typed or said.
+    private var trackRead: Task<NowPlayingTrack?, Never>?
     /// Where the result goes back to: the app in front and the clipboard, as
     /// they were when the shortcut was pressed.
     private var target: PasteTarget?
@@ -54,6 +59,7 @@ final class CorrectionCoordinator {
     private let durations: DictationCoordinator.MessageDurations
     private let pasting: PasteService
     private let captureSelection: @MainActor () async -> String?
+    private let source: NowPlayingSource
     private let makeClient: DictationCoordinator.ClientFactory
     private let makePanel: PanelMaker
     private let history: TransformHistory
@@ -61,12 +67,14 @@ final class CorrectionCoordinator {
     init(durations: DictationCoordinator.MessageDurations = .standard,
          pasting: PasteService = .system,
          selection: @escaping @MainActor () async -> String? = SelectionCapture.capture,
+         source: NowPlayingSource = .system,
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = CorrectionCoordinator.systemPanel,
          history: TransformHistory = .shared) {
         self.durations = durations
         self.pasting = pasting
         self.captureSelection = selection
+        self.source = source
         self.makeClient = client
         self.makePanel = panel
         self.history = history
@@ -128,6 +136,12 @@ final class CorrectionCoordinator {
         if listening { session.phase = .listeningInstruction }
         self.session = session
 
+        // Asked at the same moment as the selection, and on the side: a
+        // tenth of a second, which never holds the panel up. A catalog
+        // action never sends the track, so it never asks for it either.
+        if request.receivesTrack {
+            trackRead = Task { [source] in await source.current() }
+        }
         streamTask = Task { [weak self] in
             await self?.runCorrection(session: session)
         }
@@ -255,10 +269,16 @@ final class CorrectionCoordinator {
                                        en: "“Raw” only applies to dictation: pick a model for this action."))
             return
         }
+        // The player's answer, if this request sends one — back long ago
+        // when the instruction was typed or said. Esc may come while it's
+        // awaited: the answer then has nothing to go out with.
+        let track = await trackToSend(with: request)
+        guard self.session === session, !Task.isCancelled else { return }
+
         // With nothing selected, the custom action is answered rather than
         // applied: the request's own prompt, the instruction in place of a text.
-        let prompt = request.prompt(forText: session.originalText)
-        session.beginStreaming()
+        let prompt = request.prompt(forText: session.originalText, track: track)
+        session.beginStreaming(sending: prompt.track)
 
         do {
             let result = try await client.streamCompletion(
@@ -287,6 +307,14 @@ final class CorrectionCoordinator {
             guard !Task.isCancelled else { return }
             session.phase = .error(error.localizedDescription)
         }
+    }
+
+    /// The track read when the panel opened, for a request that sends one;
+    /// `nil` for the others, and when nothing plays or the player didn't
+    /// answer in time.
+    private func trackToSend(with request: ClaudioRequest) async -> NowPlayingTrack? {
+        guard request.receivesTrack, let trackRead else { return nil }
+        return await trackRead.value
     }
 
     // MARK: - Panel actions
@@ -398,6 +426,10 @@ final class CorrectionCoordinator {
     func dismiss() {
         streamTask?.cancel()
         streamTask = nil
+        // The script runs to its end or its timeout either way; its answer
+        // just has nobody left to reach.
+        trackRead?.cancel()
+        trackRead = nil
         panel?.orderOut(nil)
         panel = nil
         session = nil

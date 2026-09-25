@@ -157,7 +157,8 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// time: the panel is up and key by then, and a simulated ⌘C would land
     /// in it — with nothing selected, there is nothing to read again anyway.
     func testTryingAgainOnNothingSelectedSendsTheSameRequestWithoutCapturing() async throws {
-        let bench = Bench(selection: nil, answers: [.failure(AnswerFailure()), .success(Bench.answer)])
+        let bench = Bench(selection: nil, track: .sample,
+                          answers: [.failure(AnswerFailure()), .success(Bench.answer)])
         bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -167,19 +168,160 @@ final class CorrectionCoordinatorTests: XCTestCase {
         await bench.runs()
         XCTAssertEqual(bench.captures, 1)
         XCTAssertEqual(bench.panels, 1)
+        // The same question about the same track: the player isn't asked twice.
+        XCTAssertEqual(bench.reads, 1)
         XCTAssertEqual(bench.client.systems, [FreeRequest.system, FreeRequest.system])
-        XCTAssertEqual(bench.client.texts, Array(repeating: "<consigne>\nc'est quoi ce morceau ?\n</consigne>",
+        XCTAssertEqual(bench.client.texts, Array(repeating: "<consigne>\nc'est quoi ce morceau ?\n</consigne>\n\n"
+                                                     + Bench.trackBlock,
                                                  count: 2))
         XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(session.sentTrack, .sample)
+    }
+
+    // MARK: - The track playing
+
+    /// Something plays: it goes out with the request, and the panel names
+    /// the track that went — the line under the answer.
+    func testTheTrackPlayingGoesOutWithTheRequestAndIsNamedUnderTheAnswer() async throws {
+        let bench = Bench(selection: nil, track: .sample)
+        bench.coordinator.triggerFreeAction()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertNil(session.sentTrack)
+
+        session.instruction = "écris un message pour partager ce que j'écoute"
+        bench.coordinator.confirm()
+        await bench.runs()
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nécris un message pour partager ce que j'écoute\n</consigne>\n\n"
+                                                + Bench.trackBlock])
+        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(bench.reads, 1)
+    }
+
+    /// Over a selection too — "add the title I'm listening to at the end":
+    /// the text as ever, the track after it, the transformation's prompt.
+    func testOverASelectionTheTrackFollowsTheText() async throws {
+        let bench = Bench(selection: "Bonne soirée !", track: .sample)
+        bench.coordinator.triggerFreeAction()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        session.instruction = "ajoute le titre que j'écoute à la fin"
+        bench.coordinator.confirm()
+        await bench.runs()
+        XCTAssertEqual(bench.client.systems, [ClaudioRequest.free(instruction: "ajoute le titre que j'écoute à la fin").system])
+        XCTAssertEqual(bench.client.texts, [ClaudioRequest.wrappingSource("Bonne soirée !") + "\n\n" + Bench.trackBlock])
+        XCTAssertEqual(session.sentTrack, .sample)
+    }
+
+    /// Nothing playing: the request goes alone, without a word about it, and
+    /// no line names a track.
+    func testNothingPlayingSendsTheRequestAloneAndNamesNoTrack() async throws {
+        let bench = Bench(selection: nil, track: nil)
+        bench.coordinator.triggerRecent(instruction: "écris un mail pour décaler la réunion")
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        XCTAssertEqual(bench.reads, 1)
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nécris un mail pour décaler la réunion\n</consigne>"])
+        XCTAssertNil(session.sentTrack)
+    }
+
+    /// A catalog action never hears of the track: the player isn't even
+    /// asked, and the panel names nothing.
+    func testACatalogActionNeverReadsTheTrack() async throws {
+        let bench = Bench(selection: "Bonjour", track: .sample)
+        bench.coordinator.trigger(action: .translateEN)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        XCTAssertEqual(bench.reads, 0)
+        XCTAssertEqual(bench.client.texts, [ClaudioAction.translateEN.request.userMessage(forText: "Bonjour")])
+        XCTAssertNil(session.sentTrack)
+    }
+
+    /// The palette asks the player as it opens, since it may become the
+    /// custom action; a catalog row picked in it sends no track all the same.
+    func testACatalogRowPickedInThePaletteSendsNoTrack() async throws {
+        let bench = Bench(selection: "Bonjour", track: .sample)
+        bench.coordinator.triggerPalette()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(bench.reads, 1)
+
+        session.paletteQuery = "anglais"
+        bench.coordinator.confirm()
+        await bench.runs()
+        XCTAssertEqual(bench.client.texts, [ClaudioAction.translateEN.request.userMessage(forText: "Bonjour")])
+        XCTAssertNil(session.sentTrack)
+    }
+
+    /// The player is read while the selection is captured, and never holds
+    /// the panel up: it opens, asks for the request, and only the sending
+    /// waits for the answer — long in by then, when the request is typed.
+    func testThePlayerIsReadAlongsideTheCaptureAndOnlyWaitedForToSend() async throws {
+        let bench = Bench(selection: nil, track: .sample, readsWait: true)
+        bench.coordinator.triggerFreeAction()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(bench.reads, 1)
+        XCTAssertEqual(bench.panels, 1)
+        XCTAssertEqual(session.phase, .askingInstruction)
+
+        session.instruction = "c'est quoi ce morceau ?"
+        bench.coordinator.confirm()
+        await bench.settle { false }
+        XCTAssertEqual(bench.client.calls, 0)
+
+        bench.answerRead()
+        await bench.runs()
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nc'est quoi ce morceau ?\n</consigne>\n\n" + Bench.trackBlock])
+        XCTAssertEqual(session.sentTrack, .sample)
+    }
+
+    /// Esc while the player is still answering: the answer that comes
+    /// afterwards sends nothing.
+    func testEscapeWhileThePlayerAnswersSendsNothing() async throws {
+        let bench = Bench(selection: nil, track: .sample, readsWait: true)
+        bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
+        let task = try XCTUnwrap(bench.coordinator.streamTask)
+        // The model's client is made: all that's left before sending is the track.
+        await bench.settle { bench.clientRequests.count == 1 }
+        XCTAssertEqual(bench.reads, 1)
+
+        bench.coordinator.dismiss()
+        bench.answerRead()
+        await task.value
+        XCTAssertEqual(bench.client.calls, 0)
+        XCTAssertNil(bench.coordinator.session)
     }
 }
 
 // MARK: - The bench
 
+private extension NowPlayingTrack {
+    static let sample = NowPlayingTrack(title: "真夜中のジョーク",
+                                        artist: "間宮貴子",
+                                        album: "LOVE TRIP",
+                                        appName: "Spotify",
+                                        bundleID: "com.spotify.client",
+                                        isPlaying: false,
+                                        duration: 245.3)
+}
+
 /// One coordinator and the fakes it was built with.
 @MainActor
 private final class Bench {
     static let answer = "Bonjour, je voulais savoir."
+    /// `NowPlayingTrack.sample`, the way the model reads it.
+    static let trackBlock = """
+        <morceau_en_cours>
+        titre : 真夜中のジョーク
+        artiste : 間宮貴子
+        album : LOVE TRIP
+        lecteur : Spotify
+        </morceau_en_cours>
+        """
 
     let client: FakeAnswerClient
     var coordinator: CorrectionCoordinator { built }
@@ -187,6 +329,14 @@ private final class Bench {
 
     /// What the capture finds: `nil` is nothing selected.
     let selection: String?
+    /// What the player says is playing, `nil` for nothing.
+    let track: NowPlayingTrack?
+    /// Reads wait for `answerRead()` instead of answering at once: that's
+    /// the player still being read when the request is sent, or Esc comes.
+    let readsWait: Bool
+    /// How many times the player was read: zero proves it never was.
+    private(set) var reads = 0
+    private var waitingReads: [CheckedContinuation<NowPlayingTrack?, Never>] = []
     /// How many times the selection was captured.
     private(set) var captures = 0
     /// How many panels were put on screen.
@@ -199,10 +349,14 @@ private final class Bench {
     let history: TransformHistory
 
     init(selection: String?,
+         track: NowPlayingTrack? = nil,
+         readsWait: Bool = false,
          allowed: Bool = true,
          hasClient: Bool = true,
          answers: [Result<String, Error>] = [.success(Bench.answer)]) {
         self.selection = selection
+        self.track = track
+        self.readsWait = readsWait
         let client = FakeAnswerClient(answers)
         self.client = client
         history = TransformHistory(defaults: UserDefaults(suiteName: "ClaudioTests.correction.\(UUID().uuidString)")!)
@@ -220,6 +374,12 @@ private final class Bench {
                 self?.captures += 1
                 return selection
             },
+            source: NowPlayingSource { [weak self] in
+                guard let self else { return nil }
+                reads += 1
+                guard readsWait else { return track }
+                return await withCheckedContinuation { waitingReads.append($0) }
+            },
             client: { [weak self] choice in
                 self?.clientRequests.append(choice)
                 return hasClient ? client : nil
@@ -230,6 +390,13 @@ private final class Bench {
             },
             history: history
         )
+    }
+
+    /// Answers every read still waiting, as the player finally does.
+    func answerRead() {
+        let waiting = waitingReads
+        waitingReads = []
+        for read in waiting { read.resume(returning: track) }
     }
 
     /// Waits for the capture and the stream under way to end. One that never
