@@ -4,7 +4,8 @@ import SwiftUI
 /// UI preview mode for development: `Claudio --preview <mode>`
 /// with mode ∈ panel, panel-streaming, panel-long, panel-error,
 /// panel-noselection, panel-free, panel-free-filled, panel-free-listening,
-/// panel-free-unheard, panel-listening, panel-listening-start,
+/// panel-free-unheard, panel-free-noselection, panel-free-answer-track,
+/// panel-listening, panel-listening-start,
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
 /// palette-libre, palette-noselection, listening, listening-streaming, listening-nothing,
 /// listening-nokey, settings, settings-dictation, settings-shortcuts-lone-key,
@@ -51,6 +52,18 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     /// mid-sentence: the shortcut is still held.
     private var spokenInstruction: String {
         loc("Traduis ce message en ", en: "Translate this message to ")
+    }
+
+    /// A request made with nothing selected, about the track playing.
+    private var shareInstruction: String {
+        loc("Écris un message pour partager ce que j'écoute",
+            en: "Write a message to share what I'm listening to")
+    }
+
+    /// Its answer: a message ready to paste, which leans on the track.
+    private var sharedTrackMessage: String {
+        loc("En ce moment j'écoute « 真夜中のジョーク » de Takako Mamiya, extrait de LOVE TRIP (1982). De la city pop japonaise comme on n'en fait plus, à écouter d'urgence.",
+            en: "Right now I'm listening to “真夜中のジョーク” by Takako Mamiya, from LOVE TRIP (1982). Japanese city pop like they don't make anymore, give it a listen.")
     }
 
     /// Preview's text size: `--size large`, otherwise the current setting.
@@ -191,6 +204,18 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session = CorrectionSession(request: .awaitingInstruction)
             session.originalText = sampleText
             session.phase = .instructionNotHeard(reason: nil)
+        case "panel-free-noselection":
+            // The custom action on nothing selected: the same field, asking
+            // for a request, and no excerpt under it.
+            session = CorrectionSession(request: .awaitingInstruction)
+            session.phase = .askingInstruction
+        case "panel-free-answer-track":
+            // A request made on nothing selected, answered, with the track
+            // that went out with it named under the answer. Set by hand:
+            // nothing reads this Mac's player.
+            session = CorrectionSession(request: .free(instruction: shareInstruction))
+            session.beginStreaming(sending: sampleTrack(playing: true))
+            session.finishStreaming(with: sharedTrackMessage, truncated: false)
         default:  // "panel"
             session = CorrectionSession(action: .translateEN)
             session.phase = .done
@@ -298,7 +323,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
     /// Palette: the real panel, stopped at the choosing phase — on a
     /// selection, or on nothing at all, where only what works without one is
-    /// offered.
+    /// offered: "What's playing?", then the custom action.
     private func showPalettePreview() {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
         if mode != "palette-noselection" { session.originalText = sampleText }
