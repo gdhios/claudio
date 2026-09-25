@@ -2,11 +2,10 @@ import XCTest
 @testable import Claudio
 
 /// The hook the Stream Deck bridge watches a correction through. Only what a
-/// coordinator does with no session is playable here: starting one needs the
-/// Accessibility permission and a real selection, which no test may ask for,
-/// and nothing outside the coordinator can hand it a session. The announcement
-/// of a real one is proved on the dictation side, whose coordinator plays
-/// without a microphone; here, `DictationCoordinatorTests` is the witness.
+/// coordinator does with no session is played here; a whole correction, run
+/// on fakes, is `CorrectionCoordinatorTests`'s. The announcement of a real
+/// session is proved on the dictation side, whose hook is the same broadcast;
+/// here, `DictationCoordinatorTests` is the witness.
 @MainActor
 final class CorrectionCoordinatorHookTests: XCTestCase {
 

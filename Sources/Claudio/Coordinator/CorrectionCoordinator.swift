@@ -2,8 +2,17 @@ import AppKit
 import SwiftUI
 
 /// Orchestrates the full cycle: capture, stream, panel, paste.
+///
+/// Everything that touches the outside world arrives through `init`: the
+/// permission and the paste, the selection, the model, the panel, the
+/// history. The whole cycle is then playable without Accessibility, a
+/// pasteboard, a network or a screen.
 @MainActor
 final class CorrectionCoordinator {
+    /// Puts the session on screen and hands back the panel to keep. `nil`
+    /// when there is no screen to put it on.
+    typealias PanelMaker = @MainActor (CorrectionSession, CorrectionCoordinator) -> ResultPanel?
+
     var openSettings: (() -> Void)?
     /// The palette's "What's playing?" row. Not a request about the
     /// selection: it opens a panel of its own, which is the one to take this
@@ -34,15 +43,33 @@ final class CorrectionCoordinator {
             onSessionChange?(session)
         }
     }
-    private var streamTask: Task<Void, Never>?
-    private var previousApp: NSRunningApplication?
-    private var clipboardSnapshot: PasteboardSnapshot?
+    /// Captures, then streams: cancelled by Esc, by the next shortcut, and
+    /// by whatever sends the request again.
+    private(set) var streamTask: Task<Void, Never>?
+    /// Where the result goes back to: the app in front and the clipboard, as
+    /// they were when the shortcut was pressed.
+    private var target: PasteTarget?
     /// How long a panel that has nothing left to say stays up. Injected so a
     /// test can watch one close itself without waiting a second and a half.
     private let durations: DictationCoordinator.MessageDurations
+    private let pasting: PasteService
+    private let captureSelection: @MainActor () async -> String?
+    private let makeClient: DictationCoordinator.ClientFactory
+    private let makePanel: PanelMaker
+    private let history: TransformHistory
 
-    init(durations: DictationCoordinator.MessageDurations = .standard) {
+    init(durations: DictationCoordinator.MessageDurations = .standard,
+         pasting: PasteService = .system,
+         selection: @escaping @MainActor () async -> String? = SelectionCapture.capture,
+         client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
+         panel: @escaping PanelMaker = CorrectionCoordinator.systemPanel,
+         history: TransformHistory = .shared) {
         self.durations = durations
+        self.pasting = pasting
+        self.captureSelection = selection
+        self.makeClient = client
+        self.makePanel = panel
+        self.history = history
     }
 
     // MARK: - Triggering
@@ -86,15 +113,12 @@ final class CorrectionCoordinator {
                  listening: Bool = false) -> CorrectionSession? {
         dismiss()  // idempotent: a shortcut while a panel is open starts fresh
 
-        guard AccessibilityPermission.isGranted else {
-            AccessibilityPermission.request()
-            AccessibilityPermission.showExplanation()
-            return nil
-        }
+        // Asks for Accessibility, and explains itself, when it's missing:
+        // without it nothing can be read, nor pasted back.
+        guard pasting.isAllowed() else { return nil }
 
         // Captured BEFORE showing anything.
-        previousApp = PasteBack.frontmostApp()
-        clipboardSnapshot = PasteboardSnapshot.capture()
+        target = pasting.capture()
 
         let session = CorrectionSession(request: request, opensPalette: opensPalette)
         if listening { session.phase = .listeningInstruction }
@@ -109,9 +133,9 @@ final class CorrectionCoordinator {
     private func runCorrection(session: CorrectionSession) async {
         // Capture BEFORE showing the panel: once key, the panel would
         // intercept the simulated ⌘C meant for the source app.
-        let text = await SelectionCapture.capture()
+        let text = await captureSelection()
         guard self.session === session else { return }  // re-triggered/closed in the meantime
-        showPanel(for: session)
+        panel = makePanel(session, self)
 
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             // "No selection found", which closes itself — or, for the
@@ -225,7 +249,7 @@ final class CorrectionCoordinator {
         let client: TextStreamClient
         switch request.model {
         case .claude, .ollama:
-            guard let made = TextStreamClientFactory.make(for: request.model) else {
+            guard let made = makeClient(request.model) else {
                 session.phase = .missingKey
                 return
             }
@@ -254,7 +278,7 @@ final class CorrectionCoordinator {
             // A custom action that succeeds enters the history: its
             // instruction can be relaunched with one gesture from the menu bar.
             if case .free(let instruction) = request.origin {
-                TransformHistory.shared.record(instruction)
+                history.record(instruction)
             }
             CostLedger.shared.record(model: request.model,
                                      inputTokens: result.inputTokens,
@@ -306,7 +330,7 @@ final class CorrectionCoordinator {
         pasteboard.clearContents()
         pasteboard.setString(session.correctedText, forType: .string)
         session.justCopied = true
-        clipboardSnapshot = nil  // the user wants this content: don't restore over it
+        target?.clipboard = nil  // the user wants this content: don't restore over it
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 900_000_000)
             if self?.session === session, session.justCopied {
@@ -316,42 +340,44 @@ final class CorrectionCoordinator {
     }
 
     func pasteResult() {
-        guard let session, session.canPaste else { return }
+        // The target is captured with the session, and goes with it.
+        guard let session, session.canPaste, let target else { return }
         let text = session.correctedText
-        let target = previousApp
-        let snapshot = Constants.restoreClipboardAfterPaste ? clipboardSnapshot : nil
         dismiss()
 
-        Task { @MainActor in
-            await PasteBack.paste(text, into: PasteTarget(app: target, clipboard: snapshot))
+        Task { @MainActor [pasting] in
+            _ = await pasting.paste(text, target)
         }
     }
 
     // MARK: - Panel
 
-    private func showPanel(for session: CorrectionSession) {
+    /// The real panel, wired to this coordinator: the keyboard reaches it,
+    /// and each of its buttons lands here.
+    static func systemPanel(for session: CorrectionSession,
+                            coordinator: CorrectionCoordinator) -> ResultPanel? {
         let panel = ResultPanel.make(
             session: session,
-            onPaste: { [weak self] in self?.pasteResult() },
-            onCopy: { [weak self] in self?.copyResult() },
-            onRetry: { [weak self] in self?.retry() },
-            onSubmitInstruction: { [weak self] in self?.submitInstruction() },
-            onLaunchPaletteRow: { [weak self] index in self?.launchPaletteRow(at: index) },
-            onOpenSettings: { [weak self] in
-                self?.dismiss()
-                self?.openSettings?()
+            onPaste: { [weak coordinator] in coordinator?.pasteResult() },
+            onCopy: { [weak coordinator] in coordinator?.copyResult() },
+            onRetry: { [weak coordinator] in coordinator?.retry() },
+            onSubmitInstruction: { [weak coordinator] in coordinator?.submitInstruction() },
+            onLaunchPaletteRow: { [weak coordinator] index in coordinator?.launchPaletteRow(at: index) },
+            onOpenSettings: { [weak coordinator] in
+                coordinator?.dismiss()
+                coordinator?.openSettings?()
             },
-            onClose: { [weak self] in self?.dismiss() }
+            onClose: { [weak coordinator] in coordinator?.dismiss() }
         )
-        panel.onEnter = { [weak self] in self?.confirm() }
-        panel.onEscape = { [weak self] in self?.dismiss() }
-        panel.onCopyShortcut = { [weak self] in self?.copyResult() }
-        panel.onArrow = { [weak self] delta in self?.movePaletteSelection(by: delta) ?? false }
-        panel.onDigit = { [weak self] rank, withCommand in
-            self?.launchPaletteRank(rank, withCommand: withCommand) ?? false
+        panel.onEnter = { [weak coordinator] in coordinator?.confirm() }
+        panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
+        panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyResult() }
+        panel.onArrow = { [weak coordinator] delta in coordinator?.movePaletteSelection(by: delta) ?? false }
+        panel.onDigit = { [weak coordinator] rank, withCommand in
+            coordinator?.launchPaletteRank(rank, withCommand: withCommand) ?? false
         }
-        self.panel = panel
         panel.present()
+        return panel
     }
 
     /// The panel has said all it had to say — "No selection found", so far —
@@ -378,8 +404,7 @@ final class CorrectionCoordinator {
         panel?.orderOut(nil)
         panel = nil
         session = nil
-        previousApp = nil
-        clipboardSnapshot = nil
+        target = nil
         onDismiss?()
     }
 }
