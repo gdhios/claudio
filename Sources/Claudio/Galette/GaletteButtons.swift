@@ -42,10 +42,14 @@ extension GaletteLink {
         }
     }
 
+    /// Names what it opens: for a browser track, the artist comes from the
+    /// title and differs from the channel the card shows above.
     var buttonHelp: String {
         switch self {
-        case .artist: loc("Ouvrir l'artiste dans Galette", en: "Open the artist in Galette")
-        case .album: loc("Ouvrir l'album dans Galette", en: "Open the album in Galette")
+        case .artist(let name):
+            loc("Ouvrir « \(name) » dans Galette", en: "Open “\(name)” in Galette")
+        case .album(_, let title):
+            loc("Ouvrir l'album « \(title) » dans Galette", en: "Open the album “\(title)” in Galette")
         }
     }
 }
