@@ -55,16 +55,9 @@ struct PaletteView: View {
     }
 
     private var rows: some View {
+        // Never empty: the custom action is always there to take whatever
+        // was typed, selection or not.
         VStack(alignment: .leading, spacing: 4) {
-            // Only possible with nothing selected: with a selection, the
-            // custom action is always there to take whatever was typed.
-            if session.paletteRows.isEmpty {
-                Text(loc("Rien ne correspond.", en: "Nothing matches."))
-                    .font(.system(size: textSize.points(11)))
-                    .foregroundStyle(.white.opacity(0.38))
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 6)
-            }
             ForEach(Array(session.paletteRows.enumerated()), id: \.element.id) { index, row in
                 PaletteRowView(row: row,
                                number: PaletteCatalog.rank(ofIndex: index),
@@ -83,15 +76,12 @@ struct PaletteView: View {
 
     /// The field does two jobs at once: it filters the catalog, and whatever
     /// stays written in it becomes the instruction if it's the custom
-    /// action's row that gets launched.
+    /// action's row that gets launched — a request of its own, when nothing
+    /// is selected.
     private var field: some View {
         HStack(spacing: 10) {
-            // With nothing selected, an instruction would have nothing to
-            // apply to: the field only filters.
             TextField("", text: $session.paletteQuery,
-                      prompt: Text(session.hasSelection
-                                   ? loc("Filtrer, ou écrire une consigne…", en: "Filter, or write an instruction…")
-                                   : loc("Filtrer…", en: "Filter…"))
+                      prompt: Text(loc("Filtrer, ou écrire une consigne…", en: "Filter, or write an instruction…"))
                         .foregroundStyle(.white.opacity(0.3)))
                 .textFieldStyle(.plain)
                 .font(.system(size: textSize.bodyPoints))

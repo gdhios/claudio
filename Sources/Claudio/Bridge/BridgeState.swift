@@ -43,7 +43,7 @@ struct BridgeState: Equatable, Codable {
             self.init(gaze: ClaudioMascot.Gaze(phase),
                       activity: .correction,
                       phase: phase.bridgeName,
-                      label: phase == .streaming ? correction.request.progressLabel : nil,
+                      label: phase == .streaming ? correction.progressLabel : nil,
                       locked: false)
         } else {
             self = .idle

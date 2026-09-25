@@ -51,12 +51,18 @@ final class PaletteCatalogTests: XCTestCase {
         XCTAssertEqual(PaletteCatalog.rows(matching: "").count, ClaudioAction.allCases.count + 2)
 
         // No action matches: only the free row remains, which reuses the
-        // input as its instruction.
-        let orphelines = PaletteCatalog.rows(matching: "Traduis en espagnol")
-        XCTAssertEqual(orphelines.count, 1)
-        XCTAssertEqual(orphelines[0].title, "Traduis en espagnol")
-        XCTAssertEqual(orphelines[0].origin, .free(instruction: "Traduis en espagnol"))
-        XCTAssertEqual(orphelines[0].request?.needsInstruction, false)
+        // input as its instruction — over a selection or over nothing.
+        for hasSelection in [true, false] {
+            let orphelines = PaletteCatalog.rows(matching: "Traduis en espagnol", hasSelection: hasSelection)
+            XCTAssertEqual(orphelines.count, 1)
+            XCTAssertEqual(orphelines[0].title, "Traduis en espagnol")
+            XCTAssertEqual(orphelines[0].origin, .free(instruction: "Traduis en espagnol"))
+            XCTAssertEqual(orphelines[0].request?.needsInstruction, false)
+        }
+
+        // Nothing selected and nothing typed: there too, after "What's playing?".
+        XCTAssertEqual(PaletteCatalog.rows(matching: "", hasSelection: false).last?.origin,
+                       .free(instruction: ""))
     }
 
     @MainActor

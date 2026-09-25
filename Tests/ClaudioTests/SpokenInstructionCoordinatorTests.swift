@@ -144,18 +144,19 @@ final class SpokenInstructionCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.closed, 1)
     }
 
-    /// A panel that has already said there is no selection keeps saying it:
-    /// a tap must not hand back a field over a text nobody read.
-    func testATapLeavesASelectionlessPanelAlone() async {
+    /// A panel that has moved on keeps its phase: a tap must not hand back a
+    /// field over an instruction already on its way. Nothing selected is no
+    /// longer such a phase — the panel goes on listening over nothing.
+    func testATapLeavesAPanelThatMovedOnAlone() async {
         let bench = Bench()
         bench.coordinator.keyDown()
         await bench.settle { bench.engine.starts == 1 }
-        bench.session.phase = .noSelection  // the capture came back empty
+        bench.session.phase = .streaming  // the engine stopped by itself, and it went out
 
         bench.hold(for: 0.1)
         bench.coordinator.keyUp()
 
-        XCTAssertEqual(bench.session.phase, .noSelection)
+        XCTAssertEqual(bench.session.phase, .streaming)
         XCTAssertEqual(bench.typed, 0)
     }
 

@@ -98,20 +98,14 @@ enum PaletteCatalog {
     /// escape hatch last, so "What's playing?" found by "musique" takes the
     /// top, where Enter launches it.
     ///
-    /// With nothing selected, only what works without a selection: every
-    /// action — the custom one included — would have nothing to transform.
+    /// With nothing selected, only what works without a selection: "What's
+    /// playing?", then the custom action — which, with no text to transform,
+    /// sends what was typed as a request of its own. The catalog would have
+    /// nothing to work on.
     @MainActor
     static func rows(matching query: String, hasSelection: Bool = true) -> [PaletteRow] {
         let whatsPlaying = whatsPlayingRow(matching: query).map { [$0] } ?? []
-        guard hasSelection else { return whatsPlaying }
-
         let instruction = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let catalog = matches(query).map { action in
-            PaletteRow(kind: .request(.catalog(action)),
-                       title: action.paletteTitle,
-                       detail: action.paletteDetail,
-                       trailing: action.shortcutDescription)
-        }
         let free = PaletteRow(
             kind: .request(.free(instruction: instruction)),
             title: instruction.isEmpty ? loc("Action libre", en: "Custom action") : instruction,
@@ -119,6 +113,14 @@ enum PaletteCatalog {
                                         : loc("Envoyé tel quel comme instruction", en: "Sent as-is as the instruction"),
             trailing: instruction.isEmpty ? ClaudioRequest.freeShortcutDescription : freeBadge
         )
+        guard hasSelection else { return whatsPlaying + [free] }
+
+        let catalog = matches(query).map { action in
+            PaletteRow(kind: .request(.catalog(action)),
+                       title: action.paletteTitle,
+                       detail: action.paletteDetail,
+                       trailing: action.shortcutDescription)
+        }
         return instruction.isEmpty ? catalog + [free] + whatsPlaying
                                    : catalog + whatsPlaying + [free]
     }

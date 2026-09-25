@@ -84,6 +84,15 @@ struct ClaudioRequest: Sendable {
         let track: NowPlayingTrack?
     }
 
+    /// The custom action carries on with nothing selected: with no text to
+    /// transform, it becomes a request made to Claudio. A catalog action has
+    /// the selection for material, and stops without one. The palette's
+    /// filler counts: it may still become a custom action.
+    var worksWithoutSelection: Bool {
+        if case .free = origin { return true }
+        return false
+    }
+
     /// Only the custom action hears about the track playing, with or without
     /// a selection — "add the title I'm listening to at the end". A catalog
     /// action transforms the selection and nothing else. The palette's filler

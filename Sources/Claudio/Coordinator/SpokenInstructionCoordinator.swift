@@ -8,9 +8,10 @@ struct SpokenInstructionPanel {
     /// A tap: the instruction gets typed, exactly as the shortcut has always
     /// done. Only used when nothing was opened on the press.
     var type: @MainActor () -> Void
-    /// A hold: the free action's own panel opens on the selection, already
-    /// listening, and hands back the session the words land in. `nil` when
-    /// nothing opened — without Accessibility there is nothing to transform.
+    /// A hold: the free action's own panel opens on the selection — or on
+    /// nothing, and the words become a request — already listening, and
+    /// hands back the session they land in. `nil` when nothing opened:
+    /// without Accessibility there is nothing to read, nor to paste into.
     var listen: @MainActor () -> CorrectionSession?
     /// The instruction, as it was heard: the usual free action carries on
     /// from there, in the panel that is already up.
@@ -33,7 +34,8 @@ struct SpokenInstructionPanel {
 /// Saying the instruction instead of typing it. The free action's shortcut
 /// carries both gestures, as dictation's does: tapped it opens the field
 /// where the instruction is typed, held it opens the microphone and the
-/// instruction is spoken, then applied to the selection the press captured.
+/// instruction is spoken, then applied to the selection the press captured —
+/// or, when it captured none, sent as a request of its own.
 ///
 /// `DictationCoordinator`'s counterpart — same engine, same vocabulary, same
 /// pause around it — except the words are an instruction, not a text: they

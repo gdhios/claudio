@@ -67,14 +67,34 @@ final class CorrectionSession: ObservableObject {
     var maxTokensMultiplier = 1
 
     /// Whether the capture found anything to work on. Only ever false past
-    /// the capture for a palette: every other request stops at `noSelection`.
+    /// the capture for the palette and the custom action: a catalog action
+    /// stops at `noSelection`.
     var hasSelection: Bool { !originalText.isEmpty }
 
-    /// Where the session goes when the capture comes back empty. The palette
-    /// still opens, on what works without a selection: opening it asks a
-    /// question rather than giving an order. Every other request had the
-    /// selection for material, and says there was none.
-    var phaseWithoutSelection: Phase { opensPalette ? .choosingAction : .noSelection }
+    /// Where the session goes once the capture is back, `nil` when it waits
+    /// on nothing and the request goes out at once.
+    ///
+    /// With nothing selected, a catalog action had the selection for
+    /// material, and says there was none. The palette still opens, on what
+    /// works without a selection: opening it asks a question rather than
+    /// giving an order. And the custom action still asks for its
+    /// instruction, which, with no text to apply it to, is a request made to
+    /// Claudio.
+    var phaseAfterCapture: Phase? {
+        guard hasSelection || request.worksWithoutSelection else { return .noSelection }
+        if opensPalette { return .choosingAction }
+        guard request.needsInstruction else { return nil }
+        // The shortcut held rather than tapped: the panel keeps listening
+        // instead of asking for the instruction to be typed.
+        return phase == .listeningInstruction ? .listeningInstruction : .askingInstruction
+    }
+
+    /// What the panel says while the answer streams. The custom action on
+    /// nothing selected transforms nothing: it writes an answer, and says so.
+    var progressLabel: String {
+        guard !hasSelection, case .free = request.origin else { return request.progressLabel }
+        return loc("Rédaction…", en: "Writing…")
+    }
 
     /// Palette rows for the current input.
     var paletteRows: [PaletteRow] {
@@ -141,9 +161,9 @@ final class CorrectionSession: ObservableObject {
     }
 
     /// The shortcut was tapped, not held: the instruction goes back to being
-    /// typed, in the panel the press already opened over the same selection.
-    /// Only from the listening phase — the capture may have said in the
-    /// meantime that there was no selection at all.
+    /// typed, in the panel the press already opened over the same selection,
+    /// or over nothing. Only from the listening phase — an engine that
+    /// stopped by itself may have sent the instruction on already.
     ///
     /// The word or two caught before the key came up are dropped: they were
     /// never meant to be the instruction, and the field starts empty as ever.
@@ -327,7 +347,7 @@ struct ResultPanelView: View {
         case .streaming:
             StatusPill {
                 ProgressView().controlSize(.mini)
-                Text(session.request.progressLabel)
+                Text(session.progressLabel)
             }
         case .done:
             if session.truncated {
@@ -418,12 +438,13 @@ struct ResultPanelView: View {
     }
 
     /// Instruction input (custom action), with an excerpt of the selection
-    /// under the field: it's a text no longer visible on screen that gets transformed.
+    /// under the field: it's a text no longer visible on screen that gets
+    /// transformed. With nothing selected, no excerpt: the field asks for a
+    /// request instead.
     private var instructionPrompt: some View {
         VStack(alignment: .leading, spacing: 9) {
             TextField("", text: $session.instruction,
-                      prompt: Text(loc("Que faire du texte sélectionné ?",
-                                       en: "What should Claudio do with the selected text?")))
+                      prompt: Text(instructionPlaceholder(spoken: false)))
                 .textFieldStyle(.plain)
                 .font(.system(size: textSize.bodyPoints))
                 .foregroundStyle(.white.opacity(0.92))
@@ -438,11 +459,7 @@ struct ResultPanelView: View {
                         .strokeBorder(.white.opacity(0.1), lineWidth: 1)
                 )
 
-            Text(session.originalText)
-                .font(.system(size: textSize.points(10)))
-                .foregroundStyle(.white.opacity(0.35))
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            selectionExcerpt
         }
         .padding(14)
         .onAppear {
@@ -454,8 +471,8 @@ struct ResultPanelView: View {
 
     /// The same prompt, said rather than typed: the waveform takes the
     /// field's place and the words land in it as they are spoken. Same box,
-    /// same excerpt of the selection underneath — one panel, which goes on
-    /// to stream the answer.
+    /// same excerpt of the selection underneath, if there is one — one
+    /// panel, which goes on to stream the answer.
     private var spokenInstructionPrompt: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 10) {
@@ -464,8 +481,7 @@ struct ResultPanelView: View {
                                   spacing: textSize.points(2.5),
                                   maxHeight: textSize.points(18))
                 Text(session.instruction.isEmpty
-                     ? loc("Dis ce que Claudio doit en faire…",
-                           en: "Say what Claudio should do with it…")
+                     ? instructionPlaceholder(spoken: true)
                      : session.instruction)
                     .font(.system(size: textSize.bodyPoints))
                     .foregroundStyle(.white.opacity(session.instruction.isEmpty ? 0.35 : 0.92))
@@ -485,13 +501,36 @@ struct ResultPanelView: View {
                     .strokeBorder(.white.opacity(0.1), lineWidth: 1)
             )
 
+            selectionExcerpt
+        }
+        .padding(14)
+    }
+
+    /// What the field says before the instruction comes: what to do with the
+    /// selection — or, with nothing selected, what to ask for.
+    private func instructionPlaceholder(spoken: Bool) -> String {
+        switch (session.hasSelection, spoken) {
+        case (true, false):
+            loc("Que faire du texte sélectionné ?", en: "What should Claudio do with the selected text?")
+        case (true, true):
+            loc("Dis ce que Claudio doit en faire…", en: "Say what Claudio should do with it…")
+        case (false, false):
+            loc("Que demander à Claudio ?", en: "What should Claudio do?")
+        case (false, true):
+            loc("Dis ta demande à Claudio…", en: "Say what Claudio should do…")
+        }
+    }
+
+    /// The selection under the instruction, the text it will be applied to.
+    /// Nothing at all when nothing is selected.
+    @ViewBuilder private var selectionExcerpt: some View {
+        if session.hasSelection {
             Text(session.originalText)
                 .font(.system(size: textSize.points(10)))
                 .foregroundStyle(.white.opacity(0.35))
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
     }
 
     /// Streaming text with a blinking caret; plain text once finished.

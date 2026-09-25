@@ -80,14 +80,17 @@ final class CorrectionCoordinator {
     }
 
     /// Custom action: same cycle, with a stop to type the instruction between
-    /// capturing the selection and calling the API.
+    /// capturing the selection and calling the API. With nothing selected
+    /// the same stop comes, and the instruction goes out as a request that
+    /// Claude answers.
     func triggerFreeAction() {
         trigger(.awaitingInstruction)
     }
 
     /// Same custom action, with its instruction about to be spoken rather
-    /// than typed: same capture, same panel, except it opens listening.
-    /// Hands back the session the words land in, `nil` when nothing opened.
+    /// than typed: same capture, same panel, except it opens listening —
+    /// over a selection or over nothing, as when it's typed. Hands back the
+    /// session the words land in, `nil` when nothing opened.
     func beginSpokenInstruction() -> CorrectionSession? {
         trigger(.awaitingInstruction, listening: true)
     }
@@ -100,7 +103,8 @@ final class CorrectionCoordinator {
 
     /// Instruction relaunched from history: same cycle as a custom action,
     /// but the instruction is already known, so no stop to type it: the
-    /// capture targets the current selection and the stream starts right away.
+    /// capture targets the current selection and the stream starts right
+    /// away — as a request, when nothing is selected.
     func triggerRecent(instruction: String) {
         trigger(.free(instruction: instruction))
     }
@@ -137,30 +141,19 @@ final class CorrectionCoordinator {
         guard self.session === session else { return }  // re-triggered/closed in the meantime
         panel = makePanel(session, self)
 
-        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            // "No selection found", which closes itself — or, for the
-            // palette, what works without a selection, which waits.
-            session.phase = session.phaseWithoutSelection
+        // Blank is nothing selected. The custom action carries on all the
+        // same: its instruction becomes a request made to Claudio.
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            session.originalText = text
+        }
+
+        // Something to wait for before sending: "No selection found", which
+        // closes itself; a palette row, whose launch resumes from
+        // `launchPaletteRow(at:)`; the custom action's instruction, from
+        // `submitInstruction()`. A spoken one is already being listened to.
+        if let phase = session.phaseAfterCapture {
+            if session.phase != phase { session.phase = phase }
             autoDismiss(session)
-            return
-        }
-        session.originalText = text
-
-        // Palette: nothing to send until a row is picked.
-        // The rest resumes from `launchPaletteRow(at:)`.
-        guard !session.opensPalette else {
-            session.phase = .choosingAction
-            return
-        }
-
-        // Custom action: nothing to send until the instruction is given.
-        // The rest resumes from `submitInstruction()`.
-        guard !session.request.needsInstruction else {
-            // The shortcut held rather than tapped: the panel keeps
-            // listening instead of asking for the instruction to be typed.
-            if session.phase != .listeningInstruction {
-                session.phase = .askingInstruction
-            }
             return
         }
         await stream(session: session)
@@ -210,8 +203,8 @@ final class CorrectionCoordinator {
     func launchPaletteRow(at index: Int) {
         guard let session, session.phase == .choosingAction else { return }
         let rows = session.paletteRows
-        // An empty list — nothing selected, and a query nothing matches —
-        // leaves Enter with nothing to launch.
+        // The custom action's row is always there, whatever was typed: this
+        // only keeps a stale index from launching anything.
         guard rows.indices.contains(index) else { return }
         session.paletteSelection = index
         switch rows[index].kind {
@@ -262,12 +255,15 @@ final class CorrectionCoordinator {
                                        en: "“Raw” only applies to dictation: pick a model for this action."))
             return
         }
+        // With nothing selected, the custom action is answered rather than
+        // applied: the request's own prompt, the instruction in place of a text.
+        let prompt = request.prompt(forText: session.originalText)
         session.beginStreaming()
 
         do {
             let result = try await client.streamCompletion(
-                of: request.userMessage(forText: session.originalText),
-                system: request.system,
+                of: prompt.userMessage,
+                system: prompt.system,
                 maxTokens: request.maxTokens(forText: session.originalText,
                                              multiplier: session.maxTokensMultiplier)
             ) { @MainActor piece in
@@ -308,6 +304,12 @@ final class CorrectionCoordinator {
         }
     }
 
+    /// "Try again", or "Try again +" once an answer was cut short: the same
+    /// request goes out again, with twice the room in the second case.
+    ///
+    /// Never a second capture: the panel is up and key by now, and the
+    /// simulated ⌘C would land in it. The selection was read once, before
+    /// the panel opened — and with nothing selected there is nothing to read.
     func retry() {
         guard let session else { return }
         if session.truncated {
@@ -315,12 +317,7 @@ final class CorrectionCoordinator {
         }
         streamTask?.cancel()
         streamTask = Task { [weak self] in
-            guard let self else { return }
-            if session.originalText.isEmpty {
-                await self.runCorrection(session: session)
-            } else {
-                await self.stream(session: session)
-            }
+            await self?.stream(session: session)
         }
     }
 

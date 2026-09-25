@@ -1,11 +1,12 @@
 import XCTest
 @testable import Claudio
 
-/// With nothing selected, the palette still opens: it's a question, not an
-/// order, and some of what it offers needs no selection at all — "What's
-/// playing?", today. It shows that and nothing else: the actions, the
-/// custom one included, would have nothing to work on. The action shortcuts
-/// keep saying there's no selection, and closing by themselves.
+/// With nothing selected, the palette still opens, and so does the custom
+/// action: with no text to transform, what is typed or said goes out as a
+/// request of its own, and Claude answers it. The palette offers what works
+/// without a selection — "What's playing?", then the custom action. The
+/// catalog shortcuts keep saying there's no selection, and closing by
+/// themselves.
 @MainActor
 final class PaletteWithoutSelectionTests: XCTestCase {
 
@@ -25,55 +26,78 @@ final class PaletteWithoutSelectionTests: XCTestCase {
     }
 
     /// The capture came back empty: this is where each kind of session goes.
-    func testOnlyThePaletteOpensWithoutASelection() {
+    /// Only the catalog stops there.
+    func testWithNothingSelectedOnlyTheCatalogStops() {
         let palette = CorrectionSession(request: .awaitingChoice, opensPalette: true)
         XCTAssertFalse(palette.hasSelection)
-        XCTAssertEqual(palette.phaseWithoutSelection, .choosingAction)
+        XCTAssertEqual(palette.phaseAfterCapture, .choosingAction)
         // A palette waits for its row to be picked: it never closes by itself.
-        XCTAssertNil(palette.phaseWithoutSelection.autoDismissDelay(.standard))
+        XCTAssertNil(palette.phaseAfterCapture?.autoDismissDelay(.standard))
 
-        for session in [CorrectionSession(action: .correct),
-                        CorrectionSession(action: .summarize),
-                        CorrectionSession(request: .awaitingInstruction)] {
-            XCTAssertEqual(session.phaseWithoutSelection, .noSelection)
-            XCTAssertNotNil(session.phaseWithoutSelection.autoDismissDelay(.standard))
+        // The custom action waits for its request, typed or said.
+        XCTAssertEqual(CorrectionSession(request: .awaitingInstruction).phaseAfterCapture,
+                       .askingInstruction)
+        let spoken = CorrectionSession(request: .awaitingInstruction)
+        spoken.phase = .listeningInstruction
+        XCTAssertEqual(spoken.phaseAfterCapture, .listeningInstruction)
+        // Relaunched from the history, it has it already: it goes out at once.
+        XCTAssertNil(CorrectionSession(request: .free(instruction: "Traduis en espagnol")).phaseAfterCapture)
+
+        for action in [ClaudioAction.correct, .summarize] {
+            let session = CorrectionSession(action: action)
+            XCTAssertEqual(session.phaseAfterCapture, .noSelection, action.rawValue)
+            XCTAssertNotNil(session.phaseAfterCapture?.autoDismissDelay(.standard), action.rawValue)
         }
     }
 
-    /// Nothing selected, one row: the one that needs nothing selected. The
-    /// free row isn't there — it would have nothing to transform — and the
-    /// ranks start over from it.
-    func testWithoutASelectionOnlyWhatWorksWithoutOneIsOffered() {
+    /// Over a selection nothing changes: the palette waits for a row, the
+    /// custom action for its instruction, and everything else goes out.
+    func testOverASelectionEverySessionCarriesOnAsBefore() {
+        let palette = CorrectionSession(request: .awaitingChoice, opensPalette: true)
+        let typed = CorrectionSession(request: .awaitingInstruction)
+        let relaunched = CorrectionSession(request: .free(instruction: "Traduis en espagnol"))
+        let catalog = CorrectionSession(action: .correct)
+        for session in [palette, typed, relaunched, catalog] { session.originalText = "Bonjour" }
+
+        XCTAssertEqual(palette.phaseAfterCapture, .choosingAction)
+        XCTAssertEqual(typed.phaseAfterCapture, .askingInstruction)
+        XCTAssertNil(relaunched.phaseAfterCapture)
+        XCTAssertNil(catalog.phaseAfterCapture)
+    }
+
+    /// Nothing selected, two rows: "What's playing?", then the custom action,
+    /// ranked 1 and 2.
+    func testWithoutASelectionWhatsPlayingThenTheCustomActionAreOffered() {
         let session = Self.paletteWithoutSelection()
-        XCTAssertEqual(session.paletteRows.map(\.kind), [.whatsPlaying])
+        XCTAssertEqual(session.paletteRows.map(\.kind), [.whatsPlaying, .request(.free(instruction: ""))])
         XCTAssertEqual(session.selectedPaletteRow?.kind, .whatsPlaying)
         XCTAssertEqual(session.paletteIndex(forRank: 1, withCommand: false), 0)
-        XCTAssertNil(session.paletteIndex(forRank: 2, withCommand: true))
+        XCTAssertEqual(session.paletteIndex(forRank: 2, withCommand: false), 1)
+        XCTAssertNil(session.paletteIndex(forRank: 3, withCommand: true))
 
         session.originalText = "Bonjour"
         XCTAssertTrue(session.hasSelection)
         XCTAssertEqual(session.paletteRows.count, ClaudioAction.allCases.count + 2)
     }
 
-    /// Typing still filters. A query that matches nothing leaves an empty
-    /// list — no free row to fall back on — and nothing for Enter or a digit
-    /// to launch.
-    func testTypingStillFiltersAndAnEmptyListLaunchesNothing() {
+    /// Typing still filters, and the custom action is always there to take
+    /// what was typed as its request: no query leaves the list empty.
+    func testTypingFiltersAndWhatMatchesNothingBecomesTheRequest() {
         let session = Self.paletteWithoutSelection()
         session.paletteQuery = "musique"
-        XCTAssertEqual(session.paletteRows.map(\.kind), [.whatsPlaying])
+        XCTAssertEqual(session.paletteRows.map(\.kind),
+                       [.whatsPlaying, .request(.free(instruction: "musique"))])
 
-        session.paletteQuery = "traduis en espagnol"
-        XCTAssertTrue(session.paletteRows.isEmpty)
-        XCTAssertNil(session.selectedPaletteRow)
-        XCTAssertNil(session.paletteIndex(forRank: 1, withCommand: true))
-        session.movePaletteSelection(by: 1)
-        XCTAssertEqual(session.paletteSelection, 0)
+        session.paletteQuery = "écris un mail pour décaler la réunion"
+        XCTAssertEqual(session.paletteRows.map(\.kind),
+                       [.request(.free(instruction: "écris un mail pour décaler la réunion"))])
+        XCTAssertEqual(session.selectedPaletteRow?.request?.needsInstruction, false)
+        XCTAssertEqual(session.paletteIndex(forRank: 1, withCommand: true), 0)
     }
 
     private static func paletteWithoutSelection() -> CorrectionSession {
         let session = CorrectionSession(request: .awaitingChoice, opensPalette: true)
-        session.phase = session.phaseWithoutSelection
+        session.phase = .choosingAction
         return session
     }
 }

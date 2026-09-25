@@ -9,6 +9,21 @@ import XCTest
 @MainActor
 final class CorrectionCoordinatorTests: XCTestCase {
 
+    /// The labels compared are French: the suite pins the language rather
+    /// than inheriting it from the machine.
+    private var previousLanguage: AppLanguage = .system
+
+    override func setUp() {
+        super.setUp()
+        previousLanguage = AppSettings.language
+        AppSettings.language = .french
+    }
+
+    override func tearDown() {
+        AppSettings.language = previousLanguage
+        super.tearDown()
+    }
+
     /// Without Accessibility nothing can be read or pasted back: nothing is
     /// captured and no panel opens.
     func testWithoutAccessibilityNothingOpens() {
@@ -52,6 +67,110 @@ final class CorrectionCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.clientRequests, [])
         await bench.wait { bench.coordinator.session == nil }
         XCTAssertNil(bench.coordinator.session)
+    }
+
+    // MARK: - The custom action on nothing selected
+
+    /// Tapped on nothing selected, the custom action no longer stops: its
+    /// field asks for a request instead, and waits for it. What is typed
+    /// goes out under the request's own prompt, from the same model as
+    /// ever, and Claude's answer pastes at the cursor.
+    func testTheCustomActionOnNothingSelectedAsksForARequestThenAnswersIt() async throws {
+        let bench = Bench(selection: nil)
+        bench.coordinator.triggerFreeAction()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(session.phase, .askingInstruction)
+        XCTAssertFalse(session.hasSelection)
+        // Waiting on someone, it doesn't take itself off the screen.
+        try await Task.sleep(for: .milliseconds(60))
+        XCTAssertTrue(bench.coordinator.session === session)
+        XCTAssertEqual(bench.clientRequests, [])
+
+        session.instruction = "écris un mail pour décaler la réunion"
+        bench.coordinator.confirm()
+        await bench.runs()
+
+        XCTAssertEqual(bench.clientRequests, [.claude(.haiku45)])
+        XCTAssertEqual(bench.client.systems, [FreeRequest.system])
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nécris un mail pour décaler la réunion\n</consigne>"])
+        XCTAssertEqual(session.request.origin, .free(instruction: "écris un mail pour décaler la réunion"))
+        XCTAssertEqual(session.progressLabel, "Rédaction…")
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(bench.history.recents.entries.map(\.instruction),
+                       ["écris un mail pour décaler la réunion"])
+
+        bench.coordinator.confirm()
+        await bench.settle { !bench.pasted.isEmpty }
+        XCTAssertEqual(bench.pasted, [Bench.answer])
+        XCTAssertEqual(bench.captures, 1)
+    }
+
+    /// Held on nothing selected: the panel goes on listening instead of
+    /// saying there is no selection, and what was said goes out as the
+    /// request.
+    func testASpokenRequestOnNothingSelectedKeepsListeningThenGoesOut() async throws {
+        let bench = Bench(selection: nil)
+        let session = try XCTUnwrap(bench.coordinator.beginSpokenInstruction())
+        await bench.runs()
+        XCTAssertEqual(session.phase, .listeningInstruction)
+
+        bench.coordinator.runSpokenInstruction("c'est quoi ce morceau ?")
+        await bench.runs()
+        XCTAssertEqual(bench.client.systems, [FreeRequest.system])
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nc'est quoi ce morceau ?\n</consigne>"])
+        XCTAssertEqual(session.phase, .done)
+    }
+
+    /// Relaunched from the history on nothing selected: the instruction is
+    /// known, so it goes out at once, as a request.
+    func testARecentInstructionOnNothingSelectedGoesStraightOut() async throws {
+        let bench = Bench(selection: nil)
+        bench.coordinator.triggerRecent(instruction: "écris un mail pour décaler la réunion")
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        XCTAssertEqual(bench.client.systems, [FreeRequest.system])
+        XCTAssertEqual(bench.client.texts, ["<consigne>\nécris un mail pour décaler la réunion\n</consigne>"])
+        XCTAssertEqual(session.phase, .done)
+    }
+
+    /// The palette on nothing selected offers "What's playing?" and the
+    /// custom action. What was typed, launched on the second, is the request.
+    func testThePaletteOnNothingSelectedSendsWhatWasTypedAsTheRequest() async throws {
+        let bench = Bench(selection: nil)
+        bench.coordinator.triggerPalette()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(session.phase, .choosingAction)
+        XCTAssertEqual(session.paletteRows.map(\.kind), [.whatsPlaying, .request(.free(instruction: ""))])
+
+        session.paletteQuery = "écris un message pour partager ce que j'écoute"
+        bench.coordinator.confirm()
+        await bench.runs()
+        XCTAssertEqual(bench.client.systems, [FreeRequest.system])
+        XCTAssertEqual(bench.client.texts,
+                       ["<consigne>\nécris un message pour partager ce que j'écoute\n</consigne>"])
+    }
+
+    /// "Try again" sends the same request again, and never captures a second
+    /// time: the panel is up and key by then, and a simulated ⌘C would land
+    /// in it — with nothing selected, there is nothing to read again anyway.
+    func testTryingAgainOnNothingSelectedSendsTheSameRequestWithoutCapturing() async throws {
+        let bench = Bench(selection: nil, answers: [.failure(AnswerFailure()), .success(Bench.answer)])
+        bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(session.phase, .error(AnswerFailure().localizedDescription))
+
+        bench.coordinator.retry()
+        await bench.runs()
+        XCTAssertEqual(bench.captures, 1)
+        XCTAssertEqual(bench.panels, 1)
+        XCTAssertEqual(bench.client.systems, [FreeRequest.system, FreeRequest.system])
+        XCTAssertEqual(bench.client.texts, Array(repeating: "<consigne>\nc'est quoi ce morceau ?\n</consigne>",
+                                                 count: 2))
+        XCTAssertEqual(session.phase, .done)
     }
 }
 
