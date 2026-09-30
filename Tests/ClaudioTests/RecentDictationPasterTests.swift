@@ -15,8 +15,30 @@ final class RecentDictationPasterTests: XCTestCase {
     func testAClickPastesAtTheCursorOfTheAppInFront() async {
         let bench = PasterBench()
         await bench.paster.paste(text)
-        XCTAssertEqual(bench.steps.last, .paste(text))
+        XCTAssertTrue(bench.steps.contains(.paste(text)))
         XCTAssertFalse(bench.steps.contains(.copy(text)))
+    }
+
+    /// The paste leaves the text on the clipboard instead of putting the old
+    /// contents back: a ⌘V that found no field to land in used to leave no
+    /// trace at all, and the click looked like it did nothing.
+    func testThePastedTextStaysOnTheClipboard() async {
+        let bench = PasterBench()
+        await bench.paster.paste(text)
+        XCTAssertEqual(bench.restoredClipboards, [false])
+    }
+
+    /// Each click says what it did, once the text is where it goes.
+    func testAPasteIsAnnouncedAfterTheKeystroke() async {
+        let bench = PasterBench()
+        await bench.paster.paste(text)
+        XCTAssertEqual(bench.steps.suffix(2), [.paste(text), .announce(.pasted)])
+    }
+
+    func testACopyIsAnnouncedAsACopy() async {
+        let bench = PasterBench(app: nil)
+        await bench.paster.paste(text)
+        XCTAssertEqual(bench.steps.last, .announce(.copied))
     }
 
     /// The order is the rule. The app in front is read first, while it still
@@ -26,7 +48,7 @@ final class RecentDictationPasterTests: XCTestCase {
     func testTheTargetIsReadFirstAndThePanelsCloseBeforeTheKeystroke() async {
         let bench = PasterBench()
         await bench.paster.paste(text)
-        XCTAssertEqual(bench.steps, [.capture, .gate, .closePanels, .paste(text)])
+        XCTAssertEqual(bench.steps, [.capture, .gate, .closePanels, .paste(text), .announce(.pasted)])
     }
 
     /// Claudio itself in front — its Settings window, say — or no app at all:
@@ -35,15 +57,16 @@ final class RecentDictationPasterTests: XCTestCase {
     func testWithNoOtherAppInFrontTheTextIsCopiedNotPasted() async {
         let bench = PasterBench(app: nil)
         await bench.paster.paste(text)
-        XCTAssertEqual(bench.steps, [.capture, .copy(text)])
+        XCTAssertEqual(bench.steps, [.capture, .copy(text), .announce(.copied)])
     }
 
     /// Same gate as a dictation: without Accessibility the keystroke can't be
-    /// sent, so nothing is — and nothing on screen is closed for it.
-    func testWithoutAccessibilityNothingIsPasted() async {
+    /// sent, so nothing is — and nothing on screen is closed for it. The
+    /// clipboard still gets the text: a click always leaves it somewhere.
+    func testWithoutAccessibilityTheTextIsCopiedNotPasted() async {
         let bench = PasterBench(allowed: false)
         await bench.paster.paste(text)
-        XCTAssertEqual(bench.steps, [.capture, .gate])
+        XCTAssertEqual(bench.steps, [.capture, .gate, .copy(text), .announce(.copied)])
     }
 }
 
@@ -55,9 +78,12 @@ private final class PasterBench {
     enum Step: Equatable {
         case capture, gate, closePanels
         case paste(String), copy(String)
+        case announce(RecentDictationOutcome)
     }
 
     private(set) var steps: [Step] = []
+    /// For each paste, whether it was told to put the old clipboard back.
+    private(set) var restoredClipboards: [Bool] = []
     /// Built in `init` and never cleared: the tests see it as what it is.
     var paster: RecentDictationPaster { built }
     private var built: RecentDictationPaster!
@@ -73,15 +99,19 @@ private final class PasterBench {
                 },
                 capture: { [weak self] in
                     self?.steps.append(.capture)
-                    return PasteTarget(app: app, clipboard: nil)
+                    // A clipboard to put back, as the real capture takes:
+                    // the paster is the one that must decline it. Read only.
+                    return PasteTarget(app: app, clipboard: PasteboardSnapshot.capture())
                 },
-                paste: { [weak self] text, _ in
+                paste: { [weak self] text, target in
                     self?.steps.append(.paste(text))
+                    self?.restoredClipboards.append(target.clipboard != nil)
                     return true
                 }
             ),
             closePanels: { [weak self] in self?.steps.append(.closePanels) },
             copy: { [weak self] text in self?.steps.append(.copy(text)) },
+            announce: { [weak self] outcome in self?.steps.append(.announce(outcome)) },
             menuClosing: .zero
         )
     }

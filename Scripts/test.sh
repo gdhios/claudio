@@ -91,8 +91,9 @@ preview_shot() {
 # cleaning up and stopped), palette (plain, filtered, and opened on no
 # selection), "What's playing?" (notes done, streaming over a paused track,
 # nothing playing, no key), Settings (API key, engine per action, local
-# server, shortcuts, dictation on a lone key, dictation, Stream Deck).
-for mode in panel panel-streaming panel-error panel-noselection panel-free panel-free-listening panel-free-unheard panel-free-noselection panel-free-answer-track panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre palette-noselection listening listening-streaming listening-nothing listening-nokey settings settings-prompts settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck; do
+# server, shortcuts, dictation on a lone key, dictation, Stream Deck), and
+# the pill a recent dictation leaves (pasted, copied).
+for mode in panel panel-streaming panel-error panel-noselection panel-free panel-free-listening panel-free-unheard panel-free-noselection panel-free-answer-track panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre palette-noselection listening listening-streaming listening-nothing listening-nokey settings settings-prompts settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck toast-pasted toast-copied; do
     preview_shot "$mode"
 done
 echo "✅ Critical screens build and render ($SHOTS/)."

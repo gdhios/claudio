@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// panel-listening-locked, panel-dictation-cleaning, panel-dictation-error, palette, palette-filtre,
 /// palette-libre, palette-noselection, listening, listening-streaming, listening-nothing,
 /// listening-nokey, settings, settings-dictation, settings-shortcuts-lone-key,
-/// settings-streamdeck.
+/// settings-streamdeck, toast-pasted, toast-copied.
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// Shows the element at a fixed position and
 /// prints the region to capture (top-left, for `screencapture -R`).
@@ -105,6 +105,10 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show(initialSection: .streamDeck)
         } else if mode == "settings-about" {
             settingsController.show(initialSection: .about)
+        } else if mode.hasPrefix("toast") {
+            // The pill a click on a recent dictation leaves, held long
+            // enough for the shot to find it.
+            ClipboardToast.shared.show(mode == "toast-copied" ? .copied : .pasted, for: .seconds(60))
         } else if mode == "barre-de-menus" {
             showMenuBarPreview()
         } else if mode.hasPrefix("panel-listening") || mode.hasPrefix("panel-dictation") {
