@@ -285,6 +285,86 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertNil(entry?.cleaned, "nothing came back from the model")
     }
 
+    /// Before the microphone has even closed, the words on screen are words
+    /// said. Esc, the close button, a press that starts another dictation:
+    /// none of them pastes, and none of them throws away what was heard —
+    /// "Recent dictations" is where it waits.
+    func testEscapeWhileSpeakingKeepsWhatWasHeard() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.coordinator.session?.transcript == "bonjour" }
+
+        bench.coordinator.escape()
+
+        XCTAssertTrue(bench.pasted.isEmpty)
+        XCTAssertEqual(bench.history.recents.entries.count, 1)
+        let entry = bench.history.recents.entries.first
+        XCTAssertEqual(entry?.raw, "bonjour")
+        XCTAssertNil(entry?.cleaned)
+        XCTAssertEqual(entry?.language, DictationLanguage.frFR.rawValue)
+    }
+
+    /// A new press while the last dictation still listens starts afresh, and
+    /// the one it replaces is kept rather than dropped.
+    func testANewPressKeepsTheDictationItReplaces() async {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.coordinator.session?.transcript == "bonjour" }
+        await bench.readAnswered()
+
+        bench.coordinator.keyDown(language: .enUS)
+        await bench.settle { bench.engine.starts == 2 }
+
+        XCTAssertEqual(bench.engine.starts, 2)
+        XCTAssertEqual(bench.history.recents.entries.map(\.raw), ["bonjour"])
+        XCTAssertEqual(bench.history.recents.entries.first?.language,
+                       DictationLanguage.frFR.rawValue)
+    }
+
+    /// The engine giving up mid-sentence: its message is shown as ever, and
+    /// what it had heard until then is kept.
+    func testAnEngineFailureKeepsWhatWasHeard() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { session.transcript == "bonjour" }
+
+        bench.engine.say(.failed(.recognizer("timeout")))
+        await bench.cycleEnds()
+
+        XCTAssertEqual(session.phase,
+                       .error(SpeechEngineError.recognizer("timeout").localizedDescription))
+        XCTAssertTrue(bench.pasted.isEmpty)
+        XCTAssertEqual(bench.history.recents.entries.map(\.raw), ["bonjour"])
+        // And its panel closing later doesn't write it a second time.
+        bench.coordinator.dismiss()
+        XCTAssertEqual(bench.history.recents.entries.count, 1)
+    }
+
+    /// Kept as the speaker spells it, like a dictation that went through.
+    func testAnInterruptedDictationKeepsTheReplacements() async {
+        let bench = Bench(events: [.partial("ouvre l'a pas compris")],
+                          vocabulary: "l'a pas compris → Lapacompris")
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.coordinator.session?.transcript == "ouvre l'a pas compris" }
+
+        bench.coordinator.escape()
+
+        XCTAssertEqual(bench.history.recents.entries.first?.raw, "ouvre Lapacompris")
+    }
+
+    /// Nothing heard yet, nothing to keep: an Esc on a silence leaves the
+    /// history as it was.
+    func testEscapeOnASilenceKeepsNothing() async {
+        let bench = Bench(events: [.partial("   ")])
+        bench.coordinator.keyDown(language: .frFR)
+        await bench.settle { bench.engine.starts == 1 }
+
+        bench.coordinator.escape()
+
+        XCTAssertTrue(bench.history.recents.entries.isEmpty)
+    }
+
     /// The other half of the same change: recording the transcript early
     /// must not leave a second line behind once the cleanup answers. The
     /// cleaned text joins the entry already there.
@@ -570,19 +650,20 @@ final class DictationCoordinatorTests: XCTestCase {
     }
 
     /// Esc on a locked dictation is Esc as ever: the microphone cancelled,
-    /// nothing pasted or remembered, and the music back.
+    /// nothing pasted, and the music back. What was heard is kept.
     func testEscapeCancelsALockedDictationAndResumesTheMusic() async throws {
         let bench = Bench()
         let session = try await bench.lock()
         XCTAssertTrue(session.isLocked)
         XCTAssertEqual(bench.media.commands, [.pause])
+        await bench.settle { session.transcript == "bonjour" }
 
         bench.coordinator.escape()
 
         XCTAssertEqual(bench.engine.cancels, 1)
         XCTAssertEqual(bench.engine.stops, 0)
         XCTAssertTrue(bench.pasted.isEmpty)
-        XCTAssertTrue(bench.history.recents.entries.isEmpty)
+        XCTAssertEqual(bench.history.recents.entries.map(\.raw), ["bonjour"])
         XCTAssertNil(bench.coordinator.session)
         XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
@@ -664,13 +745,14 @@ final class DictationCoordinatorTests: XCTestCase {
     // MARK: - A lone key that was a combination after all
 
     /// Right ⌥ held alone long enough to dictate, then a key: it was ⌥( all
-    /// along. The microphone is cancelled, nothing is pasted or remembered,
-    /// the music comes back — and the release that follows finds nothing to
-    /// finish.
-    func testCancellingAHeldDictationKeepsNothing() async throws {
+    /// along — or a click that happened while speaking. The microphone is
+    /// cancelled, nothing is pasted, the music comes back, and the release
+    /// that follows finds nothing to finish. What was heard by then is kept:
+    /// Guillaume lost whole dictations to a stray click.
+    func testCancellingAHeldDictationPastesNothingButKeepsWhatWasHeard() async throws {
         let bench = Bench()
         bench.coordinator.keyDown(language: .frFR)
-        await bench.settle { bench.engine.starts == 1 }
+        await bench.settle { bench.coordinator.session?.transcript == "bonjour" }
         await bench.readAnswered()
 
         bench.coordinator.cancelHeld()
@@ -683,7 +765,7 @@ final class DictationCoordinatorTests: XCTestCase {
         await bench.coordinator.cycle?.value
         XCTAssertEqual(bench.engine.stops, 0)
         XCTAssertTrue(bench.pasted.isEmpty)
-        XCTAssertTrue(bench.history.recents.entries.isEmpty)
+        XCTAssertEqual(bench.history.recents.entries.map(\.raw), ["bonjour"])
         XCTAssertEqual(bench.media.commands, [.pause, .play])
     }
 
@@ -760,7 +842,6 @@ final class DictationCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(bench.engine.cancels, 1)
         XCTAssertTrue(bench.pasted.isEmpty)
-        XCTAssertTrue(bench.history.recents.entries.isEmpty)
         XCTAssertNil(bench.coordinator.session)
     }
 

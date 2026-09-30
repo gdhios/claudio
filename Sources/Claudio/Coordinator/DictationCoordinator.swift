@@ -61,6 +61,13 @@ final class DictationCoordinator {
 
     private var panel: ResultPanel?
     private var target: PasteTarget?
+    /// The vocabulary read on the press, for whatever ends the dictation:
+    /// a transcript is kept as the speaker spells it, however it stopped.
+    private var pressVocabulary: DictationVocabulary = .empty
+    /// When the dictation under way entered the history, `nil` until it has.
+    /// Whatever ends it later — a close, a failure, the cleanup coming back —
+    /// finds it there already and writes no second line.
+    private var recordedAt: Date?
     private var pressedAt = Date.distantPast
     /// Finishes a locked dictation at its limit. Runs from the tap, and is
     /// cancelled by whatever ends the dictation first.
@@ -191,6 +198,7 @@ final class DictationCoordinator {
         // the replacements and the prompt all get this one, whatever
         // Settings says by the time the key comes up.
         let vocabulary = self.vocabulary()
+        pressVocabulary = vocabulary
         panel = makePanel(session, self)
         cycle = Task { [weak self] in
             await self?.listen(session: session, vocabulary: vocabulary)
@@ -216,7 +224,8 @@ final class DictationCoordinator {
 
     /// Esc, at any phase: the microphone is cancelled, the cycle dropped,
     /// nothing pasted. Nothing was written to the clipboard either — only
-    /// the paste writes it, and it never ran.
+    /// the paste writes it, and it never ran. What was heard is kept in the
+    /// history all the same: Esc means "don't paste", not "forget".
     func escape() { dismiss() }
 
     /// A lone modifier key held to dictate turned out to be the start of a
@@ -275,6 +284,7 @@ final class DictationCoordinator {
             case .failed(let error):
                 // The message is read, not acted on: nothing was heard, so
                 // the panel says why and closes itself like an empty one.
+                keepWhatWasHeard(session)
                 session.fail(with: error)
                 // The panel stays up to be read; the music doesn't wait for it.
                 pauser.resume()
@@ -313,8 +323,7 @@ final class DictationCoordinator {
         // while the cleanup was under way used to take the whole dictation
         // with it: the words were said, they existed, and nothing had kept
         // them. The cleaned-up text joins this entry when it comes.
-        let recordedAt = now()
-        history.record(raw: raw, cleaned: nil, language: session.language, at: recordedAt)
+        guard let recordedAt = keepWhatWasHeard(session, raw: raw) else { return }
 
         var cleaned: String?
         if session.model != .raw {
@@ -408,6 +417,26 @@ final class DictationCoordinator {
         }
     }
 
+    /// Writes what was heard into the history, once per dictation, without
+    /// pasting it. Every end goes through here: the transcript finished, and
+    /// every way a dictation stops before that — Esc, the close button, a
+    /// click under a held ⌥, a new press, the engine giving up. The words on
+    /// screen were said; "Recent dictations" is where they wait.
+    /// `raw` is the transcript once the replacements are applied, when the
+    /// caller has it already; otherwise they are applied here, once.
+    /// Returns the entry's date, `nil` when nothing was heard.
+    @discardableResult
+    private func keepWhatWasHeard(_ session: DictationSession, raw: String? = nil) -> Date? {
+        if let recordedAt { return recordedAt }
+        let heard = session.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !heard.isEmpty else { return nil }
+        let date = now()
+        recordedAt = date
+        history.record(raw: raw ?? pressVocabulary.applyingReplacements(to: heard),
+                       cleaned: nil, language: session.language, at: date)
+        return date
+    }
+
     private func pastedWithoutCleanup(_ reason: String) -> String {
         loc("Collé sans nettoyage : \(reason)", en: "Pasted without cleanup: \(reason)")
     }
@@ -457,8 +486,10 @@ final class DictationCoordinator {
     }
 
     /// Closes the panel and drops the cycle. Idempotent: cancelling a
-    /// finished engine does nothing.
+    /// finished engine does nothing. Nothing is pasted, and what was heard
+    /// stays in the history.
     func dismiss() {
+        if let session { keepWhatWasHeard(session) }
         cycle?.cancel()
         cycle = nil
         lockTimer?.cancel()
@@ -478,5 +509,7 @@ final class DictationCoordinator {
         panel = nil
         session = nil
         target = nil
+        recordedAt = nil
+        pressVocabulary = .empty
     }
 }
