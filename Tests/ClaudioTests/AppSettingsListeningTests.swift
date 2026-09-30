@@ -7,17 +7,10 @@ import XCTest
 final class AppSettingsListeningTests: XCTestCase {
 
     private var defaults: UserDefaults!
-    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
-        suiteName = "ClaudioTests.listening.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-        super.tearDown()
+        defaults = InMemoryDefaults()
     }
 
     func testTheDefaultsAreOnAndThreeSentences() {

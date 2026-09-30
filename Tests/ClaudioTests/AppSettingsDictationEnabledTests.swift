@@ -3,21 +3,18 @@ import XCTest
 
 /// The master switch for dictation. At stake: someone who never dictates
 /// gets their keys back, and someone who never opens Settings keeps
-/// dictating. Each test writes to a throwaway suite, never to this Mac's
-/// preferences.
+/// dictating. Each test writes to throwaway defaults held in memory, never
+/// to this Mac's preferences.
 final class AppSettingsDictationEnabledTests: XCTestCase {
 
-    private var suiteName = ""
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
-        suiteName = "ClaudioTests.dictationEnabled.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        defaults = InMemoryDefaults()
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         super.tearDown()
     }

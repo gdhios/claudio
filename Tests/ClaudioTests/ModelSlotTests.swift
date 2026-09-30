@@ -7,17 +7,10 @@ import XCTest
 final class ModelSlotTests: XCTestCase {
 
     private var defaults: UserDefaults!
-    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
-        suiteName = "ClaudioTests.slots.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-        super.tearDown()
+        defaults = InMemoryDefaults()
     }
 
     /// One row per shortcut, in the order the tab shows them: the catalog's
@@ -79,7 +72,7 @@ final class ModelSlotTests: XCTestCase {
     func testTheListeningSettingIsReadFromTheDefaults() {
         ModelSlot.listening.set(.claude(.haiku45), in: defaults)
         XCTAssertEqual(AppSettings.listeningModel(in: defaults), .claude(.haiku45))
-        XCTAssertEqual(AppSettings.listeningModel(in: UserDefaults(suiteName: "ClaudioTests.empty.\(UUID())")!),
+        XCTAssertEqual(AppSettings.listeningModel(in: InMemoryDefaults()),
                        ListeningNotes.model)
     }
 
