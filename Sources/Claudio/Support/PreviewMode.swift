@@ -309,6 +309,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.facts = sampleFacts
             session.notes = String(sampleNotes.prefix(sampleNotes.count * 2 / 3))
             session.phase = .streaming
+        case "listening-essay":
+            session.track = sampleTrack(playing: true)
+            session.artwork = sampleArtwork
+            session.facts = sampleFacts
+            session.notes = sampleNotes
+            session.essaySubject = MusicSubject.album(of: sampleTrack(playing: true), facts: sampleFacts)
+            session.essay = sampleEssay
+            session.phase = .done
         case "listening-nothing":
             session.phase = .nothing
         case "listening-nokey":
@@ -324,6 +332,12 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         panel.present()
+    }
+
+    /// The long text "Tell me more" shows in place of the notes.
+    private var sampleEssay: String {
+        loc("LOVE TRIP paraît en novembre 1982 chez Columbia, au cœur de la vague city pop : Takako Mamiya, chanteuse de jazz formée dans les clubs de Tokyo, l'enregistre avec des musiciens de studio et des arrangements soignés. Ce sera son unique album.\n\nL'album se distingue par son élégance retenue : des tempos modérés, des cuivres discrets, une voix posée qui ne force jamais. Passé presque inaperçu à sa sortie, il devient culte trente ans plus tard, quand internet redécouvre la city pop.\n\nPour commencer : « 真夜中のジョーク », puis « All Or Nothing ».",
+            en: "LOVE TRIP came out in November 1982 on Columbia, at the heart of the city pop wave: Takako Mamiya, a jazz singer trained in Tokyo's clubs, recorded it with studio musicians and polished arrangements. It would be her only album.\n\nThe album stands out for its restrained elegance: moderate tempos, discreet horns, a poised voice that never forces. Almost unnoticed on release, it became a cult record thirty years later, when the internet rediscovered city pop.\n\nStart with “真夜中のジョーク”, then “All Or Nothing”.")
     }
 
     /// What MusicBrainz says of the sample track (captured 2026-10-02):

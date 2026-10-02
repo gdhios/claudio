@@ -14,6 +14,8 @@ struct ListeningPanelView: View {
     let onOpenSettings: () -> Void
     let onClose: () -> Void
     var onOpenInGalette: (GaletteLink) -> Void = { _ in }
+    var onElaborate: (MusicSubject) -> Void = { _ in }
+    var onBack: () -> Void = {}
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var notesHeight: CGFloat = 0
@@ -72,6 +74,7 @@ struct ListeningPanelView: View {
             workingPill(loc("Écoute…", en: "Checking…"))
         case .streaming:
             workingPill(loc("Rédaction…", en: "Writing…"))
+                .id(session.essaySubject)
         case .done:
             StatusPill(background: .green.opacity(0.16), foreground: .green) {
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
@@ -133,9 +136,14 @@ struct ListeningPanelView: View {
                 trackText(track)
             }
             .animation(.easeOut(duration: 0.18), value: session.artwork == nil)
-            if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
-                                            onOpen: onOpenInGalette) {
-                buttons
+            HStack(spacing: 10) {
+                if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
+                                                onOpen: onOpenInGalette) {
+                    buttons
+                }
+                if showsSubjectPills {
+                    subjectPills
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -155,6 +163,30 @@ struct ListeningPanelView: View {
             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(.white.opacity(0.12), lineWidth: 1))
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+
+    /// "Tell me more" is offered once there is a card and a Claude to ask:
+    /// not over a missing key, and not while the long text is on screen.
+    private var showsSubjectPills: Bool {
+        guard session.phase != .missingKey, !session.subjects.isEmpty else { return false }
+        return true
+    }
+
+    /// One pill per subject the card knows: the album, the artist.
+    private var subjectPills: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "text.book.closed")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            ForEach(session.subjects, id: \.self) { subject in
+                Button(subject.buttonTitle) { onElaborate(subject) }
+                    .buttonStyle(SmallPillButtonStyle())
+                    .help(loc("Un texte plus long de Claude, à la place des notes",
+                              en: "A longer text from Claude, in place of the notes"))
+            }
+        }
+        .fixedSize()
     }
 
     /// The title, the artist, then where the track comes from — the album
@@ -235,15 +267,20 @@ struct ListeningPanelView: View {
         }
     }
 
+    /// The notes, or the long text when a subject is on screen.
+    private var shownText: String {
+        session.essaySubject == nil ? session.notes : session.essay
+    }
+
     @ViewBuilder private var notesText: some View {
         if session.phase == .streaming {
             TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
                 let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(session.notes)
+                Text(shownText)
                     + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
             }
         } else {
-            Text(session.notes)
+            Text(shownText)
         }
     }
 
@@ -287,6 +324,11 @@ struct ListeningPanelView: View {
                     .lineLimit(1)
             }
             Spacer()
+            // The way back to the notes, when there are notes to go back to.
+            if session.essaySubject != nil, !session.cameFromLink {
+                Button(loc("Retour", en: "Back"), action: onBack)
+                    .buttonStyle(PanelPillButtonStyle())
+            }
             switch session.phase {
             case .missingKey:
                 Button(loc("Réglages…", en: "Settings…"), action: onOpenSettings)

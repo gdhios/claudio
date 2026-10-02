@@ -202,6 +202,75 @@ final class ListeningCoordinator {
         }
     }
 
+    // MARK: - "Tell me more"
+
+    /// A pill on the card: the notes make way for a long text about the
+    /// album or the artist. Whatever the notes were doing stops; they stay
+    /// as they are for the way back.
+    func elaborate(on subject: MusicSubject) {
+        guard let session else { return }
+        cycle?.cancel()
+        session.beginEssay(on: subject)
+        cycle = Task { [weak self] in
+            await self?.write(about: subject, session: session)
+        }
+    }
+
+    /// "Back": the notes again, as they were.
+    func back() {
+        guard let session, session.essaySubject != nil else { return }
+        cycle?.cancel()
+        cycle = nil
+        session.closeEssay()
+    }
+
+    /// A `claudio://music` link from Galette: the panel opens on the
+    /// subject's card, nothing is read from the player, and the long text
+    /// streams at once. The album's facts come with the link: the archive
+    /// is asked for its cover like a listening would.
+    func open(_ subject: MusicSubject) {
+        dismiss()
+        onOpen?()
+        let session = ListeningSession(model: model())
+        session.galette = galette.find()
+        session.cameFromLink = true
+        session.track = subject.card
+        session.facts = subject.facts
+        self.session = session
+        panel = makePanel(session, self)
+        let preferences = preferences()
+        playerCoverSettled = true
+        archiveAsked = false
+        considerArchiveCover(for: session, preferences: preferences)
+        elaborate(on: subject)
+    }
+
+    private func write(about subject: MusicSubject, session: ListeningSession) async {
+        guard let client = client(session.model) else {
+            session.phase = .missingKey
+            return
+        }
+        do {
+            let result = try await client.streamCompletion(
+                of: ListeningEssay.userMessage(for: subject),
+                system: ListeningEssay.system(),
+                maxTokens: ListeningEssay.maxTokens
+            ) { @MainActor piece in
+                session.appendEssay(piece)
+            }
+            guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
+            session.finishEssay(with: result.text)
+            CostLedger.shared.record(model: session.model,
+                                     inputTokens: result.inputTokens,
+                                     outputTokens: result.outputTokens)
+        } catch is CancellationError {
+        } catch let error as URLError where error.code == .cancelled {
+        } catch {
+            guard self.session === session, !Task.isCancelled else { return }
+            session.phase = .error(error.localizedDescription)
+        }
+    }
+
     // MARK: - Panel actions
 
     /// "Try again", once Claude has failed: the player is read again — the
@@ -210,6 +279,14 @@ final class ListeningCoordinator {
     func retry() {
         guard let session, case .error = session.phase else { return }
         cycle?.cancel()
+        // The long text failed: it is asked again, the card as it is.
+        if let subject = session.essaySubject {
+            session.beginEssay(on: subject)
+            cycle = Task { [weak self] in
+                await self?.write(about: subject, session: session)
+            }
+            return
+        }
         session.phase = .reading
         cycle = Task { [weak self] in
             await self?.read(session)
@@ -281,7 +358,9 @@ final class ListeningCoordinator {
                 coordinator?.openSettings?()
             },
             onClose: { [weak coordinator] in coordinator?.dismiss() },
-            onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) }
+            onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) },
+            onElaborate: { [weak coordinator] subject in coordinator?.elaborate(on: subject) },
+            onBack: { [weak coordinator] in coordinator?.back() }
         )
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
         panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }

@@ -46,6 +46,14 @@ final class ListeningSession: ObservableObject {
     /// What MusicBrainz said of the track, when it was asked and answered
     /// in time: known at once from the cache, or arriving on its own.
     @Published var facts: TrackFacts?
+    /// "Tell me more": the subject the long text is about, while it is on
+    /// screen in place of the notes. `nil` shows the notes.
+    @Published var essaySubject: MusicSubject?
+    /// The long text, as it streams.
+    @Published var essay = ""
+    /// Opened by a `claudio://music` link: there are no notes to go back
+    /// to, the panel only closes.
+    var cameFromLink = false
     /// Claude's notes, as they stream. Three sentences at most: published as
     /// they come, with no buffering to spare the layout.
     @Published var notes = ""
@@ -72,6 +80,34 @@ final class ListeningSession: ObservableObject {
     }
 
     func appendNotes(_ piece: String) { notes += piece }
+
+    /// The long text is being asked for: whatever an earlier one said goes.
+    func beginEssay(on subject: MusicSubject) {
+        essaySubject = subject
+        essay = ""
+        phase = .streaming
+    }
+
+    func appendEssay(_ piece: String) { essay += piece }
+
+    func finishEssay(with text: String) {
+        essay = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        phase = .done
+    }
+
+    /// Back to the notes, as they were.
+    func closeEssay() {
+        essaySubject = nil
+        essay = ""
+        phase = .done
+    }
+
+    /// The pills that lead to the long text: the album and the artist the
+    /// card knows, while the notes are what's on screen.
+    var subjects: [MusicSubject] {
+        guard essaySubject == nil, let track else { return [] }
+        return [MusicSubject.album(of: track, facts: facts), MusicSubject.artist(of: track)].compactMap { $0 }
+    }
 
     /// The whole answer replaces what streamed on the way.
     func finish(with text: String) {

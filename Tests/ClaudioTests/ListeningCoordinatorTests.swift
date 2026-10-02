@@ -199,6 +199,62 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.client.systems, [ListeningNotes.system(detail: .oneSentence)])
     }
 
+    // MARK: - "Tell me more"
+
+    /// A pill on the card: the notes make way for a long text about the
+    /// album, from the same model with the essay's prompt and budget; the
+    /// facts in hand go with the subject. "Back" brings the notes back.
+    func testTellMeMoreStreamsALongTextOverTheNotesThenComesBack() async throws {
+        let bench = Bench(cachedFacts: Bench.facts)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        let subject = try XCTUnwrap(MusicSubject.album(of: .sample, facts: Bench.facts))
+        bench.coordinator.elaborate(on: subject)
+        XCTAssertEqual(session.essaySubject, subject)
+        XCTAssertEqual(session.phase, .streaming)
+        await bench.runs()
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(session.essay, Bench.notes)
+        XCTAssertEqual(session.notes, Bench.notes, "the notes are kept for the way back")
+        XCTAssertEqual(bench.client.texts.last, ListeningEssay.userMessage(for: subject))
+        XCTAssertEqual(bench.client.systems.last, ListeningEssay.system())
+        XCTAssertEqual(bench.client.budgets.last, ListeningEssay.maxTokens)
+        XCTAssertEqual(bench.clientRequests, [ListeningNotes.model, ListeningNotes.model])
+
+        bench.coordinator.back()
+        XCTAssertNil(session.essaySubject)
+        XCTAssertEqual(session.essay, "")
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(session.notes, Bench.notes)
+    }
+
+    /// A `claudio://music` link from Galette: the panel opens on the
+    /// subject's card, nothing is read from the player, the text streams
+    /// at once, and the archive is asked for the album's cover.
+    func testALinkOpensOnTheSubjectAndStreamsWithoutReadingThePlayer() async throws {
+        let bench = Bench(remoteCover: Bench.cover)
+        let subject = MusicSubject(kind: .album, artist: "間宮貴子", title: "LOVE TRIP",
+                                   mbid: "3b03f2df-1fc0", firstReleaseDate: "1982-11-25", type: "Album")
+        bench.coordinator.open(subject)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        XCTAssertEqual(bench.panels, 1)
+        XCTAssertEqual(session.track, subject.card)
+        XCTAssertEqual(session.essaySubject, subject)
+        XCTAssertTrue(session.cameFromLink)
+
+        await bench.runs()
+        XCTAssertEqual(bench.reads, 0)
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(session.essay, Bench.notes)
+        XCTAssertEqual(bench.client.texts, [ListeningEssay.userMessage(for: subject)])
+        XCTAssertEqual(bench.factsRequests, [], "the link brought its facts")
+        await bench.wait { session.artwork != nil }
+        XCTAssertEqual(bench.remoteCoverRequests.map(\.releaseGroupID), ["3b03f2df-1fc0"])
+        XCTAssertEqual(session.facts?.summary(playerAlbum: "LOVE TRIP", english: false), "1982 · album")
+    }
+
     // MARK: - Galette
 
     /// With Galette on the Mac, the card offers the artist, then the album.

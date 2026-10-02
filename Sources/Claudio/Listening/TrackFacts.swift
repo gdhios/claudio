@@ -25,7 +25,13 @@ struct TrackFacts: Equatable, Sendable, Codable {
     /// compilation is a compilation before it is an album.
     func typeLabel(english: Bool) -> String? {
         guard let raw = secondaryTypes.first ?? primaryType else { return nil }
-        return Self.typeNames[raw.lowercased()].map { english ? $0.en : $0.fr } ?? raw.lowercased()
+        return Self.typeName(raw, english: english)
+    }
+
+    /// A MusicBrainz type as one word of the interface's language, the raw
+    /// name lowercased when it isn't a known one.
+    static func typeName(_ raw: String, english: Bool) -> String {
+        typeNames[raw.lowercased()].map { english ? $0.en : $0.fr } ?? raw.lowercased()
     }
 
     private static let typeNames: [String: (fr: String, en: String)] = [

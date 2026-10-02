@@ -16,6 +16,32 @@ final class ClaudioURLTests: XCTestCase {
         return ClaudioURL.parse(url)
     }
 
+    // MARK: - "Tell me more", from Galette
+
+    /// `claudio://music?kind=album&artist=…&title=…`: Galette's "Tell me
+    /// more", with the facts it has and only them.
+    func testAnAlbumLinkCarriesItsFacts() {
+        let link = parse("claudio://music?kind=album&artist=%E9%96%93%E5%AE%AE%E8%B2%B4%E5%AD%90&title=LOVE%20TRIP"
+                         + "&mbid=3b03f2df-1fc0&date=1982-11-25&type=Album&label=Columbia&country=JP")
+        XCTAssertEqual(link, .music(MusicSubject(kind: .album, artist: "間宮貴子", title: "LOVE TRIP",
+                                                 mbid: "3b03f2df-1fc0", firstReleaseDate: "1982-11-25",
+                                                 type: "Album", label: "Columbia", country: "JP")))
+    }
+
+    func testAnArtistLinkNeedsOnlyTheArtist() {
+        XCTAssertEqual(parse("claudio://music?kind=artist&artist=Takako%20Mamiya&mbid=abc"),
+                       .music(MusicSubject(kind: .artist, artist: "Takako Mamiya", mbid: "abc")))
+    }
+
+    /// Half a subject is no subject: an album without a title, a link
+    /// without an artist, a kind Claudio doesn't know.
+    func testAnIncompleteMusicLinkOpensNothing() {
+        XCTAssertNil(parse("claudio://music?kind=album&artist=Takako%20Mamiya"))
+        XCTAssertNil(parse("claudio://music?kind=album&title=LOVE%20TRIP"))
+        XCTAssertNil(parse("claudio://music?kind=playlist&artist=X&title=Y"))
+        XCTAssertNil(parse("claudio://music"))
+    }
+
     /// The link the plugin and the website hand out: straight to the tab
     /// where the bridge is switched on.
     func testASectionLinkOpensThatSection() {

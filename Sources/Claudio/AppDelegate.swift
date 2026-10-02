@@ -135,6 +135,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             switch ClaudioURL.parse(url) {
             case .settings(let section):
                 settingsController.show(initialSection: section)
+            case .music(let subject):
+                listening.open(subject)
             case nil:
                 continue
             }
