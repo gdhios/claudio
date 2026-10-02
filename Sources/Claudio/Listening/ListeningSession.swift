@@ -33,8 +33,11 @@ final class ListeningSession: ObservableObject {
         loc("musique chanson titre artiste album son", en: "music song title artist album listening")
     }
 
-    /// The model the notes come from, for the panel's footer.
-    let model: ModelChoice
+    /// The model writing what is on screen, for the panel's footer: the
+    /// notes' while the notes show, the long text's while it does.
+    @Published private(set) var model: ModelChoice
+    /// The model the notes come from.
+    let notesModel: ModelChoice
 
     @Published var phase: Phase = .reading
     /// The track as the player described it, `nil` until it has been read —
@@ -64,6 +67,7 @@ final class ListeningSession: ObservableObject {
 
     init(model: ModelChoice = ListeningNotes.model) {
         self.model = model
+        notesModel = model
     }
 
     /// The card's Galette buttons, in order: none without Galette, before
@@ -81,10 +85,12 @@ final class ListeningSession: ObservableObject {
 
     func appendNotes(_ piece: String) { notes += piece }
 
-    /// The long text is being asked for: whatever an earlier one said goes.
-    func beginEssay(on subject: MusicSubject) {
+    /// The long text is being asked for, from its own model: whatever an
+    /// earlier one said goes.
+    func beginEssay(on subject: MusicSubject, model: ModelChoice) {
         essaySubject = subject
         essay = ""
+        self.model = model
         phase = .streaming
     }
 
@@ -95,10 +101,11 @@ final class ListeningSession: ObservableObject {
         phase = .done
     }
 
-    /// Back to the notes, as they were.
+    /// Back to the notes, as they were, and to their model in the footer.
     func closeEssay() {
         essaySubject = nil
         essay = ""
+        model = notesModel
         phase = .done
     }
 
@@ -106,7 +113,7 @@ final class ListeningSession: ObservableObject {
     /// card knows, while the notes are what's on screen.
     var subjects: [MusicSubject] {
         guard essaySubject == nil, let track else { return [] }
-        return [MusicSubject.album(of: track, facts: facts), MusicSubject.artist(of: track)].compactMap { $0 }
+        return [MusicSubject.album(of: track, facts: facts), MusicSubject.artist(of: track, facts: facts)].compactMap { $0 }
     }
 
     /// The whole answer replaces what streamed on the way.

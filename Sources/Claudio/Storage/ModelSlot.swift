@@ -15,10 +15,14 @@ enum ModelSlot: Hashable, Sendable {
     case dictation
     /// The notes under the track playing.
     case listening
+    /// The long text "Tell me more" writes about the album or the artist:
+    /// its own slot, so a small model on the notes never writes the text
+    /// that answers for the facts.
+    case essay
 
     /// Every slot, in the order the Models tab shows them.
     static var all: [ModelSlot] {
-        ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening]
+        ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening, .essay]
     }
 
     /// The UserDefaults key. Historical where a setting predates this type.
@@ -28,6 +32,7 @@ enum ModelSlot: Hashable, Sendable {
         case .freeAction: "model.free"
         case .dictation: "dictationModel"
         case .listening: "model.listening"
+        case .essay: "model.essay"
         }
     }
 
@@ -39,6 +44,7 @@ enum ModelSlot: Hashable, Sendable {
         case .freeAction: loc("Action libre et instruction vocale", en: "Custom action and spoken instruction")
         case .dictation: loc("Dictée : nettoyage", en: "Dictation: cleanup")
         case .listening: ListeningSession.menuTitle
+        case .essay: loc("Texte long « En savoir plus »", en: "Long text “Tell me more”")
         }
     }
 
@@ -48,6 +54,7 @@ enum ModelSlot: Hashable, Sendable {
         case .freeAction: .claude(.haiku45)
         case .dictation: AppSettings.defaultDictationModel
         case .listening: ListeningNotes.model
+        case .essay: ListeningEssay.model
         }
     }
 

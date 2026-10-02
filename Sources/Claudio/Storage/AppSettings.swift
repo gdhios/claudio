@@ -151,6 +151,11 @@ enum AppSettings {
         ModelSlot.listening.current(in: defaults)
     }
 
+    /// The long text's model: its own setting, Sonnet 5.5 unless set.
+    static func essayModel(in defaults: UserDefaults = .standard) -> ModelChoice {
+        ModelSlot.essay.current(in: defaults)
+    }
+
     // MARK: - Dictation
 
     private static let dictationEnabledKey = "dictationEnabled"

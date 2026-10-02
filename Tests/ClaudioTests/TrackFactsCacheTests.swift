@@ -63,4 +63,24 @@ final class TrackFactsCacheTests: XCTestCase {
         let ninetyOneDays = now.addingTimeInterval(91 * 86_400)
         XCTAssertEqual(cache.lookup(found, now: ninetyOneDays), .unknown)
     }
+
+    /// Artists have their own file, keyed by their normalized name: the
+    /// same kind of cache, the same lifetimes.
+    func testArtistsHaveTheirOwnCache() {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClaudioTests.artists.\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let artists = ArtistFactsCache(fileURL: file)
+        let facts = ArtistFacts(artistID: "0df6d50f", name: "The Supermen Lovers", type: "Person",
+                                country: "FR", beginDate: "1975-02-09", releases: [])
+        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: now), .unknown)
+        artists.store(facts, forArtist: "The Supermen Lovers", at: now)
+        XCTAssertEqual(artists.lookup(artistNamed: "the supermen  lovers", now: now), .facts(facts))
+        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: now.addingTimeInterval(91 * 86_400)),
+                       .unknown)
+        XCTAssertEqual(ArtistFactsCache.standard.fileURL.lastPathComponent, "musicbrainz-artists.json")
+        XCTAssertEqual(TrackFactsCache.standard.fileURL.lastPathComponent, "musicbrainz-facts.json")
+        XCTAssertEqual(ArtistFactsCache.standard.fileURL.deletingLastPathComponent(),
+                       TrackFactsCache.standard.fileURL.deletingLastPathComponent())
+    }
 }

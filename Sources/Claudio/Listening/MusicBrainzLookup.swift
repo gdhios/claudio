@@ -1,9 +1,10 @@
 import Foundation
 
-/// The two MusicBrainz WS/2 questions "What's playing?" asks, and how their
+/// The MusicBrainz WS/2 questions "What's playing?" asks, and how their
 /// answers are read: a recording search by title and artist, then the
-/// release group's own record. Pure functions over URLs and JSON; the
-/// cadence and the budget are `MusicBrainzService`'s.
+/// release group's own record; and before the long text, the artist — by
+/// id or by name — then their release groups. Pure functions over URLs and
+/// JSON; the cadence and the budget are `MusicBrainzService`'s.
 enum MusicBrainzLookup {
     static let baseURL = URL(string: "https://musicbrainz.org/ws/2/")!
     /// Under this the search index is guessing: another song's facts would
@@ -59,6 +60,38 @@ enum MusicBrainzLookup {
         return components.url!
     }
 
+    static func artistSearchURL(name: String) -> URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent("artist"),
+                                       resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "query", value: "artist:\(luceneQuoted(name))"),
+            URLQueryItem(name: "limit", value: String(searchLimit)),
+            URLQueryItem(name: "fmt", value: "json"),
+        ]
+        return components.url!
+    }
+
+    static func artistURL(id: String) -> URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent("artist/\(id)"),
+                                       resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "fmt", value: "json")]
+        return components.url!
+    }
+
+    /// The artist's albums and EPs, a hundred at most: a browse, not a
+    /// search, so it isn't held to the search index's cadence.
+    static func releaseGroupsURL(artist id: String) -> URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent("release-group"),
+                                       resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "artist", value: id),
+            URLQueryItem(name: "type", value: "album|ep"),
+            URLQueryItem(name: "limit", value: "100"),
+            URLQueryItem(name: "fmt", value: "json"),
+        ]
+        return components.url!
+    }
+
     static func request(_ url: URL, version: String) -> URLRequest {
         var request = URLRequest(url: url)
         request.setValue(userAgent(version: version), forHTTPHeaderField: "User-Agent")
@@ -92,12 +125,14 @@ enum MusicBrainzLookup {
                 && ($0["secondary-types"] as? [String] ?? []).isEmpty }
             ?? groups.first
 
+        let credited = (best["artist-credit"] as? [[String: Any]])?.first?["artist"] as? [String: Any]
         return TrackFacts(recordingID: id,
                           releaseGroupID: chosen?["id"] as? String,
                           albumTitle: chosen?["title"] as? String,
                           primaryType: chosen?["primary-type"] as? String,
                           secondaryTypes: chosen?["secondary-types"] as? [String] ?? [],
-                          firstReleaseDate: nonEmpty(best["first-release-date"] as? String))
+                          firstReleaseDate: nonEmpty(best["first-release-date"] as? String),
+                          artistID: credited?["id"] as? String)
     }
 
     /// The release group's own record replaces what the search guessed. An
@@ -115,6 +150,70 @@ enum MusicBrainzLookup {
         filled.primaryType = group["primary-type"] as? String ?? facts.primaryType
         filled.secondaryTypes = group["secondary-types"] as? [String] ?? facts.secondaryTypes
         filled.firstReleaseDate = nonEmpty(group["first-release-date"] as? String) ?? facts.firstReleaseDate
+        return filled
+    }
+
+    // MARK: - The artist
+
+    /// The best artist at `minimumScore` or more, with what the search
+    /// already says of them; their releases come from the browse.
+    static func parseArtistSearch(_ json: String) -> ArtistFacts? {
+        parseArtistSearch(Data(json.utf8))
+    }
+
+    static func parseArtistSearch(_ data: Data) -> ArtistFacts? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let artists = root["artists"] as? [[String: Any]],
+              let best = artists.max(by: { ($0["score"] as? Int ?? 0) < ($1["score"] as? Int ?? 0) }),
+              (best["score"] as? Int ?? 0) >= minimumScore
+        else { return nil }
+        return artistFacts(from: best)
+    }
+
+    /// The artist's own record, when their id is already known.
+    static func parseArtist(_ json: String) -> ArtistFacts? {
+        parseArtist(Data(json.utf8))
+    }
+
+    static func parseArtist(_ data: Data) -> ArtistFacts? {
+        guard let artist = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return artistFacts(from: artist)
+    }
+
+    private static func artistFacts(from artist: [String: Any]) -> ArtistFacts? {
+        guard let id = artist["id"] as? String, let name = artist["name"] as? String else { return nil }
+        let lifeSpan = artist["life-span"] as? [String: Any]
+        return ArtistFacts(artistID: id,
+                           name: name,
+                           type: artist["type"] as? String,
+                           country: nonEmpty(artist["country"] as? String),
+                           beginDate: nonEmpty(lifeSpan?["begin"] as? String),
+                           endDate: nonEmpty(lifeSpan?["end"] as? String),
+                           disambiguation: nonEmpty(artist["disambiguation"] as? String))
+    }
+
+    /// The browse lists the release groups in no order: they are kept by
+    /// first release, the undated last, and the plain ones only — a live
+    /// or a remix album isn't the discography. An answer that doesn't
+    /// read leaves the facts as they were.
+    static func parseReleaseGroups(_ json: String, into facts: ArtistFacts) -> ArtistFacts {
+        parseReleaseGroups(Data(json.utf8), into: facts)
+    }
+
+    static func parseReleaseGroups(_ data: Data, into facts: ArtistFacts) -> ArtistFacts {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let groups = root["release-groups"] as? [[String: Any]] else { return facts }
+        var filled = facts
+        filled.releases = groups.compactMap { group -> ArtistFacts.Release? in
+            guard let id = group["id"] as? String, let title = group["title"] as? String else { return nil }
+            let secondary = group["secondary-types"] as? [String] ?? []
+            guard secondary.isEmpty else { return nil }
+            return ArtistFacts.Release(id: id, title: title,
+                                       primaryType: group["primary-type"] as? String,
+                                       secondaryTypes: secondary,
+                                       firstReleaseDate: nonEmpty(group["first-release-date"] as? String))
+        }
+        .sorted { ($0.firstReleaseDate ?? "9999") < ($1.firstReleaseDate ?? "9999") }
         return filled
     }
 

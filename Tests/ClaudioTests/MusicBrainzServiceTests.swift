@@ -10,6 +10,7 @@ final class MusicBrainzServiceTests: XCTestCase {
     private var clock: FakeClock!
     private var transport: FakeTransport!
     private var cache: TrackFactsCache!
+    private var artists: ArtistFactsCache!
     private let track = NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP")
 
     override func setUp() {
@@ -18,17 +19,77 @@ final class MusicBrainzServiceTests: XCTestCase {
         transport = FakeTransport(clock: clock)
         cache = TrackFactsCache(fileURL: FileManager.default.temporaryDirectory
             .appendingPathComponent("ClaudioTests.service.\(UUID().uuidString).json"))
+        artists = ArtistFactsCache(fileURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClaudioTests.service.artists.\(UUID().uuidString).json"))
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: cache.fileURL)
+        try? FileManager.default.removeItem(at: artists.fileURL)
         super.tearDown()
     }
 
     private func makeService() -> MusicBrainzService {
-        MusicBrainzService(transport: transport.send, version: "1.13.0", cache: cache,
+        MusicBrainzService(transport: transport.send, version: "1.13.0", cache: cache, artists: artists,
                            now: { [clock] in clock!.now },
                            sleep: { [clock] duration in clock!.advance(by: duration) })
+    }
+
+    // MARK: - The artist, before the long text
+
+    private let artistID = "0df6d50f-7e43-4c6a-8220-61932b67c9c5"
+
+    /// With the artist's id in hand: their record, then their release
+    /// groups; no search. The result is kept under the artist's name.
+    func testAKnownArtistIsLookedUpThenBrowsed() async {
+        transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
+        transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
+        let service = makeService()
+        let subject = MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: artistID)
+
+        let facts = await service.artist(for: subject)
+        XCTAssertEqual(facts?.name, "The Supermen Lovers")
+        XCTAssertEqual(facts?.releases.map(\.title), ["Starlight", "The Player", "Body Double", "Staralight 20th anniversary edition"])
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist/\(artistID)", "/ws/2/release-group"])
+        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: clock.now), .facts(facts!))
+
+        _ = await service.artist(for: subject)
+        XCTAssertEqual(transport.requests.count, 2, "the cache answered")
+    }
+
+    /// Without an id, the artist is searched by name — on the search
+    /// index's cadence — then browsed. No match is a miss, kept.
+    func testAnUnknownArtistIsSearchedByName() async {
+        transport.answers["/ws/2/artist"] = ArtistFactsTests.artistSearch
+        transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
+        let service = makeService()
+
+        let facts = await service.artist(for: MusicSubject(kind: .album, artist: "The Supermen Lovers", title: "The Player"))
+        XCTAssertEqual(facts?.artistID, artistID)
+        XCTAssertEqual(facts?.releases.count, 4)
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist", "/ws/2/release-group"])
+
+        transport.answers["/ws/2/artist"] = #"{"count":0,"offset":0,"artists":[]}"#
+        let missed = await service.artist(for: MusicSubject(kind: .artist, artist: "Nobody"))
+        XCTAssertNil(missed)
+        XCTAssertEqual(artists.lookup(artistNamed: "Nobody", now: clock.now), .miss)
+        XCTAssertGreaterThanOrEqual(transport.sentAt[2].timeIntervalSince(transport.sentAt[0]), 4,
+                                    "two searches keep the index's cadence")
+    }
+
+    /// The long text waits for the facts, so the budget is wider than the
+    /// card's; past it, the artist without their releases is still worth
+    /// handing over.
+    func testTheArtistsBudgetIsTenSeconds() async {
+        XCTAssertEqual(MusicBrainzService.artistBudget, 10)
+        transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
+        transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
+        transport.delayBeforeAnswering = 9.5
+        let service = makeService()
+        let facts = await service.artist(for: MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: artistID))
+        XCTAssertEqual(facts?.name, "The Supermen Lovers")
+        XCTAssertEqual(facts?.releases, [])
+        XCTAssertEqual(transport.requests.count, 1)
     }
 
     /// Two questions, in order, both signed; the facts are kept.

@@ -21,10 +21,10 @@ final class ModelSlotTests: XCTestCase {
     }
 
     /// One row per shortcut, in the order the tab shows them: the catalog's
-    /// eight actions, the custom action, dictation, listening.
+    /// eight actions, the custom action, dictation, listening, the long text.
     func testTheTabListsEveryShortcutThatCallsAModel() {
         XCTAssertEqual(ModelSlot.all,
-                       ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening])
+                       ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening, .essay])
     }
 
     /// Each slot keeps its historical storage key: a setting written by an
@@ -34,6 +34,7 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(ModelSlot.dictation.storageKey, "dictationModel")
         XCTAssertEqual(ModelSlot.freeAction.storageKey, "model.free")
         XCTAssertEqual(ModelSlot.listening.storageKey, "model.listening")
+        XCTAssertEqual(ModelSlot.essay.storageKey, "model.essay")
     }
 
     func testTheDefaultsAreTheCodes() {
@@ -42,6 +43,9 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(ModelSlot.freeAction.defaultChoice, .claude(.haiku45))
         XCTAssertEqual(ModelSlot.dictation.defaultChoice, AppSettings.defaultDictationModel)
         XCTAssertEqual(ModelSlot.listening.defaultChoice, ListeningNotes.model)
+        XCTAssertEqual(ModelSlot.essay.defaultChoice, ListeningEssay.model)
+        XCTAssertEqual(ListeningEssay.model, .claude(.sonnet55),
+                       "the long text answers for the facts: never a small model by default")
     }
 
     /// "Raw" means no model at all: only dictation can paste the transcript
@@ -81,6 +85,16 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(AppSettings.listeningModel(in: defaults), .claude(.haiku45))
         XCTAssertEqual(AppSettings.listeningModel(in: UserDefaults(suiteName: "ClaudioTests.empty.\(UUID())")!),
                        ListeningNotes.model)
+    }
+
+    /// The long text has its own setting: Haiku on the notes leaves the
+    /// text on its default.
+    func testTheEssaySettingIsItsOwn() {
+        ModelSlot.listening.set(.claude(.haiku45), in: defaults)
+        XCTAssertEqual(AppSettings.essayModel(in: defaults), ListeningEssay.model)
+        ModelSlot.essay.set(.claude(.opus55), in: defaults)
+        XCTAssertEqual(AppSettings.essayModel(in: defaults), .claude(.opus55))
+        XCTAssertEqual(AppSettings.listeningModel(in: defaults), .claude(.haiku45))
     }
 
     /// The custom action's request carries the model set for it. Through the

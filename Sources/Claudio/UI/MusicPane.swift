@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The Music tab: what "What's playing?" asks Claude — which model, how
-/// much — and what completes his notes: the MusicBrainz facts, the cover.
-/// The model is the same setting as the Models tab's row. Not here, on
+/// much — what completes his notes: the MusicBrainz facts, the cover; and
+/// the long text's own model. The models are the same settings as the
+/// Models tab's rows. Not here, on
 /// purpose: the notes' language (the interface's), their system prompt
 /// (it carries the "invent nothing" rule), the sources' budget.
 @MainActor
@@ -30,6 +31,16 @@ struct MusicPane: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text(loc("Notes de Claude", en: "Claude's notes"))
+            }
+
+            Section {
+                ModelSlotRow(slot: .essay, localModels: localModels)
+                Text(loc("Le texte long de « Sur l'album » et « Sur l'artiste ». Avec MusicBrainz, Claude reçoit d'abord la fiche de l'artiste et sa discographie datée, et ne cite que ce qui s'y trouve. Un petit modèle invente sur un catalogue peu connu : Sonnet 5.5 au moins.",
+                         en: "The long text of “About the album” and “About the artist”. With MusicBrainz, Claude first gets the artist's record and dated discography, and cites nothing beyond them. A small model invents on a little-known catalogue: Sonnet 5.5 at least."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text(loc("En savoir plus", en: "Tell me more"))
             }
 
             Section {

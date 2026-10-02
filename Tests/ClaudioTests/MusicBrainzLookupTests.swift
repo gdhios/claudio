@@ -56,6 +56,8 @@ final class MusicBrainzLookupTests: XCTestCase {
         XCTAssertEqual(facts.secondaryTypes, [])
         // The recording's own first release, until the release group says.
         XCTAssertEqual(facts.firstReleaseDate, "1982-11-25")
+        // The artist's id, for the long text to look them up without a search.
+        XCTAssertEqual(facts.artistID, "c3a2c5d6-1")
     }
 
     /// Without the player's album, an album with no secondary type is the

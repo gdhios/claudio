@@ -2,8 +2,10 @@ import AppKit
 
 /// Asks MusicBrainz about a track under its rules and the panel's budget:
 /// the cache first, then the recording search, then the release group,
-/// each on its own cadence, and nothing past six seconds. Time is
-/// injected: a test moves the clock by sleeping.
+/// each on its own cadence, and nothing past six seconds. Before the long
+/// text, the artist and their discography the same way, on a wider budget
+/// since the text waits for them. Time is injected: a test moves the
+/// clock by sleeping.
 actor MusicBrainzService {
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
@@ -18,10 +20,14 @@ actor MusicBrainzService {
     static let budget: TimeInterval = 6
     /// A request with less than this left would be sent to time out.
     static let minimumRemaining: TimeInterval = 1
+    /// The long text waits for the artist: the wait is the price of a
+    /// text that doesn't invent, within reason.
+    static let artistBudget: TimeInterval = 10
 
     private let transport: Transport
     private let version: String
     private let cache: TrackFactsCache
+    private let artists: ArtistFactsCache
     private let now: @Sendable () -> Date
     private let sleep: @Sendable (Duration) async throws -> Void
     private var lastSearch: Date?
@@ -30,11 +36,13 @@ actor MusicBrainzService {
     init(transport: @escaping Transport,
          version: String,
          cache: TrackFactsCache,
+         artists: ArtistFactsCache,
          now: @escaping @Sendable () -> Date = { Date() },
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.transport = transport
         self.version = version
         self.cache = cache
+        self.artists = artists
         self.now = now
         self.sleep = sleep
     }
@@ -42,7 +50,8 @@ actor MusicBrainzService {
     static let shared = MusicBrainzService(
         transport: { try await URLSession.shared.data(for: $0) },
         version: MusicBrainzLookup.appVersion,
-        cache: .standard)
+        cache: .standard,
+        artists: .standard)
 
     /// The facts, `nil` when MusicBrainz has none, failed, or took too
     /// long. A miss is cached, a failure is not: the next listen may find
@@ -65,6 +74,39 @@ actor MusicBrainzService {
             facts = MusicBrainzLookup.parseReleaseGroup(group, into: facts)
         }
         cache.store(facts, for: track, at: now())
+        return facts
+    }
+
+    /// The subject's artist and their albums, `nil` when MusicBrainz
+    /// doesn't know them, failed, or took too long. By id when the subject
+    /// has one — the record, no search — by name otherwise. Past the
+    /// budget, the artist without their releases is still handed over.
+    func artist(for subject: MusicSubject) async -> ArtistFacts? {
+        switch artists.lookup(artistNamed: subject.artist, now: now()) {
+        case .facts(let facts): return facts
+        case .miss: return nil
+        case .unknown: break
+        }
+        let deadline = now().addingTimeInterval(Self.artistBudget)
+        let found: ArtistFacts?
+        if let id = subject.artistMBID {
+            guard let data = await send(MusicBrainzLookup.artistURL(id: id), search: false, deadline: deadline)
+            else { return nil }
+            found = MusicBrainzLookup.parseArtist(data)
+        } else {
+            guard let data = await send(MusicBrainzLookup.artistSearchURL(name: subject.artist),
+                                        search: true, deadline: deadline) else { return nil }
+            found = MusicBrainzLookup.parseArtistSearch(data)
+        }
+        guard var facts = found else {
+            artists.store(nil, forArtist: subject.artist, at: now())
+            return nil
+        }
+        if let groups = await send(MusicBrainzLookup.releaseGroupsURL(artist: facts.artistID),
+                                   search: false, deadline: deadline) {
+            facts = MusicBrainzLookup.parseReleaseGroups(groups, into: facts)
+            artists.store(facts, forArtist: subject.artist, at: now())
+        }
         return facts
     }
 
@@ -104,6 +146,8 @@ actor MusicBrainzService {
 struct FactsSource {
     var cached: @MainActor (NowPlayingTrack) -> TrackFacts?
     var fetch: @MainActor (NowPlayingTrack) async -> TrackFacts?
+    /// The subject's artist, before the long text.
+    var artist: @MainActor (MusicSubject) async -> ArtistFacts? = { _ in nil }
 
     static let system = FactsSource(
         cached: { track in
@@ -114,6 +158,10 @@ struct FactsSource {
         fetch: { track in
             guard !PreviewRun.isActive else { return nil }
             return await MusicBrainzService.shared.facts(for: track)
+        },
+        artist: { subject in
+            guard !PreviewRun.isActive else { return nil }
+            return await MusicBrainzService.shared.artist(for: subject)
         })
 
     static let none = FactsSource(cached: { _ in nil }, fetch: { _ in nil })

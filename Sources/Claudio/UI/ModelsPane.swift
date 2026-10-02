@@ -33,6 +33,7 @@ struct ModelsPane: View {
 
             Section(ListeningSession.panelTitle) {
                 ModelSlotRow(slot: .listening, localModels: localModels)
+                ModelSlotRow(slot: .essay, localModels: localModels)
             }
 
             Section {

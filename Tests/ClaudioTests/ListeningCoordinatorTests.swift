@@ -221,13 +221,66 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.client.texts.last, ListeningEssay.userMessage(for: subject))
         XCTAssertEqual(bench.client.systems.last, ListeningEssay.system())
         XCTAssertEqual(bench.client.budgets.last, ListeningEssay.maxTokens)
-        XCTAssertEqual(bench.clientRequests, [ListeningNotes.model, ListeningNotes.model])
+        XCTAssertEqual(bench.clientRequests, [ListeningNotes.model, ListeningEssay.model])
+        XCTAssertEqual(bench.artistRequests, [subject], "the artist's facts were asked for, and were none")
 
         bench.coordinator.back()
         XCTAssertNil(session.essaySubject)
         XCTAssertEqual(session.essay, "")
         XCTAssertEqual(session.phase, .done)
         XCTAssertEqual(session.notes, Bench.notes)
+    }
+
+    /// The long text has its own model: Haiku on the notes, the text's own
+    /// on the text, and the footer follows what is on screen.
+    func testTheLongTextComesFromItsOwnModel() async throws {
+        let bench = Bench(model: .claude(.haiku45), essayModel: .claude(.opus55))
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        XCTAssertEqual(session.model, .claude(.haiku45))
+
+        bench.coordinator.elaborate(on: try XCTUnwrap(MusicSubject.artist(of: .sample)))
+        XCTAssertEqual(session.model, .claude(.opus55), "the footer names the model writing")
+        await bench.runs()
+        XCTAssertEqual(bench.clientRequests, [.claude(.haiku45), .claude(.opus55)])
+
+        bench.coordinator.back()
+        XCTAssertEqual(session.model, .claude(.haiku45))
+    }
+
+    /// Before the long text, the artist's facts are fetched — the text
+    /// waits for them — and go to Claude after the subject. The panel
+    /// streams meanwhile: the wait shows as the text coming.
+    func testTheArtistsFactsAreFetchedBeforeTheLongText() async throws {
+        let bench = Bench(artistFacts: Bench.artist, artistWaits: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        let subject = try XCTUnwrap(MusicSubject.artist(of: .sample))
+        bench.coordinator.elaborate(on: subject)
+        await bench.wait { bench.artistRequests == [subject] }
+        XCTAssertEqual(session.phase, .streaming)
+        XCTAssertEqual(bench.client.texts.count, 1, "Claude isn't asked before the facts are in")
+
+        bench.answerArtist()
+        await bench.runs()
+        XCTAssertEqual(bench.client.texts.last, ListeningEssay.userMessage(for: subject, artist: Bench.artist))
+        XCTAssertEqual(session.essay, Bench.notes)
+    }
+
+    /// MusicBrainz off: no facts are asked for, the text goes at once.
+    func testWithMusicBrainzOffTheLongTextAsksNoFacts() async throws {
+        let bench = Bench(artistFacts: Bench.artist,
+                          preferences: .init(musicBrainz: false, showsArtwork: true, detail: .threeSentences))
+        bench.coordinator.trigger()
+        await bench.runs()
+        let subject = try XCTUnwrap(MusicSubject.artist(of: .sample))
+        bench.coordinator.elaborate(on: subject)
+        await bench.runs()
+        XCTAssertEqual(bench.artistRequests, [])
+        XCTAssertEqual(bench.client.texts.last, ListeningEssay.userMessage(for: subject))
     }
 
     /// A `claudio://music` link from Galette: the panel opens on the
@@ -250,6 +303,8 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.essay, Bench.notes)
         XCTAssertEqual(bench.client.texts, [ListeningEssay.userMessage(for: subject)])
         XCTAssertEqual(bench.factsRequests, [], "the link brought its facts")
+        XCTAssertEqual(bench.artistRequests, [subject], "the artist is still asked about")
+        XCTAssertEqual(session.model, ListeningEssay.model)
         await bench.wait { session.artwork != nil }
         XCTAssertEqual(bench.remoteCoverRequests.map(\.releaseGroupID), ["3b03f2df-1fc0"])
         XCTAssertEqual(session.facts?.summary(playerAlbum: "LOVE TRIP", english: false), "1982 · album")
@@ -362,6 +417,10 @@ private final class Bench {
     static let cover = NSImage(size: NSSize(width: 1, height: 1))
     static let facts = TrackFacts(recordingID: "783dfef9", releaseGroupID: "3b03f2df", albumTitle: "LOVE TRIP",
                                   primaryType: "Album", secondaryTypes: [], firstReleaseDate: "1982-11-25")
+    static let artist = ArtistFacts(artistID: "c3a2c5d6", name: "間宮貴子", type: "Person", country: "JP",
+                                    beginDate: nil, releases: [
+                                        ArtistFacts.Release(id: "3b03f2df", title: "LOVE TRIP", primaryType: "Album",
+                                                            secondaryTypes: [], firstReleaseDate: "1982-11-25")])
 
     let client: FakeNotesClient
     /// Galette, missing unless the test installs it.
@@ -389,7 +448,10 @@ private final class Bench {
     private(set) var factsRequests: [NowPlayingTrack] = []
     /// Every facts the archive was asked a cover for.
     private(set) var remoteCoverRequests: [TrackFacts] = []
+    /// Every subject MusicBrainz was asked the artist of.
+    private(set) var artistRequests: [MusicSubject] = []
     private var waitingFacts: [CheckedContinuation<TrackFacts?, Never>] = []
+    private var waitingArtists: [CheckedContinuation<ArtistFacts?, Never>] = []
 
     private var waitingReads: [CheckedContinuation<NowPlayingTrack?, Never>] = []
     private var waitingArtwork: [CheckedContinuation<NSImage?, Never>] = []
@@ -407,8 +469,11 @@ private final class Bench {
          facts: TrackFacts? = nil,
          factsWait: Bool = false,
          remoteCover: NSImage? = nil,
+         artistFacts: ArtistFacts? = nil,
+         artistWaits: Bool = false,
          preferences: ListeningPreferences = .init(musicBrainz: true, showsArtwork: true, detail: .threeSentences),
-         model: ModelChoice = ListeningNotes.model) {
+         model: ModelChoice = ListeningNotes.model,
+         essayModel: ModelChoice = ListeningEssay.model) {
         self.track = track
         self.readsWait = readsWait
         self.artwork = artwork
@@ -447,6 +512,12 @@ private final class Bench {
                     factsRequests.append(track)
                     guard factsWait else { return facts }
                     return await withCheckedContinuation { waitingFacts.append($0) }
+                },
+                artist: { [weak self] subject in
+                    guard let self else { return nil }
+                    artistRequests.append(subject)
+                    guard artistWaits else { return artistFacts }
+                    return await withCheckedContinuation { waitingArtists.append($0) }
                 }
             ),
             remoteArtwork: RemoteArtworkSource { [weak self] facts in
@@ -454,8 +525,16 @@ private final class Bench {
                 return remoteCover
             },
             preferences: { preferences },
-            model: { model }
+            model: { model },
+            essayModel: { essayModel }
         )
+    }
+
+    /// Hands the artist's facts to every request still waiting.
+    func answerArtist() {
+        let waiting = waitingArtists
+        waitingArtists = []
+        for request in waiting { request.resume(returning: Bench.artist) }
     }
 
     /// Hands the facts to every request still waiting, as MusicBrainz

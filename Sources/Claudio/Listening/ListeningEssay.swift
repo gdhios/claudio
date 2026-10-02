@@ -2,13 +2,19 @@ import Foundation
 
 /// What Claude is asked when someone wants more than three sentences: a
 /// long text about the album or the artist on the card — from a pill on it,
-/// or from Galette's "Tell me more" link. Same model as the notes.
+/// or from Galette's "Tell me more" link. Its own model: the text answers
+/// for the facts, a small one set on the notes mustn't write it.
 enum ListeningEssay {
     /// Two hundred and fifty words fit; a runaway answer doesn't.
     static let maxTokens = 900
+    /// The default: never a small model. Haiku 4.5 invented an artist's
+    /// whole career on 2026-10-02.
+    static let model: ModelChoice = .claude(.sonnet55)
 
-    static func userMessage(for subject: MusicSubject) -> String {
-        subject.promptBlock
+    /// The subject, then the artist's facts when MusicBrainz gave them:
+    /// the discography under Claude's eyes before his first word.
+    static func userMessage(for subject: MusicSubject, artist: ArtistFacts? = nil) -> String {
+        [subject.promptBlock, artist?.promptBlock].compactMap { $0 }.joined(separator: "\n")
     }
 
     /// Written once, in French like every prompt; only its last line
@@ -25,11 +31,14 @@ enum ListeningEssay {
             - Pour un artiste : son parcours en trois temps, ce qui le caractérise, et par quoi commencer.
 
             Méthode :
-            - Les faits entre balises <sujet> viennent d'une base publique (MusicBrainz) et priment sur \
-            ta mémoire : artiste, album, date, type, label, pays.
+            - Les faits entre balises <sujet> et <artiste> viennent d'une base publique (MusicBrainz) et \
+            priment sur ta mémoire : artiste, album, date, type, label, pays, discographie.
+            - La discographie du bloc <artiste> est la liste de référence : ne cite aucun album ni EP qui \
+            n'y figure pas, et aucune autre année que celles qu'elle donne. Ce qui n'y est pas, tu ne le \
+            sais pas.
             - Tu n'inventes rien : aucune date, aucun classement, aucune collaboration, aucune anecdote \
-            dont tu n'es pas sûr. Si tu ne connais pas cet album ou cet artiste, dis-le en une phrase et \
-            arrête-toi.
+            dont tu n'es pas sûr. Si tu ne connais pas cet album ou cet artiste au-delà de ces faits, \
+            dis-le en une phrase et arrête-toi.
 
             Règles impératives :
             - Texte brut en paragraphes : ni titre, ni gras, ni puces, ni préambule.

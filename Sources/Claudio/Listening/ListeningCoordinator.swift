@@ -34,6 +34,8 @@ final class ListeningCoordinator {
     /// The model the notes come from, asked at each trigger: a setting
     /// since the Models tab, a fixed value in a test.
     private let model: () -> ModelChoice
+    /// The long text's own model, asked at each pill.
+    private let essayModel: () -> ModelChoice
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -59,7 +61,8 @@ final class ListeningCoordinator {
          facts: FactsSource = .system,
          remoteArtwork: RemoteArtworkSource = .system,
          preferences: @escaping () -> ListeningPreferences = { .current() },
-         model: @escaping () -> ModelChoice = { AppSettings.listeningModel() }) {
+         model: @escaping () -> ModelChoice = { AppSettings.listeningModel() },
+         essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() }) {
         self.source = source
         self.client = client
         self.makePanel = panel
@@ -70,6 +73,7 @@ final class ListeningCoordinator {
         self.remoteArtwork = remoteArtwork
         self.preferences = preferences
         self.model = model
+        self.essayModel = essayModel
     }
 
     // MARK: - The cycle
@@ -210,7 +214,7 @@ final class ListeningCoordinator {
     func elaborate(on subject: MusicSubject) {
         guard let session else { return }
         cycle?.cancel()
-        session.beginEssay(on: subject)
+        session.beginEssay(on: subject, model: essayModel())
         cycle = Task { [weak self] in
             await self?.write(about: subject, session: session)
         }
@@ -245,14 +249,18 @@ final class ListeningCoordinator {
         elaborate(on: subject)
     }
 
+    /// The artist's facts first — the text waits for them, the panel shows
+    /// it coming meanwhile — then Claude, with the discography in hand.
     private func write(about subject: MusicSubject, session: ListeningSession) async {
         guard let client = client(session.model) else {
             session.phase = .missingKey
             return
         }
+        let artist = preferences().musicBrainz ? await facts.artist(subject) : nil
+        guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
         do {
             let result = try await client.streamCompletion(
-                of: ListeningEssay.userMessage(for: subject),
+                of: ListeningEssay.userMessage(for: subject, artist: artist),
                 system: ListeningEssay.system(),
                 maxTokens: ListeningEssay.maxTokens
             ) { @MainActor piece in
@@ -281,7 +289,7 @@ final class ListeningCoordinator {
         cycle?.cancel()
         // The long text failed: it is asked again, the card as it is.
         if let subject = session.essaySubject {
-            session.beginEssay(on: subject)
+            session.beginEssay(on: subject, model: essayModel())
             cycle = Task { [weak self] in
                 await self?.write(about: subject, session: session)
             }

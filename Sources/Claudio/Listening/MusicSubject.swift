@@ -19,6 +19,14 @@ struct MusicSubject: Hashable, Sendable {
     var type: String? = nil
     var label: String? = nil
     var country: String? = nil
+    /// The artist's MusicBrainz id, when the recording search gave it.
+    var artistID: String? = nil
+
+    /// The artist's id wherever the subject got it: a link that names the
+    /// artist carries it as `mbid`; an album's subject as `artistID`.
+    var artistMBID: String? {
+        kind == .artist ? mbid ?? artistID : artistID
+    }
 
     /// The album of the track playing: the one of origin when MusicBrainz
     /// said, the player's otherwise. `nil` without an album or an artist.
@@ -27,12 +35,13 @@ struct MusicSubject: Hashable, Sendable {
         return MusicSubject(kind: .album, artist: artist, title: title,
                             mbid: facts?.releaseGroupID,
                             firstReleaseDate: facts?.firstReleaseDate,
-                            type: facts?.primaryType)
+                            type: facts?.primaryType,
+                            artistID: facts?.artistID)
     }
 
-    static func artist(of track: NowPlayingTrack) -> MusicSubject? {
+    static func artist(of track: NowPlayingTrack, facts: TrackFacts? = nil) -> MusicSubject? {
         guard let artist = track.artist else { return nil }
-        return MusicSubject(kind: .artist, artist: artist)
+        return MusicSubject(kind: .artist, artist: artist, artistID: facts?.artistID)
     }
 
     /// The card a link opens on: the album over its artist, or the artist

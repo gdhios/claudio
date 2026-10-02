@@ -16,6 +16,10 @@ struct TrackFacts: Equatable, Sendable, Codable {
     /// "1982-11-25", "1982-11" or "1982": MusicBrainz says what it knows,
     /// and so does the card.
     var firstReleaseDate: String?
+    /// The first credited artist's MusicBrainz id, for the long text to
+    /// look them up without a search. Absent from entries cached before
+    /// it was kept.
+    var artistID: String? = nil
 
     var year: String? {
         firstReleaseDate.map { String($0.prefix(4)) }
