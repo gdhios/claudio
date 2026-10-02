@@ -82,6 +82,10 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             settingsController.show()
         } else if mode == "settings-prompts" {
             settingsController.show(initialSection: .prompts)
+        } else if mode == "settings-models" {
+            // Every row shows its default: nothing is read from this Mac's
+            // preferences, and the local list is the frozen one.
+            settingsController.show(initialSection: .models)
         } else if mode == "settings-ollama" {
             settingsController.show(initialSection: .ollama)
         } else if mode == "settings-shortcuts" {

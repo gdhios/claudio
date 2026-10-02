@@ -21,7 +21,6 @@ struct DictationPane: View {
     // choice is for, and a screen of three identical pickers shows nothing.
     @State private var secondaryOutput = PreviewRun.isActive
         ? DictationOutput.translateEN : AppSettings.dictationSecondaryOutput
-    @ObservedObject private var catalog = ModelCatalog.shared
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
     @State private var pausesMedia = PreviewRun.isActive ? true : AppSettings.dictationPausesMedia
@@ -36,15 +35,6 @@ struct DictationPane: View {
     @State private var entries: [RecentDictation] = []
 
     private var isCustomized: Bool { promptText != DictationCleanup.defaultSystemPrompt }
-
-    /// The already-set model stays offered even if the server doesn't respond:
-    /// without it, the picker would show a blank line for a valid setting.
-    private var offeredLocalModels: [String] {
-        guard case .ollama(let current) = model, !localModels.contains(current) else {
-            return localModels
-        }
-        return [current] + localModels
-    }
 
     var body: some View {
         Form {
@@ -167,32 +157,16 @@ struct DictationPane: View {
 
     private var cleanupModel: some View {
         Section(loc("Modèle de nettoyage", en: "Cleanup model")) {
-            Picker(loc("Modèle", en: "Model"), selection: $model) {
-                Section("Claude") {
-                    ForEach(catalog.models.offering(model), id: \.self) { claude in
-                        Text(claude.pickerLabel(isNew: catalog.isNew(claude))).tag(ModelChoice.claude(claude))
-                    }
-                }
-                Section(loc("Local (Ollama)", en: "Local (Ollama)")) {
-                    ForEach(offeredLocalModels, id: \.self) { name in
-                        Text(name).tag(ModelChoice.ollama(model: name))
-                    }
-                }
-                Section(loc("Sans modèle", en: "No model")) {
-                    Text(ModelChoice.raw.displayName).tag(ModelChoice.raw)
-                }
-            }
-            .onChange(of: model) { AppSettings.dictationModel = model }
+            ModelPicker(loc("Modèle", en: "Model"), selection: $model,
+                        localModels: localModels, allowsRaw: true)
+                .onChange(of: model) { AppSettings.dictationModel = model }
 
             Text("\(model.costHint). \(model == .raw ? loc("La transcription est collée telle qu'elle a été entendue : sans ponctuation, avec les hésitations.", en: "The transcript is pasted exactly as it was heard: no punctuation, hesitations and all.") : loc("Le modèle ponctue la transcription et retire les hésitations, sans jamais reformuler. S'il échoue, le brut est collé quand même.", en: "The model punctuates the transcript and drops the hesitations, never rephrasing. If it fails, the raw text is pasted anyway."))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if offeredLocalModels.isEmpty {
-                Text(loc("Aucun modèle local détecté : règle le serveur dans l'onglet Local (Ollama).",
-                         en: "No local model found: set the server up in the Local (Ollama) tab."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if localModels.isEmpty {
+                NoLocalModelHint()
             }
         }
     }

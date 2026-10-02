@@ -53,6 +53,18 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertNotNil(bench.coordinator.session)
     }
 
+    /// The model is a setting since the Models tab: the coordinator asks
+    /// for whatever it says, and the session names it for the footer.
+    func testTheNotesComeFromTheModelSetInSettings() async throws {
+        let bench = Bench(model: .claude(.haiku45))
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        XCTAssertEqual(session.model, .claude(.haiku45))
+
+        await bench.runs()
+        XCTAssertEqual(bench.clientRequests, [.claude(.haiku45)])
+    }
+
     /// Without a key the card is still worth something: it stays, with the
     /// usual missing-key message under it.
     func testWithoutAKeyTheCardStaysWithTheMissingKeyMessage() async throws {
@@ -186,7 +198,8 @@ private final class Bench {
          answer: Result<String, Error> = .success(Bench.notes),
          hasClient: Bool = true,
          readsWait: Bool = false,
-         galetteInstalled: Bool = false) {
+         galetteInstalled: Bool = false,
+         model: ModelChoice = ListeningNotes.model) {
         self.track = track
         self.readsWait = readsWait
         let client = FakeNotesClient(answer)
@@ -209,7 +222,8 @@ private final class Bench {
                 return nil
             },
             durations: .init(empty: .milliseconds(50), failure: .milliseconds(50)),
-            galette: galette.service
+            galette: galette.service,
+            model: { model }
         )
     }
 

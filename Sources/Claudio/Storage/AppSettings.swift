@@ -124,27 +124,31 @@ enum AppSettings {
         return url
     }
 
-    // MARK: - Models per action
+    // MARK: - Models per shortcut
 
-    private static func modelKey(for action: ClaudioAction) -> String {
-        "model.\(action.rawValue)"
-    }
+    /// Each shortcut that calls a model is a `ModelSlot`, which owns its key
+    /// and its default. The accessors below are the historical names.
 
     /// The action's custom engine (nil = the code's default). Settings written
     /// before Ollama carried no prefix: `ModelChoice` reads them back.
     static func customModel(for action: ClaudioAction) -> ModelChoice? {
-        UserDefaults.standard.string(forKey: modelKey(for: action))
+        UserDefaults.standard.string(forKey: ModelSlot.action(action).storageKey)
             .flatMap(ModelChoice.init(storageValue:))
     }
 
     /// nil or identical to the default: fall back to the default (follows app updates).
     static func setCustomModel(_ choice: ModelChoice?, for action: ClaudioAction) {
-        let key = modelKey(for: action)
-        if let choice, choice != .claude(action.defaultModel) {
-            UserDefaults.standard.set(choice.storageValue, forKey: key)
-        } else {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+        ModelSlot.action(action).set(choice ?? .claude(action.defaultModel))
+    }
+
+    /// The model behind the custom action and the spoken instruction.
+    static func freeActionModel(in defaults: UserDefaults = .standard) -> ModelChoice {
+        ModelSlot.freeAction.current(in: defaults)
+    }
+
+    /// The model behind "What's playing?"'s notes.
+    static func listeningModel(in defaults: UserDefaults = .standard) -> ModelChoice {
+        ModelSlot.listening.current(in: defaults)
     }
 
     // MARK: - Dictation
@@ -164,7 +168,6 @@ enum AppSettings {
 
     private static let dictationPrimaryLanguageKey = "dictationPrimaryLanguage"
     private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
-    private static let dictationModelKey = "dictationModel"
     private static let dictationSystemPromptKey = "dictationSystemPrompt"
     private static let dictationVocabularyKey = "dictationVocabulary"
     private static let dictationOutputKey = "dictationOutput"
@@ -235,13 +238,11 @@ enum AppSettings {
     static let defaultDictationModel = ModelChoice.claude(.haiku45)
 
     /// Stored like an action's model, same encoding, so the two settings read
-    /// the same way. Unreadable value: back to the default.
+    /// the same way (`ModelSlot.dictation`). Unreadable value: back to the
+    /// default.
     static var dictationModel: ModelChoice {
-        get {
-            UserDefaults.standard.string(forKey: dictationModelKey)
-                .flatMap(ModelChoice.init(storageValue:)) ?? defaultDictationModel
-        }
-        set { UserDefaults.standard.set(newValue.storageValue, forKey: dictationModelKey) }
+        get { ModelSlot.dictation.current() }
+        set { ModelSlot.dictation.set(newValue) }
     }
 
     /// Custom cleanup prompt (nil = the code's default). Same contract as the

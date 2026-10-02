@@ -6,6 +6,7 @@ import KeyboardShortcuts
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
+    case models
     case ollama
     case shortcuts
     case dictation
@@ -19,6 +20,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: loc("Général", en: "General")
         case .apiKey: loc("Clé API", en: "API key")
+        case .models: loc("Modèles", en: "Models")
         case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
         case .dictation: loc("Dictée", en: "Dictation")
@@ -32,6 +34,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape.fill"
         case .apiKey: "key.fill"
+        case .models: "cpu.fill"
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
@@ -45,6 +48,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: .gray
         case .apiKey: ClaudioTheme.accent
+        case .models: .purple
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
@@ -80,6 +84,7 @@ struct SettingsView: View {
             switch selection.section {
             case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
             case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
+            case .models: ModelsPane().navigationTitle(SettingsSection.models.title)
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
             case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
@@ -157,9 +162,9 @@ private struct GeneralPane: View {
 
             Section(loc("Modèle", en: "Model")) {
                 LabeledContent(loc("Modèle", en: "Model"),
-                               value: loc("réglable par action", en: "set per action"))
-                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
-                         en: "The model is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
+                               value: loc("réglable par raccourci", en: "set per shortcut"))
+                Text(loc("Le modèle se choisit pour chaque raccourci dans l'onglet Modèles : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
+                         en: "The model is chosen per shortcut in the Models tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -505,24 +510,8 @@ private struct PromptsPane: View {
     @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
     /// Models pulled on the Ollama server, read when the pane opens.
     @State private var localModels: [String] = []
-    @ObservedObject private var catalog = ModelCatalog.shared
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
-
-    /// The catalog, plus the set model when the catalog lost it: a model
-    /// the API no longer lists stays a valid setting until it is changed.
-    private var offeredClaudeModels: [ClaudioModel] {
-        catalog.models.offering(selectedModel)
-    }
-
-    /// The already-set model stays offered even if the server doesn't respond:
-    /// without it, the picker would show a blank line for a valid setting.
-    private var offeredLocalModels: [String] {
-        guard case .ollama(let current) = selectedModel, !localModels.contains(current) else {
-            return localModels
-        }
-        return [current] + localModels
-    }
 
     var body: some View {
         Form {
@@ -539,29 +528,14 @@ private struct PromptsPane: View {
             }
 
             Section(loc("Modèle", en: "Model")) {
-                Picker(loc("Modèle de cette action", en: "Model for this action"), selection: $selectedModel) {
-                    Section("Claude") {
-                        ForEach(offeredClaudeModels, id: \.self) { model in
-                            Text(model.pickerLabel(isNew: catalog.isNew(model))).tag(ModelChoice.claude(model))
-                        }
+                ModelPicker(loc("Modèle de cette action", en: "Model for this action"),
+                            selection: $selectedModel, localModels: localModels)
+                    .onChange(of: selectedModel) {
+                        AppSettings.setCustomModel(selectedModel, for: selectedAction)
                     }
-                    Section(loc("Local (Ollama)", en: "Local (Ollama)")) {
-                        ForEach(offeredLocalModels, id: \.self) { model in
-                            Text(model).tag(ModelChoice.ollama(model: model))
-                        }
-                    }
-                }
-                .onChange(of: selectedModel) {
-                    AppSettings.setCustomModel(selectedModel, for: selectedAction)
-                }
-                Text("\(selectedModel.costHint). \(selectedModel == .claude(selectedAction.defaultModel) ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(selectedAction.defaultModel.displayName).", en: "Custom model; the default is \(selectedAction.defaultModel.displayName)."))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if offeredLocalModels.isEmpty {
-                    Text(loc("Aucun modèle local détecté : règle le serveur dans l'onglet Local (Ollama).",
-                             en: "No local model found: set the server up in the Local (Ollama) tab."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                ModelChoiceCaption(choice: selectedModel, defaultChoice: .claude(selectedAction.defaultModel))
+                if localModels.isEmpty {
+                    NoLocalModelHint()
                 }
             }
 
@@ -598,18 +572,7 @@ private struct PromptsPane: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            guard !PreviewRun.isActive else {
-                localModels = ["qwen2.5:14b", "llama3.2:3b"]
-                return
-            }
-            Task {
-                // Discovery doesn't depend on a model: any one would do,
-                // this is only meant to populate the menu.
-                localModels = await OllamaClient(baseURL: AppSettings.ollamaBaseURL,
-                                                 model: "").availableModels()
-            }
-        }
+        .task { localModels = await LocalModels.discover() }
     }
 }
 

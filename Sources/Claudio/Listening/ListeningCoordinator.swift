@@ -26,6 +26,9 @@ final class ListeningCoordinator {
     private let makePanel: PanelMaker
     private let durations: DictationCoordinator.MessageDurations
     private let galette: GaletteService
+    /// The model the notes come from, asked at each trigger: a setting
+    /// since the Models tab, a fixed value in a test.
+    private let model: () -> ModelChoice
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -38,12 +41,14 @@ final class ListeningCoordinator {
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = ListeningCoordinator.systemPanel,
          durations: DictationCoordinator.MessageDurations = .standard,
-         galette: GaletteService = .system) {
+         galette: GaletteService = .system,
+         model: @escaping () -> ModelChoice = { AppSettings.listeningModel() }) {
         self.source = source
         self.client = client
         self.makePanel = panel
         self.durations = durations
         self.galette = galette
+        self.model = model
     }
 
     // MARK: - The cycle
@@ -55,7 +60,7 @@ final class ListeningCoordinator {
         // Before this session exists: closing another panel may call back
         // into `dismiss()`, which must then find nothing of this one to close.
         onOpen?()
-        let session = ListeningSession()
+        let session = ListeningSession(model: model())
         // Looked for with each panel: the card only offers what this Mac has.
         session.galette = galette.find()
         self.session = session

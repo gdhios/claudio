@@ -157,11 +157,13 @@ extension ClaudioRequest {
     /// playing may follow the text: one line of the method presents it, and
     /// lets through what it says. With nothing selected this prompt isn't
     /// sent at all — `prompt(forText:track:)` sends `FreeRequest`'s instead.
-    /// `panelTitle` is only overridden for the palette's filler.
+    /// `panelTitle` is only overridden for the palette's filler. The model
+    /// is the slot's setting unless the caller names one.
     static func free(instruction: String,
-                     model: ModelChoice = .claude(.haiku45),
+                     model: ModelChoice? = nil,
                      panelTitle: String = loc("Action libre", en: "Custom action")) -> ClaudioRequest {
         let task = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = model ?? AppSettings.freeActionModel()
         let system = """
         Tu es un outil silencieux de transformation de texte, intégré à une application macOS.
         Tâche, formulée par l'utilisateur : \(task)
