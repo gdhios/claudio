@@ -175,7 +175,7 @@ final class AnthropicClientTests: XCTestCase {
     /// `temperature` is accepted by Haiku 4.5 but rejected (400) by the 5
     /// models: sending it to the wrong model would break all of its actions.
     func testTemperatureOnlyGoesToHaiku() {
-        for model in ClaudioModel.allCases {
+        for model in ClaudioModel.bundled + [ClaudioModel(id: "claude-haiku-9")] {
             let body = AnthropicClient.makeBody(text: "t", system: "s", model: model, maxTokens: 64)
             if model.supportsTemperature {
                 XCTAssertEqual(body["temperature"] as? Double, Constants.temperature, model.rawValue)
@@ -184,6 +184,6 @@ final class AnthropicClientTests: XCTestCase {
             }
         }
         // The guard itself: only Haiku 4.5 supports it today.
-        XCTAssertEqual(ClaudioModel.allCases.filter(\.supportsTemperature), [.haiku45])
+        XCTAssertEqual(ClaudioModel.bundled.filter(\.supportsTemperature), [.haiku45])
     }
 }

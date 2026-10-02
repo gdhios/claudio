@@ -21,6 +21,7 @@ struct DictationPane: View {
     // choice is for, and a screen of three identical pickers shows nothing.
     @State private var secondaryOutput = PreviewRun.isActive
         ? DictationOutput.translateEN : AppSettings.dictationSecondaryOutput
+    @ObservedObject private var catalog = ModelCatalog.shared
     @State private var model = PreviewRun.isActive
         ? AppSettings.defaultDictationModel : AppSettings.dictationModel
     @State private var pausesMedia = PreviewRun.isActive ? true : AppSettings.dictationPausesMedia
@@ -168,8 +169,8 @@ struct DictationPane: View {
         Section(loc("Modèle de nettoyage", en: "Cleanup model")) {
             Picker(loc("Modèle", en: "Model"), selection: $model) {
                 Section("Claude") {
-                    ForEach(ClaudioModel.allCases, id: \.self) { claude in
-                        Text(claude.displayName).tag(ModelChoice.claude(claude))
+                    ForEach(catalog.models.offering(model), id: \.self) { claude in
+                        Text(claude.pickerLabel(isNew: catalog.isNew(claude))).tag(ModelChoice.claude(claude))
                     }
                 }
                 Section(loc("Local (Ollama)", en: "Local (Ollama)")) {

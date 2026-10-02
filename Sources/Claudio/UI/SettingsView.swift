@@ -89,6 +89,9 @@ struct SettingsView: View {
             }
         }
         .frame(minWidth: 700, minHeight: 500)
+        // The Claude list is a day old at most: asked here, where it is
+        // read, and nowhere on the way to an action.
+        .task { await ModelCatalog.shared.refreshIfStale() }
     }
 }
 
@@ -102,6 +105,7 @@ private struct GeneralPane: View {
     @State private var panelTextSize = AppSettings.panelTextSize
     @State private var language = AppSettings.language
     @ObservedObject private var ledger = CostLedger.shared
+    @ObservedObject private var catalog = ModelCatalog.shared
 
     var body: some View {
         Form {
@@ -154,8 +158,8 @@ private struct GeneralPane: View {
             Section(loc("Modèle", en: "Model")) {
                 LabeledContent(loc("Modèle", en: "Model"),
                                value: loc("réglable par action", en: "set per action"))
-                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
-                         en: "The model is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(ClaudioModel.allCases.map(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
+                Text(loc("Le modèle se choisit pour chaque action dans l'onglet Prompts : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
+                         en: "The model is chosen per action in the Prompts tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -179,6 +183,12 @@ private struct GeneralPane: View {
                          en: "The total is computed on your Mac from the tokens billed per call, and starts over every day. The count that matters is still the one on console.anthropic.com."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if costCounterEnabled, ledger.day.unpricedActions > 0 {
+                    Text(loc("* \(ledger.day.unpricedActions) appel\(ledger.day.unpricedActions > 1 ? "s" : "") à un modèle dont cette version de Claudio ne connaît pas le tarif : compté\(ledger.day.unpricedActions > 1 ? "s" : "") pour zéro, le total est un plancher.",
+                             en: "* \(ledger.day.unpricedActions) call\(ledger.day.unpricedActions > 1 ? "s" : "") to a model whose price this version of Claudio doesn't know, counted as zero: the total is a floor."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -495,8 +505,15 @@ private struct PromptsPane: View {
     @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
     /// Models pulled on the Ollama server, read when the pane opens.
     @State private var localModels: [String] = []
+    @ObservedObject private var catalog = ModelCatalog.shared
 
     private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
+
+    /// The catalog, plus the set model when the catalog lost it: a model
+    /// the API no longer lists stays a valid setting until it is changed.
+    private var offeredClaudeModels: [ClaudioModel] {
+        catalog.models.offering(selectedModel)
+    }
 
     /// The already-set model stays offered even if the server doesn't respond:
     /// without it, the picker would show a blank line for a valid setting.
@@ -524,8 +541,8 @@ private struct PromptsPane: View {
             Section(loc("Modèle", en: "Model")) {
                 Picker(loc("Modèle de cette action", en: "Model for this action"), selection: $selectedModel) {
                     Section("Claude") {
-                        ForEach(ClaudioModel.allCases, id: \.self) { model in
-                            Text(model.displayName).tag(ModelChoice.claude(model))
+                        ForEach(offeredClaudeModels, id: \.self) { model in
+                            Text(model.pickerLabel(isNew: catalog.isNew(model))).tag(ModelChoice.claude(model))
                         }
                     }
                     Section(loc("Local (Ollama)", en: "Local (Ollama)")) {

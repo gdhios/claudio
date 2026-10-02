@@ -27,14 +27,21 @@ struct DailyCost: Equatable, Sendable {
     var total: Double
     /// Number of billed calls.
     var actions: Int
+    /// Among them, the calls to a model the price table doesn't know: they
+    /// added nothing to `total`, which is therefore a floor, not the bill.
+    var unpricedActions: Int = 0
 
-    /// Adds a call, starting over from zero if the day has rolled over.
-    func adding(_ dollars: Double, at date: Date, calendar: Calendar = .current) -> DailyCost {
+    /// Adds a call, starting over from zero if the day has rolled over. An
+    /// unpriced call adds its count and nothing else.
+    func adding(_ dollars: Double, priced: Bool = true,
+                at date: Date, calendar: Calendar = .current) -> DailyCost {
         let start = calendar.startOfDay(for: date)
+        let unpriced = priced ? 0 : 1
         guard start == dayStart else {
-            return DailyCost(dayStart: start, total: dollars, actions: 1)
+            return DailyCost(dayStart: start, total: dollars, actions: 1, unpricedActions: unpriced)
         }
-        return DailyCost(dayStart: start, total: total + dollars, actions: actions + 1)
+        return DailyCost(dayStart: start, total: total + dollars, actions: actions + 1,
+                         unpricedActions: unpricedActions + unpriced)
     }
 
     /// What we display: the total only makes sense for the current day.
@@ -43,7 +50,11 @@ struct DailyCost: Equatable, Sendable {
         return start == dayStart ? self : DailyCost(dayStart: start, total: 0, actions: 0)
     }
 
-    var formattedTotal: String { Money.format(total) }
+    /// The amount, starred when a call couldn't be priced: the total is
+    /// then a floor, and Settings says why.
+    var formattedTotal: String {
+        Money.format(total) + (unpricedActions > 0 ? "*" : "")
+    }
 }
 
 /// Today's cost counter. The calculation happens on the machine, from the
@@ -57,6 +68,7 @@ final class CostLedger: ObservableObject {
         static let dayStart = "cost.dayStart"
         static let total = "cost.dayTotal"
         static let actions = "cost.dayActions"
+        static let unpriced = "cost.dayUnpriced"
     }
 
     @Published private(set) var day: DailyCost
@@ -70,7 +82,8 @@ final class CostLedger: ObservableObject {
         let stored = DailyCost(
             dayStart: Date(timeIntervalSinceReferenceDate: defaults.double(forKey: Key.dayStart)),
             total: defaults.double(forKey: Key.total),
-            actions: defaults.integer(forKey: Key.actions)
+            actions: defaults.integer(forKey: Key.actions),
+            unpricedActions: defaults.integer(forKey: Key.unpriced)
         )
         day = stored.current(at: now)
     }
@@ -78,13 +91,14 @@ final class CostLedger: ObservableObject {
     /// Records a completed call. A cancellation or an error reports no
     /// tokens: we then count nothing rather than estimate. A local call
     /// costs nothing and so isn't a spend: it inflates neither the amount
-    /// nor the count of billed actions.
+    /// nor the count of billed actions. A call to a model without a known
+    /// price is billed all the same: counted, and marked as unpriced.
     func record(model: ModelChoice, inputTokens: Int, outputTokens: Int, at date: Date = Date()) {
         guard !model.isLocal else { return }
         guard AppSettings.costCounterEnabled else { return }
         guard inputTokens > 0 || outputTokens > 0 else { return }
         let dollars = model.cost(inputTokens: inputTokens, outputTokens: outputTokens)
-        day = day.adding(dollars, at: date)
+        day = day.adding(dollars, priced: model.isPriced, at: date)
         persist()
     }
 
@@ -106,5 +120,6 @@ final class CostLedger: ObservableObject {
         defaults.set(day.dayStart.timeIntervalSinceReferenceDate, forKey: Key.dayStart)
         defaults.set(day.total, forKey: Key.total)
         defaults.set(day.actions, forKey: Key.actions)
+        defaults.set(day.unpricedActions, forKey: Key.unpriced)
     }
 }

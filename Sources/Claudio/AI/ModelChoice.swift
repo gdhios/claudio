@@ -49,6 +49,15 @@ enum ModelChoice: Sendable, Hashable {
         }
     }
 
+    /// False only for a Claude model the price table doesn't know: its
+    /// calls are billed, but Claudio can't say how much.
+    var isPriced: Bool {
+        switch self {
+        case .claude(let model): model.pricing != nil
+        case .ollama, .raw: true
+        }
+    }
+
     /// True when nothing leaves the machine (or the local network).
     var isLocal: Bool {
         switch self {
@@ -91,6 +100,8 @@ enum ModelChoice: Sendable, Hashable {
 
         switch provider {
         case "claude":
+            // Any Claude identifier reads, known to this version or not: the
+            // list it was picked from came from the API.
             guard let model = ClaudioModel(rawValue: identifier) else { return nil }
             self = .claude(model)
         case "ollama":

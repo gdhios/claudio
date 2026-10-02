@@ -15,7 +15,7 @@ final class ModelChoiceTests: XCTestCase {
     }
 
     func testClaudeCostStaysTheModels() {
-        for model in ClaudioModel.allCases {
+        for model in ClaudioModel.bundled {
             XCTAssertEqual(ModelChoice.claude(model).cost(inputTokens: 200, outputTokens: 200),
                            model.cost(inputTokens: 200, outputTokens: 200),
                            accuracy: 1e-12, model.rawValue)
@@ -47,7 +47,7 @@ final class ModelChoiceTests: XCTestCase {
     // MARK: - Settings encoding
 
     func testAClaudeChoiceReadsBackAfterWriting() {
-        for model in ClaudioModel.allCases {
+        for model in ClaudioModel.bundled {
             let choice = ModelChoice.claude(model)
             XCTAssertEqual(choice.storageValue, "claude:\(model.rawValue)")
             XCTAssertEqual(ModelChoice(storageValue: choice.storageValue), choice, model.rawValue)
@@ -118,10 +118,20 @@ final class ModelChoiceTests: XCTestCase {
     /// A value that can't be read (a setting written by a future version,
     /// corrupted storage) yields nil: the action then falls back to its
     /// default.
+    /// A Claude identifier the app has never shipped still reads: it was
+    /// picked from the API's list, or it is a model newer than this version.
+    /// Whether the API still serves it is the call's business, not the
+    /// setting's.
+    func testAClaudeIdentifierTheAppDoesntKnowStillReads() {
+        XCTAssertEqual(ModelChoice(storageValue: "claude:claude-sonnet-9"),
+                       .claude(ClaudioModel(id: "claude-sonnet-9")))
+        XCTAssertEqual(ModelChoice(storageValue: "claude-sonnet-9"),
+                       .claude(ClaudioModel(id: "claude-sonnet-9")), "legacy bare form")
+    }
+
     func testAnUnreadableValueYieldsNoChoice() {
         XCTAssertNil(ModelChoice(storageValue: ""))
         XCTAssertNil(ModelChoice(storageValue: "ollama:"))
-        XCTAssertNil(ModelChoice(storageValue: "claude:claude-inconnu-9"))
         XCTAssertNil(ModelChoice(storageValue: "openrouter:mixtral"))
         XCTAssertNil(ModelChoice(storageValue: "gpt-4"))
         XCTAssertNil(ModelChoice(storageValue: "raw:"))

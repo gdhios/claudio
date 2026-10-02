@@ -7,7 +7,8 @@ enum ListeningNotes {
     /// Sonnet rather than Haiku: here being right matters more than being
     /// fast, and Haiku knows less about little-known catalogues and invents
     /// more readily. Three sentences cost next to nothing either way.
-    static let model: ModelChoice = .claude(.sonnet5)
+    /// Sonnet 5.5 since 2026-10-02: same price as Sonnet 5.
+    static let model: ModelChoice = .claude(.sonnet55)
 
     /// Three short sentences fit many times over; a runaway answer doesn't.
     static let maxTokens = 400

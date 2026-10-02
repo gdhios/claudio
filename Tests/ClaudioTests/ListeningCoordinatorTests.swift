@@ -46,7 +46,7 @@ final class ListeningCoordinatorTests: XCTestCase {
                       "the notes should arrive piece by piece: \(log.notes)")
         XCTAssertEqual(session.notes, Bench.notes)
 
-        XCTAssertEqual(bench.clientRequests, [.claude(.sonnet5)])
+        XCTAssertEqual(bench.clientRequests, [.claude(.sonnet55)])
         XCTAssertEqual(bench.client.texts, [ListeningNotes.userMessage(for: .sample)])
         XCTAssertEqual(bench.client.systems, [ListeningNotes.system()])
         XCTAssertEqual(bench.client.budgets, [400])
@@ -63,7 +63,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         await bench.runs()
         XCTAssertEqual(session.phase, .missingKey)
         XCTAssertEqual(session.track, .sample)
-        XCTAssertEqual(bench.clientRequests, [.claude(.sonnet5)])
+        XCTAssertEqual(bench.clientRequests, [.claude(.sonnet55)])
         XCTAssertEqual(bench.client.calls, 0)
         XCTAssertNotNil(bench.coordinator.session)
     }

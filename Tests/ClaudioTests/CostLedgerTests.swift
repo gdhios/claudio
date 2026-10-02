@@ -14,13 +14,17 @@ final class CostLedgerTests: XCTestCase {
         XCTAssertEqual(ClaudioModel.sonnet5.outputPricePerMTok, 10)
         XCTAssertEqual(ClaudioModel.opus5.inputPricePerMTok, 5)
         XCTAssertEqual(ClaudioModel.opus5.outputPricePerMTok, 25)
+        XCTAssertEqual(ClaudioModel.sonnet55.inputPricePerMTok, 2)
+        XCTAssertEqual(ClaudioModel.sonnet55.outputPricePerMTok, 10)
+        XCTAssertEqual(ClaudioModel.opus55.inputPricePerMTok, 4)
+        XCTAssertEqual(ClaudioModel.opus55.outputPricePerMTok, 20)
     }
 
     /// A million tokens on each side = the sum of the two rates.
     func testAMillionTokensOnEachSideCostsTheSumOfBothRates() {
-        for model in ClaudioModel.allCases {
+        for model in ClaudioModel.bundled {
             XCTAssertEqual(model.cost(inputTokens: 1_000_000, outputTokens: 1_000_000),
-                           model.inputPricePerMTok + model.outputPricePerMTok,
+                           model.inputPricePerMTok! + model.outputPricePerMTok!,
                            accuracy: 1e-9, model.rawValue)
         }
     }
@@ -126,5 +130,32 @@ final class CostLedgerTests: XCTestCase {
                       inputTokens: 5_000, outputTokens: 5_000, at: noon)
         XCTAssertEqual(ledger.day.actions, 1, "a local call is not a cost")
         XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
+    }
+
+    /// A model the price table doesn't know is still a billed call: it is
+    /// counted, adds nothing to the amount, and the amount says so with a
+    /// star rather than pretending to be complete.
+    @MainActor
+    func testACallToAnUnpricedModelIsCountedAndStarred() {
+        let previous = AppSettings.costCounterEnabled
+        AppSettings.costCounterEnabled = true
+        defer { AppSettings.costCounterEnabled = previous }
+
+        let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
+        let ledger = CostLedger(defaults: defaults, now: noon)
+        ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: noon)
+        ledger.record(model: .claude(ClaudioModel(id: "claude-sonnet-9")),
+                      inputTokens: 200, outputTokens: 200, at: noon)
+        XCTAssertEqual(ledger.day.actions, 2)
+        XCTAssertEqual(ledger.day.unpricedActions, 1)
+        XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
+        withLanguage(.french) {
+            XCTAssertEqual(ledger.day.formattedTotal, "< 0,01 $*")
+        }
+
+        // The star survives a restart, and the day's rollover clears it.
+        let reopened = CostLedger(defaults: defaults, now: noon)
+        XCTAssertEqual(reopened.day.unpricedActions, 1)
+        XCTAssertEqual(reopened.day.current(at: noon.addingTimeInterval(24 * 3600)).unpricedActions, 0)
     }
 }
