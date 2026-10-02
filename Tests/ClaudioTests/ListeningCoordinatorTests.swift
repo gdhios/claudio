@@ -113,6 +113,92 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.client.calls, 0)
     }
 
+    // MARK: - The facts
+
+    /// MusicBrainz is asked beside the card and never waited for: Claude is
+    /// asked without the facts, they take their place under the card when
+    /// they arrive, and the card's player cover is left alone.
+    func testTheFactsArriveOnTheirOwnUnderTheCard() async throws {
+        let bench = Bench(artwork: Bench.cover, facts: Bench.facts, factsWait: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(bench.factsRequests, [.sample])
+        XCTAssertNil(session.facts, "the notes never wait for the facts")
+        XCTAssertEqual(bench.client.texts, [ListeningNotes.userMessage(for: .sample)])
+
+        bench.answerFacts()
+        await bench.wait { session.facts != nil }
+        XCTAssertEqual(session.facts, Bench.facts)
+        XCTAssertEqual(bench.remoteCoverRequests, [], "the player gave a cover: the archive isn't asked")
+    }
+
+    /// Facts already in the cache go to Claude with the first request, and
+    /// MusicBrainz isn't asked again.
+    func testCachedFactsGoToClaudeAtOnce() async throws {
+        let bench = Bench(cachedFacts: Bench.facts, facts: Bench.facts)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        XCTAssertEqual(session.facts, Bench.facts)
+        XCTAssertEqual(bench.client.texts, [ListeningNotes.userMessage(for: .sample, facts: Bench.facts)])
+        XCTAssertEqual(bench.factsRequests, [])
+    }
+
+    /// No cover from the player: the archive's, by the release group the
+    /// facts name, once they are in.
+    func testWithoutAPlayerCoverTheArchivesIsFetched() async throws {
+        let bench = Bench(artwork: nil, facts: Bench.facts, remoteCover: Bench.cover)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        await bench.wait { session.artwork != nil }
+        XCTAssertEqual(bench.remoteCoverRequests, [Bench.facts])
+        XCTAssertTrue(session.artwork === Bench.cover)
+    }
+
+    /// MusicBrainz switched off: nothing is asked of it, nor of the archive.
+    func testWithMusicBrainzOffNothingIsAsked() async throws {
+        let bench = Bench(artwork: nil, cachedFacts: Bench.facts, facts: Bench.facts, remoteCover: Bench.cover,
+                          preferences: .init(musicBrainz: false, showsArtwork: true, detail: .threeSentences))
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        XCTAssertNil(session.facts)
+        XCTAssertEqual(bench.factsRequests, [])
+        XCTAssertEqual(bench.remoteCoverRequests, [])
+        XCTAssertEqual(bench.client.texts, [ListeningNotes.userMessage(for: .sample)])
+    }
+
+    /// The cover switched off: neither the player's nor the archive's is
+    /// asked for, facts or not.
+    func testWithTheCoverOffNoCoverIsAskedFor() async throws {
+        let bench = Bench(artwork: Bench.cover, cachedFacts: Bench.facts, remoteCover: Bench.cover,
+                          preferences: .init(musicBrainz: true, showsArtwork: false, detail: .threeSentences))
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertNil(session.artwork)
+        XCTAssertEqual(bench.artworkRequests, [])
+        XCTAssertEqual(bench.remoteCoverRequests, [])
+    }
+
+    /// The detail setting is the budget Claude gets and the ask in the prompt.
+    func testTheDetailSettingReachesClaude() async throws {
+        let bench = Bench(preferences: .init(musicBrainz: true, showsArtwork: true, detail: .oneSentence))
+        bench.coordinator.trigger()
+        await bench.runs()
+        XCTAssertEqual(bench.client.budgets, [150])
+        XCTAssertEqual(bench.client.systems, [ListeningNotes.system(detail: .oneSentence)])
+    }
+
     // MARK: - Galette
 
     /// With Galette on the Mac, the card offers the artist, then the album.
@@ -218,6 +304,8 @@ private final class Bench {
     static let notes = "Takako Mamiya est une chanteuse japonaise de city pop. Love Trip est son seul album."
     /// The cover the fake player hands back, compared by identity.
     static let cover = NSImage(size: NSSize(width: 1, height: 1))
+    static let facts = TrackFacts(recordingID: "783dfef9", releaseGroupID: "3b03f2df", albumTitle: "LOVE TRIP",
+                                  primaryType: "Album", secondaryTypes: [], firstReleaseDate: "1982-11-25")
 
     let client: FakeNotesClient
     /// Galette, missing unless the test installs it.
@@ -241,6 +329,11 @@ private final class Bench {
     private(set) var panels = 0
     /// Every track a cover was asked for.
     private(set) var artworkRequests: [NowPlayingTrack] = []
+    /// Every track MusicBrainz was asked about.
+    private(set) var factsRequests: [NowPlayingTrack] = []
+    /// Every facts the archive was asked a cover for.
+    private(set) var remoteCoverRequests: [TrackFacts] = []
+    private var waitingFacts: [CheckedContinuation<TrackFacts?, Never>] = []
 
     private var waitingReads: [CheckedContinuation<NowPlayingTrack?, Never>] = []
     private var waitingArtwork: [CheckedContinuation<NSImage?, Never>] = []
@@ -254,6 +347,11 @@ private final class Bench {
          galetteInstalled: Bool = false,
          artwork: NSImage? = nil,
          artworkWaits: Bool = false,
+         cachedFacts: TrackFacts? = nil,
+         facts: TrackFacts? = nil,
+         factsWait: Bool = false,
+         remoteCover: NSImage? = nil,
+         preferences: ListeningPreferences = .init(musicBrainz: true, showsArtwork: true, detail: .threeSentences),
          model: ModelChoice = ListeningNotes.model) {
         self.track = track
         self.readsWait = readsWait
@@ -286,8 +384,30 @@ private final class Bench {
                 guard artworkWaits else { return artwork }
                 return await withCheckedContinuation { waitingArtwork.append($0) }
             },
+            facts: FactsSource(
+                cached: { _ in cachedFacts },
+                fetch: { [weak self] track in
+                    guard let self else { return nil }
+                    factsRequests.append(track)
+                    guard factsWait else { return facts }
+                    return await withCheckedContinuation { waitingFacts.append($0) }
+                }
+            ),
+            remoteArtwork: RemoteArtworkSource { [weak self] facts in
+                self?.remoteCoverRequests.append(facts)
+                return remoteCover
+            },
+            preferences: { preferences },
             model: { model }
         )
+    }
+
+    /// Hands the facts to every request still waiting, as MusicBrainz
+    /// finally does.
+    func answerFacts() {
+        let waiting = waitingFacts
+        waitingFacts = []
+        for request in waiting { request.resume(returning: Bench.facts) }
     }
 
     /// Hands the cover to every request still waiting, as the player's

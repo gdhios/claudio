@@ -43,6 +43,9 @@ final class ListeningSession: ObservableObject {
     /// The track's cover, when its player gave one: it arrives on its own,
     /// after the card and whatever Claude is doing.
     @Published var artwork: NSImage?
+    /// What MusicBrainz said of the track, when it was asked and answered
+    /// in time: known at once from the cache, or arriving on its own.
+    @Published var facts: TrackFacts?
     /// Claude's notes, as they stream. Three sentences at most: published as
     /// they come, with no buffering to spare the layout.
     @Published var notes = ""

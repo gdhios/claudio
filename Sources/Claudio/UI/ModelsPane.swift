@@ -54,7 +54,7 @@ struct ModelsPane: View {
 /// A preview shows the defaults rather than this Mac's settings: the shot
 /// has to be the same on every machine.
 @MainActor
-private struct ModelSlotRow: View {
+struct ModelSlotRow: View {
     let slot: ModelSlot
     let localModels: [String]
     @State private var choice: ModelChoice

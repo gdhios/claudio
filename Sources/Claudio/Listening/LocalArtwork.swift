@@ -56,10 +56,11 @@ enum LocalArtwork {
 
     /// Cached: the same track asked again shows its cover at once, offline
     /// too. A response that isn't an image is nothing.
-    static func fetch(_ url: URL) async -> NSImage? {
+    static func fetch(_ url: URL, userAgent: String? = nil) async -> NSImage? {
         var request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad,
                                  timeoutInterval: fetchTimeout)
         request.setValue("image/*", forHTTPHeaderField: "Accept")
+        if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true
         else { return nil }

@@ -94,6 +94,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             // "Dictate" on right ⌥ held alone, the dictation rows in view.
             PreviewRun.dictationLoneKeys = [.dictate: .rightOption]
             settingsController.show(initialSection: .shortcuts)
+        } else if mode == "settings-music" {
+            settingsController.show(initialSection: .music)
         } else if mode == "settings-dictation" {
             // The pane freezes its own history and its model list behind
             // `PreviewRun.isActive`: nothing is read from, or written to,
@@ -304,6 +306,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         case "listening-streaming":
             session.track = sampleTrack(playing: false)
             session.artwork = sampleArtwork
+            session.facts = sampleFacts
             session.notes = String(sampleNotes.prefix(sampleNotes.count * 2 / 3))
             session.phase = .streaming
         case "listening-nothing":
@@ -314,12 +317,22 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         default:  // "listening"
             session.track = sampleTrack(playing: true)
             session.artwork = sampleArtwork
+            session.facts = sampleFacts
             session.notes = sampleNotes
             session.phase = .done
         }
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         panel.present()
+    }
+
+    /// What MusicBrainz says of the sample track (captured 2026-10-02):
+    /// the player names the album, so the line shows the year and type.
+    private var sampleFacts: TrackFacts {
+        TrackFacts(recordingID: "783dfef9-87f4-4056-b944-c7ae624d5964",
+                   releaseGroupID: "3b03f2df-1fc0-4572-8b90-8f952a2a9fcb",
+                   albumTitle: "LOVE TRIP", primaryType: "Album", secondaryTypes: [],
+                   firstReleaseDate: "1982-11-25")
     }
 
     /// A cover drawn here rather than read anywhere: the same square on

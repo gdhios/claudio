@@ -183,7 +183,16 @@ struct ListeningPanelView: View {
                     .font(.system(size: textSize.points(11)))
                     .foregroundStyle(.secondary)
             }
+            if let facts = session.facts?.summary(playerAlbum: track.album, english: AppSettings.language.showsEnglish) {
+                // What MusicBrainz said, when it has: the album of origin
+                // if the player plays a compilation, the year, the type.
+                Text(facts)
+                    .font(.system(size: textSize.points(11)))
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.18), value: session.facts == nil)
         .lineLimit(2)
         // A title on two lines is a sentence to read, not a label to cut.
         .fixedSize(horizontal: false, vertical: true)

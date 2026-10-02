@@ -10,25 +10,29 @@ enum ListeningNotes {
     /// Sonnet 5.5 since 2026-10-02: same price as Sonnet 5.
     static let model: ModelChoice = .claude(.sonnet55)
 
-    /// Three short sentences fit many times over; a runaway answer doesn't.
-    static let maxTokens = 400
+    /// The budget of the default detail: three short sentences fit many
+    /// times over, a runaway answer doesn't.
+    static let maxTokens = ListeningDetail.threeSentences.maxTokens
 
     /// The track as the player described it, tagged: only the fields it
-    /// gave, and not whether it's paused.
-    static func userMessage(for track: NowPlayingTrack) -> String {
-        track.promptBlock(tag: "morceau")
+    /// gave, and not whether it's paused. Facts already known follow in
+    /// their own block, so Claude has them before its first word.
+    static func userMessage(for track: NowPlayingTrack, facts: TrackFacts? = nil) -> String {
+        guard let facts else { return track.promptBlock(tag: "morceau") }
+        return track.promptBlock(tag: "morceau") + "\n" + facts.promptBlock
     }
 
     /// Written once, in French like every prompt in the app; only its last
     /// line follows the interface language, so the notes read in the same
-    /// language as the panel around them.
-    static func system(language: AppLanguage = AppSettings.language) -> String {
+    /// language as the panel around them. The detail is the Music tab's.
+    static func system(language: AppLanguage = AppSettings.language,
+                       detail: ListeningDetail = .threeSentences) -> String {
         let answerLanguage = language.showsEnglish ? "anglais" : "français"
         return """
             Tu es Claudio, un petit assistant de barre de menus sur macOS. L'utilisateur écoute le \
             contenu décrit entre balises <morceau> et te demande ce que c'est.
 
-            Tâche : en trois phrases courtes au plus, présente ce qu'il écoute : qui est l'artiste, \
+            Tâche : \(detail.instruction), présente ce qu'il écoute : qui est l'artiste, \
             d'où vient le morceau (album, année, genre ou courant), et un fait marquant si tu en \
             connais un de façon sûre.
 
@@ -38,6 +42,9 @@ enum ListeningNotes {
             le morceau.
             - Si ce n'est pas de la musique (podcast, vidéo, livre audio), dis ce que c'est en une \
             phrase.
+            - Les faits entre balises <faits> viennent d'une base publique (MusicBrainz) et priment \
+            sur ta mémoire : album d'origine, type, première sortie. Sans ce bloc, ne cite ni date ni \
+            album dont tu n'es pas sûr.
             - Tu n'inventes rien : aucune date, aucun classement, aucune collaboration, aucune \
             anecdote dont tu n'es pas sûr. Si tu ne connais pas ce morceau ou cet artiste, dis-le en \
             une phrase et tiens-t'en à ce que disent les métadonnées.

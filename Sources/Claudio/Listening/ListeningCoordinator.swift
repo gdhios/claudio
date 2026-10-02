@@ -27,6 +27,10 @@ final class ListeningCoordinator {
     private let durations: DictationCoordinator.MessageDurations
     private let galette: GaletteService
     private let artwork: ArtworkSource
+    private let facts: FactsSource
+    private let remoteArtwork: RemoteArtworkSource
+    /// The Music tab's settings, read at each read of the player.
+    private let preferences: () -> ListeningPreferences
     /// The model the notes come from, asked at each trigger: a setting
     /// since the Models tab, a fixed value in a test.
     private let model: () -> ModelChoice
@@ -40,6 +44,11 @@ final class ListeningCoordinator {
     /// Fetches the cover beside the cycle, never holding it up: cancelled
     /// with it.
     private var coverFetch: Task<Void, Never>?
+    private var factsFetch: Task<Void, Never>?
+    /// The archive is asked for a cover once the player has given none and
+    /// the facts name a release group, whichever comes last — and once.
+    private var playerCoverSettled = false
+    private var archiveAsked = false
 
     init(source: NowPlayingSource = .system,
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
@@ -47,6 +56,9 @@ final class ListeningCoordinator {
          durations: DictationCoordinator.MessageDurations = .standard,
          galette: GaletteService = .system,
          artwork: ArtworkSource = .system,
+         facts: FactsSource = .system,
+         remoteArtwork: RemoteArtworkSource = .system,
+         preferences: @escaping () -> ListeningPreferences = { .current() },
          model: @escaping () -> ModelChoice = { AppSettings.listeningModel() }) {
         self.source = source
         self.client = client
@@ -54,6 +66,9 @@ final class ListeningCoordinator {
         self.durations = durations
         self.galette = galette
         self.artwork = artwork
+        self.facts = facts
+        self.remoteArtwork = remoteArtwork
+        self.preferences = preferences
         self.model = model
     }
 
@@ -82,17 +97,33 @@ final class ListeningCoordinator {
         // Esc or another trigger while the player was answering: its answer
         // belongs to a panel that is gone.
         guard self.session === session, !Task.isCancelled else { return }
-        // A retry that finds another track drops the old cover; the same
-        // track keeps it rather than blink.
-        if session.track != track { session.artwork = nil }
+        // A retry that finds another track drops the old cover and facts;
+        // the same track keeps them rather than blink.
+        if session.track != track {
+            session.artwork = nil
+            session.facts = nil
+        }
         session.track = track
         guard let track else {
             session.phase = .nothing
             closeAfter(durations.empty, session: session)
             return
         }
-        fetchCover(of: track, for: session)
-        await tell(about: track, session: session)
+        let preferences = preferences()
+        // Facts already known go to Claude with the first request.
+        let known = preferences.musicBrainz ? facts.cached(track) : nil
+        session.facts = known
+        playerCoverSettled = false
+        archiveAsked = false
+        if preferences.showsArtwork {
+            fetchCover(of: track, for: session)
+        }
+        if preferences.musicBrainz, known == nil {
+            fetchFacts(of: track, for: session, preferences: preferences)
+        } else {
+            considerArchiveCover(for: session, preferences: preferences)
+        }
+        await tell(about: track, facts: known, detail: preferences.detail, session: session)
     }
 
     /// The cover goes its own way: the card is up, Claude is being asked,
@@ -103,13 +134,46 @@ final class ListeningCoordinator {
         coverFetch = Task { [weak self, artwork] in
             let image = await artwork.image(track)
             guard let self, self.session === session, !Task.isCancelled else { return }
+            if let image { session.artwork = image }
+            playerCoverSettled = true
+            considerArchiveCover(for: session, preferences: preferences())
+        }
+    }
+
+    /// MusicBrainz, beside the cycle and never holding it up: the facts
+    /// take their place under the card when they arrive. Claude isn't
+    /// asked again — his text is on screen — but they serve the cover, and
+    /// the next listen of the track.
+    private func fetchFacts(of track: NowPlayingTrack, for session: ListeningSession,
+                            preferences: ListeningPreferences) {
+        factsFetch?.cancel()
+        factsFetch = Task { [weak self, facts] in
+            let found = await facts.fetch(track)
+            guard let self, self.session === session, !Task.isCancelled else { return }
+            session.facts = found
+            considerArchiveCover(for: session, preferences: preferences)
+        }
+    }
+
+    /// The archive's cover, once: when the player has given none, the
+    /// facts name a release group, and the cover is wanted at all.
+    private func considerArchiveCover(for session: ListeningSession, preferences: ListeningPreferences) {
+        guard preferences.showsArtwork, preferences.musicBrainz, !archiveAsked,
+              playerCoverSettled || !preferences.showsArtwork,
+              session.artwork == nil,
+              let facts = session.facts, facts.releaseGroupID != nil else { return }
+        archiveAsked = true
+        Task { [weak self, remoteArtwork] in
+            let image = await remoteArtwork.image(facts)
+            guard let self, self.session === session, session.artwork == nil else { return }
             session.artwork = image
         }
     }
 
     /// The card is up by now, and worth something without Claude: whatever
     /// happens from here, it stays.
-    private func tell(about track: NowPlayingTrack, session: ListeningSession) async {
+    private func tell(about track: NowPlayingTrack, facts: TrackFacts?, detail: ListeningDetail,
+                      session: ListeningSession) async {
         guard let client = client(session.model) else {
             session.phase = .missingKey
             return
@@ -117,9 +181,9 @@ final class ListeningCoordinator {
         session.beginStreaming()
         do {
             let result = try await client.streamCompletion(
-                of: ListeningNotes.userMessage(for: track),
-                system: ListeningNotes.system(),
-                maxTokens: ListeningNotes.maxTokens
+                of: ListeningNotes.userMessage(for: track, facts: facts),
+                system: ListeningNotes.system(detail: detail),
+                maxTokens: detail.maxTokens
             ) { @MainActor piece in
                 session.appendNotes(piece)
             }
@@ -195,6 +259,8 @@ final class ListeningCoordinator {
         cycle = nil
         coverFetch?.cancel()
         coverFetch = nil
+        factsFetch?.cancel()
+        factsFetch = nil
         panel?.orderOut(nil)
         panel = nil
         session = nil

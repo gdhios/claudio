@@ -10,6 +10,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case ollama
     case shortcuts
     case dictation
+    case music
     case streamDeck
     case prompts
     case about
@@ -24,6 +25,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: loc("Local (Ollama)", en: "Local (Ollama)")
         case .shortcuts: loc("Raccourcis", en: "Shortcuts")
         case .dictation: loc("Dictée", en: "Dictation")
+        case .music: loc("Musique", en: "Music")
         case .streamDeck: loc("Stream Deck", en: "Stream Deck")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
@@ -38,6 +40,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
+        case .music: "music.note"
         case .streamDeck: "rectangle.grid.3x2.fill"
         case .prompts: "text.quote"
         case .about: "info"
@@ -52,6 +55,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
+        case .music: .mint
         case .streamDeck: .teal
         case .prompts: .orange
         case .about: .blue
@@ -88,6 +92,7 @@ struct SettingsView: View {
             case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
             case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
             case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
+            case .music: MusicPane().navigationTitle(SettingsSection.music.title)
             case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
             case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
             case .about: AboutPane().navigationTitle(SettingsSection.about.title)
