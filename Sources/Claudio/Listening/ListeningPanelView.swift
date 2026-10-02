@@ -16,6 +16,7 @@ struct ListeningPanelView: View {
     var onOpenInGalette: (GaletteLink) -> Void = { _ in }
     var onElaborate: (MusicSubject) -> Void = { _ in }
     var onBack: () -> Void = {}
+    var onSearch: (MusicSubject) -> Void = { _ in }
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var notesHeight: CGFloat = 0
@@ -185,8 +186,39 @@ struct ListeningPanelView: View {
                     .help(loc("Un texte plus long de Claude, à la place des notes",
                               en: "A longer text from Claude, in place of the notes"))
             }
+            searchInClaude
         }
         .fixedSize()
+    }
+
+    /// Claude in the browser, where he searches the web: one button when
+    /// the card knows one subject, a menu when it knows the two.
+    @ViewBuilder
+    private var searchInClaude: some View {
+        let subjects = session.subjects
+        if subjects.count == 1, let only = subjects.first {
+            Button(Self.searchTitle) { onSearch(only) }
+                .buttonStyle(SmallPillButtonStyle())
+                .help(Self.searchHelp)
+        } else if subjects.count > 1 {
+            Menu {
+                ForEach(subjects, id: \.self) { subject in
+                    Button(subject.searchTitle) { onSearch(subject) }
+                }
+            } label: {
+                // The ellipsis says a choice comes first, as macOS has it.
+                Text(Self.searchTitle + "…")
+            }
+            .menuStyle(.button)
+            .buttonStyle(SmallPillButtonStyle())
+            .help(Self.searchHelp)
+        }
+    }
+
+    static var searchTitle: String { loc("Chercher dans Claude", en: "Search in Claude") }
+    static var searchHelp: String {
+        loc("Ouvre claude.ai avec la demande préremplie : Claude cherche sur le web avant de répondre",
+            en: "Opens claude.ai with the request filled in: Claude searches the web before answering")
     }
 
     /// The title, the artist, then where the track comes from — the album
@@ -324,6 +356,13 @@ struct ListeningPanelView: View {
                     .lineLimit(1)
             }
             Spacer()
+            // Under the long text: the same subject, in Claude's browser. The
+            // footer is narrow: the site's name says where it goes.
+            if let subject = session.essaySubject, session.phase != .missingKey {
+                Button("claude.ai") { onSearch(subject) }
+                    .buttonStyle(PanelPillButtonStyle())
+                    .help(Self.searchHelp)
+            }
             // The way back to the notes, when there are notes to go back to.
             if session.essaySubject != nil, !session.cameFromLink {
                 Button(loc("Retour", en: "Back"), action: onBack)

@@ -36,6 +36,8 @@ final class ListeningCoordinator {
     private let model: () -> ModelChoice
     /// The long text's own model, asked at each pill.
     private let essayModel: () -> ModelChoice
+    /// Hands a link to the browser: "Search in Claude".
+    private let openLink: @MainActor (URL) -> Void
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -62,7 +64,8 @@ final class ListeningCoordinator {
          remoteArtwork: RemoteArtworkSource = .system,
          preferences: @escaping () -> ListeningPreferences = { .current() },
          model: @escaping () -> ModelChoice = { AppSettings.listeningModel() },
-         essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() }) {
+         essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() },
+         openLink: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }) {
         self.source = source
         self.client = client
         self.makePanel = panel
@@ -74,6 +77,7 @@ final class ListeningCoordinator {
         self.preferences = preferences
         self.model = model
         self.essayModel = essayModel
+        self.openLink = openLink
     }
 
     // MARK: - The cycle
@@ -258,6 +262,7 @@ final class ListeningCoordinator {
         }
         let artist = preferences().musicBrainz ? await facts.artist(subject) : nil
         guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
+        session.artistFacts = artist
         do {
             let result = try await client.streamCompletion(
                 of: ListeningEssay.userMessage(for: subject, artist: artist),
@@ -277,6 +282,16 @@ final class ListeningCoordinator {
             guard self.session === session, !Task.isCancelled else { return }
             session.phase = .error(error.localizedDescription)
         }
+    }
+
+    /// "Search in Claude": the subject goes to Claude in the browser, with
+    /// the artist's facts when the long text got them, and the panel
+    /// closes, its job done.
+    func search(_ subject: MusicSubject) {
+        guard let session else { return }
+        let artist = session.essaySubject == subject ? session.artistFacts : nil
+        openLink(ClaudeSearch.url(for: subject, artist: artist))
+        dismiss()
     }
 
     // MARK: - Panel actions
@@ -368,7 +383,8 @@ final class ListeningCoordinator {
             onClose: { [weak coordinator] in coordinator?.dismiss() },
             onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) },
             onElaborate: { [weak coordinator] subject in coordinator?.elaborate(on: subject) },
-            onBack: { [weak coordinator] in coordinator?.back() }
+            onBack: { [weak coordinator] in coordinator?.back() },
+            onSearch: { [weak coordinator] subject in coordinator?.search(subject) }
         )
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
         panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }

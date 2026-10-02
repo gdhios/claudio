@@ -69,6 +69,14 @@ struct MusicSubject: Hashable, Sendable {
         }
     }
 
+    /// The row of the "Search in Claude" menu.
+    var searchTitle: String {
+        switch kind {
+        case .album: loc("L'album", en: "The album")
+        case .artist: loc("L'artiste", en: "The artist")
+        }
+    }
+
     /// Claude's block, in French like every prompt: the facts in hand, and
     /// only them.
     var promptBlock: String {

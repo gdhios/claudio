@@ -270,6 +270,31 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.essay, Bench.notes)
     }
 
+    /// "Search in Claude" from the card: the browser opens on claude.ai
+    /// with the subject, and the panel closes, its job done. After the
+    /// long text, the artist's facts go along.
+    func testSearchInClaudeOpensTheLinkThenClosesThePanel() async throws {
+        let bench = Bench(artistFacts: Bench.artist)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        let subject = try XCTUnwrap(MusicSubject.artist(of: .sample))
+
+        bench.coordinator.search(subject)
+        XCTAssertEqual(bench.opened, [ClaudeSearch.url(for: subject, artist: nil, language: AppSettings.language)])
+        XCTAssertNil(bench.coordinator.session)
+
+        bench.coordinator.trigger()
+        let again = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        bench.coordinator.elaborate(on: subject)
+        await bench.runs()
+        XCTAssertEqual(again.artistFacts, Bench.artist, "kept for the link, and shown nowhere")
+        bench.coordinator.search(subject)
+        XCTAssertEqual(bench.opened.last, ClaudeSearch.url(for: subject, artist: Bench.artist, language: AppSettings.language))
+        _ = session
+    }
+
     /// MusicBrainz off: no facts are asked for, the text goes at once.
     func testWithMusicBrainzOffTheLongTextAsksNoFacts() async throws {
         let bench = Bench(artistFacts: Bench.artist,
@@ -450,6 +475,8 @@ private final class Bench {
     private(set) var remoteCoverRequests: [TrackFacts] = []
     /// Every subject MusicBrainz was asked the artist of.
     private(set) var artistRequests: [MusicSubject] = []
+    /// Every link handed to the browser.
+    private(set) var opened: [URL] = []
     private var waitingFacts: [CheckedContinuation<TrackFacts?, Never>] = []
     private var waitingArtists: [CheckedContinuation<ArtistFacts?, Never>] = []
 
@@ -526,7 +553,8 @@ private final class Bench {
             },
             preferences: { preferences },
             model: { model },
-            essayModel: { essayModel }
+            essayModel: { essayModel },
+            openLink: { [weak self] url in self?.opened.append(url) }
         )
     }
 

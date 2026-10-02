@@ -54,6 +54,9 @@ final class ListeningSession: ObservableObject {
     @Published var essaySubject: MusicSubject?
     /// The long text, as it streams.
     @Published var essay = ""
+    /// What MusicBrainz said of the subject's artist before the long text:
+    /// shown nowhere, carried by the "Search in Claude" link.
+    @Published var artistFacts: ArtistFacts?
     /// Opened by a `claudio://music` link: there are no notes to go back
     /// to, the panel only closes.
     var cameFromLink = false
@@ -90,6 +93,7 @@ final class ListeningSession: ObservableObject {
     func beginEssay(on subject: MusicSubject, model: ModelChoice) {
         essaySubject = subject
         essay = ""
+        artistFacts = nil
         self.model = model
         phase = .streaming
     }

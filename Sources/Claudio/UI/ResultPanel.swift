@@ -117,7 +117,8 @@ final class ResultPanel: NSPanel {
                      onClose: @escaping () -> Void = {},
                      onOpenInGalette: @escaping (GaletteLink) -> Void = { _ in },
                      onElaborate: @escaping (MusicSubject) -> Void = { _ in },
-                     onBack: @escaping () -> Void = {}) -> ResultPanel {
+                     onBack: @escaping () -> Void = {},
+                     onSearch: @escaping (MusicSubject) -> Void = { _ in }) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
         panel.host(ListeningPanelView(
             session: session,
@@ -129,6 +130,7 @@ final class ResultPanel: NSPanel {
             onOpenInGalette: onOpenInGalette,
             onElaborate: onElaborate,
             onBack: onBack,
+            onSearch: onSearch,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         ))
         return panel
