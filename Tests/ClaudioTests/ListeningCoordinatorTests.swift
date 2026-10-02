@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import XCTest
 @testable import Claudio
@@ -116,6 +117,51 @@ final class ListeningCoordinatorTests: XCTestCase {
 
     /// With Galette on the Mac, the card offers the artist, then the album.
     /// Galette is looked for once, as the panel opens.
+    // MARK: - The cover
+
+    /// The cover is the player's own, read beside the card and never
+    /// waited for: Claude is asked and answers while it is still coming,
+    /// and it takes its place on the card when it arrives.
+    func testTheCoverArrivesOnItsOwnBesideTheCard() async throws {
+        let bench = Bench(artwork: Bench.cover, artworkWaits: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+
+        await bench.runs()
+        XCTAssertEqual(session.phase, .done)
+        XCTAssertEqual(bench.artworkRequests, [.sample])
+        XCTAssertNil(session.artwork, "the notes never wait for the cover")
+
+        bench.answerArtwork()
+        await bench.wait { session.artwork != nil }
+        XCTAssertTrue(session.artwork === Bench.cover)
+    }
+
+    /// Nothing playing: no track, so no cover to ask for.
+    func testNothingPlayingAsksForNoCover() async throws {
+        let bench = Bench(track: nil, artwork: Bench.cover)
+        bench.coordinator.trigger()
+        await bench.runs()
+        XCTAssertEqual(bench.artworkRequests, [])
+    }
+
+    /// Esc while the cover is still coming: it belongs to a panel that is
+    /// gone, and lands nowhere.
+    func testEscapeWhileTheCoverIsComingDropsIt() async throws {
+        let bench = Bench(artwork: Bench.cover, artworkWaits: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+
+        bench.coordinator.dismiss()
+        bench.answerArtwork()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertNil(session.artwork)
+        XCTAssertNil(bench.coordinator.session)
+    }
+
+    // MARK: - Galette
+
     func testWithGaletteTheCardOffersTheArtistThenTheAlbum() async throws {
         let bench = Bench(galetteInstalled: true)
         bench.coordinator.trigger()
@@ -170,6 +216,8 @@ private extension NowPlayingTrack {
 @MainActor
 private final class Bench {
     static let notes = "Takako Mamiya est une chanteuse japonaise de city pop. Love Trip est son seul album."
+    /// The cover the fake player hands back, compared by identity.
+    static let cover = NSImage(size: NSSize(width: 1, height: 1))
 
     let client: FakeNotesClient
     /// Galette, missing unless the test installs it.
@@ -191,17 +239,26 @@ private final class Bench {
     private(set) var cardWhenClaudeWasAsked: [NowPlayingTrack?] = []
     /// How many panels were put on screen.
     private(set) var panels = 0
+    /// Every track a cover was asked for.
+    private(set) var artworkRequests: [NowPlayingTrack] = []
 
     private var waitingReads: [CheckedContinuation<NowPlayingTrack?, Never>] = []
+    private var waitingArtwork: [CheckedContinuation<NSImage?, Never>] = []
+    private let artwork: NSImage?
+    private let artworkWaits: Bool
 
     init(track: NowPlayingTrack? = .sample,
          answer: Result<String, Error> = .success(Bench.notes),
          hasClient: Bool = true,
          readsWait: Bool = false,
          galetteInstalled: Bool = false,
+         artwork: NSImage? = nil,
+         artworkWaits: Bool = false,
          model: ModelChoice = ListeningNotes.model) {
         self.track = track
         self.readsWait = readsWait
+        self.artwork = artwork
+        self.artworkWaits = artworkWaits
         let client = FakeNotesClient(answer)
         self.client = client
         galette = FakeGalette(installed: galetteInstalled)
@@ -223,8 +280,22 @@ private final class Bench {
             },
             durations: .init(empty: .milliseconds(50), failure: .milliseconds(50)),
             galette: galette.service,
+            artwork: ArtworkSource { [weak self] track in
+                guard let self else { return nil }
+                artworkRequests.append(track)
+                guard artworkWaits else { return artwork }
+                return await withCheckedContinuation { waitingArtwork.append($0) }
+            },
             model: { model }
         )
+    }
+
+    /// Hands the cover to every request still waiting, as the player's
+    /// CDN finally does.
+    func answerArtwork() {
+        let waiting = waitingArtwork
+        waitingArtwork = []
+        for request in waiting { request.resume(returning: artwork) }
     }
 
     /// Answers every read still waiting, as the player finally does.

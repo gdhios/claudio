@@ -40,6 +40,9 @@ final class ListeningSession: ObservableObject {
     /// The track as the player described it, `nil` until it has been read —
     /// and when it plays nothing.
     @Published var track: NowPlayingTrack?
+    /// The track's cover, when its player gave one: it arrives on its own,
+    /// after the card and whatever Claude is doing.
+    @Published var artwork: NSImage?
     /// Claude's notes, as they stream. Three sentences at most: published as
     /// they come, with no buffering to spare the layout.
     @Published var notes = ""

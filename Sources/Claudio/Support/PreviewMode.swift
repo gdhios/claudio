@@ -303,6 +303,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case "listening-streaming":
             session.track = sampleTrack(playing: false)
+            session.artwork = sampleArtwork
             session.notes = String(sampleNotes.prefix(sampleNotes.count * 2 / 3))
             session.phase = .streaming
         case "listening-nothing":
@@ -312,12 +313,27 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             session.phase = .missingKey
         default:  // "listening"
             session.track = sampleTrack(playing: true)
+            session.artwork = sampleArtwork
             session.notes = sampleNotes
             session.phase = .done
         }
         let panel = ResultPanel.make(session: session, textSize: textSize)
         self.panel = panel
         panel.present()
+    }
+
+    /// A cover drawn here rather than read anywhere: the same square on
+    /// every machine, the night-blue of the sample album.
+    private var sampleArtwork: NSImage {
+        let size = NSSize(width: 250, height: 250)
+        return NSImage(size: size, flipped: false) { rect in
+            NSGradient(colors: [NSColor(calibratedRed: 0.10, green: 0.14, blue: 0.36, alpha: 1),
+                                NSColor(calibratedRed: 0.72, green: 0.36, blue: 0.48, alpha: 1)])?
+                .draw(in: rect, angle: -60)
+            NSColor(calibratedWhite: 1, alpha: 0.85).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 70, dy: 70)).fill()
+            return true
+        }
     }
 
     /// A track whose metadata isn't in the Latin alphabet: the card shows it

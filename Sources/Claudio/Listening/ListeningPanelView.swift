@@ -126,7 +126,13 @@ struct ListeningPanelView: View {
     /// this Mac has Galette — from the moment the card is up.
     private func card(_ track: NowPlayingTrack) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            trackText(track)
+            HStack(alignment: .top, spacing: 12) {
+                if let artwork = session.artwork {
+                    cover(artwork)
+                }
+                trackText(track)
+            }
+            .animation(.easeOut(duration: 0.18), value: session.artwork == nil)
             if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
                                             onOpen: onOpenInGalette) {
                 buttons
@@ -136,6 +142,19 @@ struct ListeningPanelView: View {
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, session.phase == .reading ? 12 : 2)
+    }
+
+    /// The player's cover, the size of three lines of card: it arrives
+    /// after the text and slides in beside it.
+    private func cover(_ image: NSImage) -> some View {
+        Image(nsImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: textSize.points(52), height: textSize.points(52))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1))
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 
     /// The title, the artist, then where the track comes from — the album

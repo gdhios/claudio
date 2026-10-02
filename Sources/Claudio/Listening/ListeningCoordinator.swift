@@ -26,6 +26,7 @@ final class ListeningCoordinator {
     private let makePanel: PanelMaker
     private let durations: DictationCoordinator.MessageDurations
     private let galette: GaletteService
+    private let artwork: ArtworkSource
     /// The model the notes come from, asked at each trigger: a setting
     /// since the Models tab, a fixed value in a test.
     private let model: () -> ModelChoice
@@ -36,18 +37,23 @@ final class ListeningCoordinator {
     /// Reads the player, then streams the notes: cancelled by Esc, by the
     /// next trigger, and by a retry.
     private(set) var cycle: Task<Void, Never>?
+    /// Fetches the cover beside the cycle, never holding it up: cancelled
+    /// with it.
+    private var coverFetch: Task<Void, Never>?
 
     init(source: NowPlayingSource = .system,
          client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = ListeningCoordinator.systemPanel,
          durations: DictationCoordinator.MessageDurations = .standard,
          galette: GaletteService = .system,
+         artwork: ArtworkSource = .system,
          model: @escaping () -> ModelChoice = { AppSettings.listeningModel() }) {
         self.source = source
         self.client = client
         self.makePanel = panel
         self.durations = durations
         self.galette = galette
+        self.artwork = artwork
         self.model = model
     }
 
@@ -76,13 +82,29 @@ final class ListeningCoordinator {
         // Esc or another trigger while the player was answering: its answer
         // belongs to a panel that is gone.
         guard self.session === session, !Task.isCancelled else { return }
+        // A retry that finds another track drops the old cover; the same
+        // track keeps it rather than blink.
+        if session.track != track { session.artwork = nil }
         session.track = track
         guard let track else {
             session.phase = .nothing
             closeAfter(durations.empty, session: session)
             return
         }
+        fetchCover(of: track, for: session)
         await tell(about: track, session: session)
+    }
+
+    /// The cover goes its own way: the card is up, Claude is being asked,
+    /// and the image takes its place whenever it arrives — if this is still
+    /// the panel it was asked for.
+    private func fetchCover(of track: NowPlayingTrack, for session: ListeningSession) {
+        coverFetch?.cancel()
+        coverFetch = Task { [weak self, artwork] in
+            let image = await artwork.image(track)
+            guard let self, self.session === session, !Task.isCancelled else { return }
+            session.artwork = image
+        }
     }
 
     /// The card is up by now, and worth something without Claude: whatever
@@ -171,6 +193,8 @@ final class ListeningCoordinator {
     func dismiss() {
         cycle?.cancel()
         cycle = nil
+        coverFetch?.cancel()
+        coverFetch = nil
         panel?.orderOut(nil)
         panel = nil
         session = nil
