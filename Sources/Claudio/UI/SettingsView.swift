@@ -67,6 +67,10 @@ struct SettingsView: View {
     /// The tab, owned outside the view: whoever opens Settings a second time
     /// on another tab has to be obeyed by the window already on screen.
     @ObservedObject private var selection: SettingsSelection
+    /// The interface language, watched under the key `AppSettings.language`
+    /// keeps it in: General changes it with this window open, and the
+    /// sidebar and the pane have to say everything again in the new one.
+    @AppStorage("language") private var language: AppLanguage = .system
 
     init(selection: SettingsSelection) {
         _selection = ObservedObject(wrappedValue: selection)
@@ -85,16 +89,23 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            // Built again on every opening: the window is reused, and a pane
-            // that never left it would replay neither its `.onAppear` nor its
-            // `.task`, which is where it reads this Mac.
-            pane.id(selection.openings)
+            // Built again on every opening and in every language: the window
+            // is reused, and a pane that never left it would replay neither
+            // its `.onAppear` nor its `.task`, which is where it reads this
+            // Mac, and would keep the labels it was built with.
+            pane.id(PaneKey(opening: selection.openings, language: language))
         }
         .frame(minWidth: 700, minHeight: 500)
         // The Claude list is a day old at most: asked here, where it is
         // read, and nowhere on the way to an action. Asked again on every
         // opening, since the window outlives this view's first appearance.
         .task(id: selection.openings) { await ModelCatalog.shared.refreshIfStale() }
+    }
+
+    /// What a pane is built for: one opening of the window, in one language.
+    private struct PaneKey: Hashable {
+        let opening: Int
+        let language: AppLanguage
     }
 
     @ViewBuilder private var pane: some View {

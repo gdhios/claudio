@@ -28,18 +28,23 @@ final class SettingsWindowController {
     private func present(on section: SettingsSection?) {
         let onScreen = window?.isVisible == true
         selection.broughtUp(on: section, alreadyOnScreen: onScreen)
-        if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView(selection: selection))
-            let win = NSWindow(contentViewController: hosting)
-            win.title = loc("Réglages Claudio", en: "Claudio Settings")
-            win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-            win.setContentSize(NSSize(width: 740, height: 520))
-            win.setFrameAutosaveName("ClaudioSettings")
-            win.isReleasedWhenClosed = false
-            window = win
-        }
+        let win = window ?? makeWindow()
+        window = win
+        // Named on every opening: the language may have changed in General
+        // since the window was built.
+        win.title = loc("Réglages Claudio", en: "Claudio Settings")
         NSApp.activate(ignoringOtherApps: true)
-        if !onScreen { window?.center() }
-        window?.makeKeyAndOrderFront(nil)
+        if !onScreen { win.center() }
+        win.makeKeyAndOrderFront(nil)
+    }
+
+    private func makeWindow() -> NSWindow {
+        let hosting = NSHostingController(rootView: SettingsView(selection: selection))
+        let win = NSWindow(contentViewController: hosting)
+        win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        win.setContentSize(NSSize(width: 740, height: 520))
+        win.setFrameAutosaveName("ClaudioSettings")
+        win.isReleasedWhenClosed = false
+        return win
     }
 }
