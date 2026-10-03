@@ -12,17 +12,21 @@ enum DeezerLookup {
 
     /// Deezer's own query syntax: quoted fields, no boolean words.
     static func albumSearchURL(artist: String, album: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent("search/album"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [
+        url("search/album", [
             URLQueryItem(name: "q", value: "artist:\(quoted(artist)) album:\(quoted(TrackTitle.plain(album)))"),
             URLQueryItem(name: "limit", value: String(searchLimit)),
-        ]
-        return components.url!
+        ])
     }
 
     static func albumURL(id: Int) -> URL {
-        baseURL.appendingPathComponent("album/\(id)")
+        url("album/\(id)")
+    }
+
+    /// An address under `baseURL`, with its parameters when it has any.
+    private static func url(_ path: String, _ items: [URLQueryItem] = []) -> URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = items.isEmpty ? nil : items
+        return components.url!
     }
 
     /// Quotes inside a quoted field break the query: they go.
@@ -32,10 +36,6 @@ enum DeezerLookup {
 
     /// The first album credited to the artist asked for — a namesake's
     /// isn't this one — in the order Deezer ranks them.
-    static func parseAlbumSearch(_ json: String, artist: String) -> Int? {
-        parseAlbumSearch(Data(json.utf8), artist: artist)
-    }
-
     static func parseAlbumSearch(_ data: Data, artist: String) -> Int? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let albums = root["data"] as? [[String: Any]] else { return nil }
@@ -48,10 +48,6 @@ enum DeezerLookup {
 
     /// The album's record as the card's facts, in MusicBrainz's words so
     /// the card speaks one language, and marked as Deezer's.
-    static func parseAlbum(_ json: String) -> TrackFacts? {
-        parseAlbum(Data(json.utf8))
-    }
-
     static func parseAlbum(_ data: Data) -> TrackFacts? {
         guard let album = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               album["id"] is Int, let title = album["title"] as? String else { return nil }

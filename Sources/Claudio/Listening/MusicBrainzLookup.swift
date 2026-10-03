@@ -34,14 +34,10 @@ enum MusicBrainzLookup {
         if let artist, !artist.trimmingCharacters(in: .whitespaces).isEmpty {
             terms.append("artist:\(luceneQuoted(artist))")
         }
-        var components = URLComponents(url: baseURL.appendingPathComponent("recording"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [
+        return url("recording", [
             URLQueryItem(name: "query", value: terms.joined(separator: " AND ")),
             URLQueryItem(name: "limit", value: String(searchLimit)),
-            URLQueryItem(name: "fmt", value: "json"),
-        ]
-        return components.url!
+        ])
     }
 
     /// Quoted for Lucene: the backslash and the quote escaped, so the text
@@ -54,41 +50,35 @@ enum MusicBrainzLookup {
     }
 
     static func releaseGroupURL(id: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent("release-group/\(id)"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "fmt", value: "json")]
-        return components.url!
+        url("release-group/\(id)")
     }
 
     static func artistSearchURL(name: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent("artist"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [
+        url("artist", [
             URLQueryItem(name: "query", value: "artist:\(luceneQuoted(name))"),
             URLQueryItem(name: "limit", value: String(searchLimit)),
-            URLQueryItem(name: "fmt", value: "json"),
-        ]
-        return components.url!
+        ])
     }
 
     static func artistURL(id: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent("artist/\(id)"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "fmt", value: "json")]
-        return components.url!
+        url("artist/\(id)")
     }
 
     /// The artist's albums and EPs, a hundred at most: a browse, not a
     /// search, so it isn't held to the search index's cadence.
     static func releaseGroupsURL(artist id: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent("release-group"),
-                                       resolvingAgainstBaseURL: false)!
-        components.queryItems = [
+        url("release-group", [
             URLQueryItem(name: "artist", value: id),
             URLQueryItem(name: "type", value: "album|ep"),
             URLQueryItem(name: "limit", value: "100"),
-            URLQueryItem(name: "fmt", value: "json"),
-        ]
+        ])
+    }
+
+    /// A WS/2 address: the path under `baseURL`, its parameters, and the
+    /// JSON format asked for last.
+    private static func url(_ path: String, _ items: [URLQueryItem] = []) -> URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = items + [URLQueryItem(name: "fmt", value: "json")]
         return components.url!
     }
 
@@ -106,15 +96,9 @@ enum MusicBrainzLookup {
     /// answer: the one bearing the player's album title wins, then a plain
     /// album, then whatever comes first. The recording's own first release
     /// stands in for the release group's until that one is looked up.
-    static func parseSearch(_ json: String, playerAlbum: String?) -> TrackFacts? {
-        parseSearch(Data(json.utf8), playerAlbum: playerAlbum)
-    }
-
     static func parseSearch(_ data: Data, playerAlbum: String?) -> TrackFacts? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let recordings = root["recordings"] as? [[String: Any]],
-              let best = recordings.max(by: { ($0["score"] as? Int ?? 0) < ($1["score"] as? Int ?? 0) }),
-              (best["score"] as? Int ?? 0) >= minimumScore,
+              let best = Self.best(root["recordings"] as? [[String: Any]]),
               let id = best["id"] as? String
         else { return nil }
 
@@ -137,10 +121,6 @@ enum MusicBrainzLookup {
 
     /// The release group's own record replaces what the search guessed. An
     /// answer that doesn't read leaves the facts as they were.
-    static func parseReleaseGroup(_ json: String, into facts: TrackFacts) -> TrackFacts {
-        parseReleaseGroup(Data(json.utf8), into: facts)
-    }
-
     static func parseReleaseGroup(_ data: Data, into facts: TrackFacts) -> TrackFacts {
         guard let group = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = group["id"] as? String else { return facts }
@@ -157,24 +137,14 @@ enum MusicBrainzLookup {
 
     /// The best artist at `minimumScore` or more, with what the search
     /// already says of them; their releases come from the browse.
-    static func parseArtistSearch(_ json: String) -> ArtistFacts? {
-        parseArtistSearch(Data(json.utf8))
-    }
-
     static func parseArtistSearch(_ data: Data) -> ArtistFacts? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let artists = root["artists"] as? [[String: Any]],
-              let best = artists.max(by: { ($0["score"] as? Int ?? 0) < ($1["score"] as? Int ?? 0) }),
-              (best["score"] as? Int ?? 0) >= minimumScore
+              let best = Self.best(root["artists"] as? [[String: Any]])
         else { return nil }
         return artistFacts(from: best)
     }
 
     /// The artist's own record, when their id is already known.
-    static func parseArtist(_ json: String) -> ArtistFacts? {
-        parseArtist(Data(json.utf8))
-    }
-
     static func parseArtist(_ data: Data) -> ArtistFacts? {
         guard let artist = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         return artistFacts(from: artist)
@@ -196,10 +166,6 @@ enum MusicBrainzLookup {
     /// first release, the undated last, and the plain ones only — a live
     /// or a remix album isn't the discography. An answer that doesn't
     /// read leaves the facts as they were.
-    static func parseReleaseGroups(_ json: String, into facts: ArtistFacts) -> ArtistFacts {
-        parseReleaseGroups(Data(json.utf8), into: facts)
-    }
-
     static func parseReleaseGroups(_ data: Data, into facts: ArtistFacts) -> ArtistFacts {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let groups = root["release-groups"] as? [[String: Any]] else { return facts }
@@ -215,6 +181,14 @@ enum MusicBrainzLookup {
         }
         .sorted { ($0.firstReleaseDate ?? "9999") < ($1.firstReleaseDate ?? "9999") }
         return filled
+    }
+
+    /// The best-scored entry of a search, when it scores `minimumScore` or
+    /// more: under that the index is guessing.
+    private static func best(_ entries: [[String: Any]]?) -> [String: Any]? {
+        func score(_ entry: [String: Any]) -> Int { entry["score"] as? Int ?? 0 }
+        guard let best = entries?.max(by: { score($0) < score($1) }), score(best) >= minimumScore else { return nil }
+        return best
     }
 
     private static func nonEmpty(_ text: String?) -> String? {
