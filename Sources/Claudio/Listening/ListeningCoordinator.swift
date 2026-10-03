@@ -40,6 +40,8 @@ final class ListeningCoordinator {
     private let openLink: @MainActor (URL) -> Void
     /// Whether Claude Desktop is on this Mac, asked at each click.
     private let claudeDesktop: @MainActor () -> Bool
+    /// Brings the player forward, by bundle id: "Open Spotify".
+    private let activatePlayer: @MainActor (String) -> Void
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -68,7 +70,8 @@ final class ListeningCoordinator {
          model: @escaping () -> ModelChoice = { AppSettings.listeningModel() },
          essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() },
          openLink: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
-         claudeDesktop: @escaping @MainActor () -> Bool = ClaudeSearch.desktopInstalled) {
+         claudeDesktop: @escaping @MainActor () -> Bool = ClaudeSearch.desktopInstalled,
+         activatePlayer: @escaping @MainActor (String) -> Void = ListeningCoordinator.activateApp) {
         self.source = source
         self.client = client
         self.makePanel = panel
@@ -82,6 +85,7 @@ final class ListeningCoordinator {
         self.essayModel = essayModel
         self.openLink = openLink
         self.claudeDesktop = claudeDesktop
+        self.activatePlayer = activatePlayer
     }
 
     // MARK: - The cycle
@@ -309,6 +313,24 @@ final class ListeningCoordinator {
         dismiss()
     }
 
+    /// "Open Spotify": back to the player the track came from, where the
+    /// favourite button is if there is one (Guillaume, 2026-10-03). The
+    /// panel closes, the listener gone back to it.
+    func openPlayer() {
+        guard let session, let bundleID = session.track?.bundleID else { return }
+        activatePlayer(bundleID)
+        dismiss()
+    }
+
+    /// Brings an installed app forward by its bundle id; nothing happens
+    /// for an app this Mac doesn't have.
+    static func activateApp(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+    }
+
     /// The line under the card when the model sent nothing: which model,
     /// how the stream ended, what it carried. Enough to tell a refusal
     /// from a thinking-only answer from a cut connection.
@@ -407,7 +429,8 @@ final class ListeningCoordinator {
             onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) },
             onElaborate: { [weak coordinator] subject in coordinator?.elaborate(on: subject) },
             onBack: { [weak coordinator] in coordinator?.back() },
-            onSearch: { [weak coordinator] subject in coordinator?.search(subject) }
+            onSearch: { [weak coordinator] subject in coordinator?.search(subject) },
+            onOpenPlayer: { [weak coordinator] in coordinator?.openPlayer() }
         )
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
         panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }

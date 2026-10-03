@@ -17,6 +17,7 @@ struct ListeningPanelView: View {
     var onElaborate: (MusicSubject) -> Void = { _ in }
     var onBack: () -> Void = {}
     var onSearch: (MusicSubject) -> Void = { _ in }
+    var onOpenPlayer: () -> Void = {}
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var notesHeight: CGFloat = 0
@@ -377,6 +378,15 @@ struct ListeningPanelView: View {
                     .buttonStyle(PanelPillButtonStyle())
             case .reading, .nothing, .streaming, .done:
                 EmptyView()
+            }
+            // Back to the player the track came from, where its favourite
+            // button is: as soon as the card knows the app behind it. Not
+            // under the long text, whose footer is full already.
+            if session.essaySubject == nil, let player = session.track?.playerName {
+                Button(loc("Ouvrir \(player)", en: "Open \(player)"), action: onOpenPlayer)
+                    .buttonStyle(PanelPillButtonStyle())
+                    .help(loc("Ramène le lecteur au premier plan et ferme ce panneau",
+                              en: "Brings the player forward and closes this panel"))
             }
             // Always last, whatever the phase: it copies the card, and ⌘C
             // works as soon as the card is up.

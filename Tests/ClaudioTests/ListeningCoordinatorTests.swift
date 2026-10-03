@@ -284,6 +284,25 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.essay, Bench.notes)
     }
 
+    /// "Open Spotify": the player comes forward, and the panel closes, the
+    /// listener gone back to it. Without a player there is nothing to open.
+    func testOpenPlayerBringsThePlayerForwardThenClosesThePanel() async throws {
+        let bench = Bench()
+        bench.coordinator.trigger()
+        await bench.runs()
+
+        bench.coordinator.openPlayer()
+        XCTAssertEqual(bench.activated, ["com.spotify.client"])
+        XCTAssertNil(bench.coordinator.session)
+
+        let linked = Bench(track: NowPlayingTrack(title: "LOVE TRIP", artist: "間宮貴子", appName: "Galette"))
+        linked.coordinator.trigger()
+        await linked.runs()
+        linked.coordinator.openPlayer()
+        XCTAssertEqual(linked.activated, [])
+        XCTAssertNotNil(linked.coordinator.session)
+    }
+
     /// "Search in Claude" from the card: the browser opens on claude.ai
     /// with the subject, and the panel closes, its job done. After the
     /// long text, the artist's facts go along.
@@ -501,6 +520,8 @@ private final class Bench {
     private(set) var artistRequests: [MusicSubject] = []
     /// Every link handed to the browser.
     private(set) var opened: [URL] = []
+    /// Every player brought forward, by bundle id.
+    private(set) var activated: [String] = []
     private var waitingFacts: [CheckedContinuation<TrackFacts?, Never>] = []
     private var waitingArtists: [CheckedContinuation<ArtistFacts?, Never>] = []
 
@@ -584,7 +605,8 @@ private final class Bench {
             model: { model },
             essayModel: { essayModel },
             openLink: { [weak self] url in self?.opened.append(url) },
-            claudeDesktop: { claudeDesktop }
+            claudeDesktop: { claudeDesktop },
+            activatePlayer: { [weak self] bundleID in self?.activated.append(bundleID) }
         )
     }
 

@@ -61,6 +61,13 @@ struct NowPlayingTrack: Sendable, Equatable {
                   duration: fields["duration"] as? Double)
     }
 
+    /// The player's name for the button that brings it forward: only when
+    /// macOS gave the app behind the track. A card from a link has none.
+    var playerName: String? {
+        guard bundleID != nil else { return nil }
+        return appName
+    }
+
     /// What ⌘C copies: the track the way one would write it to someone.
     var copyLine: String {
         guard let artist else { return title }
