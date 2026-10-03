@@ -1196,7 +1196,7 @@ private final class Bench {
          readsWait: Bool = false,
          pausesMedia: Bool = true,
          enabled: Bool = true,
-         durations: DictationCoordinator.MessageDurations = .standard,
+         durations: PanelMessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          cleanupParks: Bool = false) {
         self.microphoneGranted = microphoneGranted

@@ -36,6 +36,10 @@ enum Constants {
     static let updateFeedURL = URL(string: "https://claudio.okonoma.com/version.json")!
     static let updateCheckInterval: TimeInterval = 24 * 3600
 
+    /// What a status menu row waits for the menu to close and the app in
+    /// front to get the focus back.
+    static let menuCloseDelay: Duration = .milliseconds(250)
+
     /// A panel closes this long after a copy, time to see "Copied".
     static let closeAfterCopyDelay: Duration = .milliseconds(900)
 

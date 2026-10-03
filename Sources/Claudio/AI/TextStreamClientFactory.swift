@@ -8,6 +8,10 @@ import Foundation
 /// way. `nil` means no client for this choice: the Claude key is missing, or
 /// the choice names no model at all.
 enum TextStreamClientFactory {
+    /// What a coordinator is handed in place of `make`, so a test can answer
+    /// with a fake client.
+    typealias Maker = @MainActor (ModelChoice) -> TextStreamClient?
+
     @MainActor
     static func make(for choice: ModelChoice) -> TextStreamClient? {
         switch choice {

@@ -382,7 +382,7 @@ private final class Bench {
          playing: Bool = true,
          readsWait: Bool = false,
          pausesMedia: Bool = true,
-         durations: DictationCoordinator.MessageDurations = .standard) {
+         durations: PanelMessageDurations = .standard) {
         self.microphoneGranted = microphoneGranted
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
         let engine = FakeInstructionEngine(events)
@@ -472,10 +472,10 @@ private final class Bench {
     }
 }
 
-private extension DictationCoordinator.MessageDurations {
+private extension PanelMessageDurations {
     /// Short enough for a test to watch a panel close itself without waiting
     /// four seconds for it.
-    static let brief = DictationCoordinator.MessageDurations(empty: .milliseconds(5),
+    static let brief = PanelMessageDurations(empty: .milliseconds(5),
                                                              failure: .milliseconds(5))
 }
 

@@ -34,15 +34,10 @@ enum WindowMover {
     /// Nil when the permission is missing — it is then asked for — when Claudio
     /// itself is in front, or when the window can't be read.
     private static func frontmostWindow() -> (window: AXUIElement, frame: CGRect, visible: CGRect)? {
-        guard AccessibilityPermission.isGranted else {
-            AccessibilityPermission.request()
-            AccessibilityPermission.showExplanation()
-            return nil
-        }
+        guard AccessibilityPermission.ensureGranted() else { return nil }
         // Skip Claudio's own windows: nothing to snap, and the frontmost app is
         // whoever was in front when the shortcut fired.
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              app.bundleIdentifier != Bundle.main.bundleIdentifier,
+        guard let app = PasteBack.frontmostApp(),
               let window = focusedWindow(of: app),
               let current = frame(of: window),
               let screen = screenContaining(current) ?? NSScreen.main else { return nil }

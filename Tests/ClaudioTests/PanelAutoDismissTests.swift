@@ -10,7 +10,7 @@ import XCTest
 @MainActor
 final class PanelAutoDismissTests: XCTestCase {
 
-    private let durations = DictationCoordinator.MessageDurations.standard
+    private let durations = PanelMessageDurations.standard
 
     /// The case the change exists for. Same duration as "Nothing heard":
     /// both are a glance, not a decision.

@@ -6,13 +6,11 @@ enum AccessibilityPermission {
     static var isGranted: Bool { AXIsProcessTrusted() }
 
     /// Triggers the system prompt (only once per signing identity).
-    @discardableResult
-    static func request() -> Bool {
-        if AXIsProcessTrusted() { return true }
+    private static func request() {
         // Literal value of kAXTrustedCheckOptionPrompt (the C global isn't
         // Sendable under strict Swift 6).
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        AXIsProcessTrustedWithOptions(options)
     }
 
     /// Granted, or asked for and explained. `false` means the cycle has to
@@ -24,7 +22,7 @@ enum AccessibilityPermission {
         return false
     }
 
-    static func showExplanation() {
+    private static func showExplanation() {
         let alert = NSAlert()
         alert.messageText = loc("Autorisation Accessibilité requise",
                                 en: "Accessibility permission needed")

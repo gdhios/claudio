@@ -1,18 +1,8 @@
 import AppKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private var statusItem: NSStatusItem?
-    private var statusMenu: NSMenu?
-    /// The "Recent ▸" entry and its submenu: hidden while history is empty,
-    /// repopulated on every open (recents change).
-    private var recentsItem: NSMenuItem?
-    private var recentsMenu: NSMenu?
-    /// "Recent dictations ▸", on the same terms: hidden while no dictation
-    /// was made, repopulated on every open.
-    private var recentDictationsItem: NSMenuItem?
-    private var recentDictationsMenu: NSMenu?
-    private let updateMenuItemTag = 777
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusMenu: StatusMenu?
     private let coordinator = CorrectionCoordinator()
     /// Dictation's own coordinator, on Apple's engine. Built here and kept
     /// for the life of the app: the hold shortcuts hold a weak reference to
@@ -31,8 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// notes in a panel of its own. Nothing is captured, so no Accessibility.
     private let listening = ListeningCoordinator()
     /// The free action's own microphone: its shortcut held speaks the
-    /// instruction instead of typing it. Its own engine, because a dictation
-    /// and an instruction are two microphones that never open together.
+    /// instruction instead of typing it. Its own engine, so a dictation
+    /// still listening never shares one with it.
     private lazy var spokenInstruction = SpokenInstructionCoordinator(
         engine: AppleSpeechEngine(),
         panel: .freeAction(coordinator)
@@ -84,8 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // palette's through `onOpen` above, before the new session exists:
         // the `onDismiss` that follows finds nothing of it to take away.
         coordinator.openWhatsPlaying = { [weak self] in self?.listening.trigger() }
-        setupMainMenu()
-        setupStatusItem()
+        NSApp.mainMenu = MainMenu.make()
+        statusMenu = StatusMenu(actions: statusMenuActions)
         HotkeySetup.install(coordinator: coordinator)
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
@@ -96,16 +86,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // folder is what opens the socket on a fresh launch.
         streamDeck.attach(correction: coordinator, dictation: dictation)
         wireStreamDeckSettings()
-        if AppSettings.streamDeckBridgeEnabled(
-            pluginInstalled: StreamDeckPluginLocator().isInstalled) {
-            streamDeck.start()
-        }
+        syncStreamDeckBridge()
         // Earlier builds muted the other apps with a tap that outlives a
         // crash, and every app with it: a launch gives the sound back.
         LeftoverMuteTaps.remove()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
-            self?.showUpdateMenuItem(feed)
+            self?.statusMenu?.showUpdate(feed)
         }
         UpdateChecker.shared.startPeriodicChecks()
 
@@ -176,293 +163,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func applyStreamDeckChoice(_ choice: Bool?) {
         let model = StreamDeckStatusModel.shared
         AppSettings.setStreamDeckBridgeChoice(choice)
+        model.pluginInstalled = syncStreamDeckBridge()
+    }
+
+    /// Opens or closes the socket as the setting and the plugin's presence
+    /// say, and reports whether the plugin is there.
+    @discardableResult
+    private func syncStreamDeckBridge() -> Bool {
         let installed = StreamDeckPluginLocator().isInstalled
-        model.pluginInstalled = installed
         if AppSettings.streamDeckBridgeEnabled(pluginInstalled: installed) {
             streamDeck.start()
         } else {
             streamDeck.stop()
         }
+        return installed
     }
 
-    /// Invisible main menu (app .accessory): without an Edit menu, macOS
-    /// doesn't route ⌘X/⌘C/⌘V/⌘A to text fields.
-    private func setupMainMenu() {
-        let mainMenu = NSMenu()
+    // MARK: - The status menu
 
-        let appItem = NSMenuItem()
-        let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        appItem.submenu = appMenu
-        mainMenu.addItem(appItem)
-
-        let editItem = NSMenuItem()
-        let editMenu = NSMenu(title: loc("Édition", en: "Edit"))
-        editMenu.addItem(NSMenuItem(title: loc("Annuler", en: "Undo"), action: Selector(("undo:")), keyEquivalent: "z"))
-        editMenu.addItem(NSMenuItem(title: loc("Rétablir", en: "Redo"), action: Selector(("redo:")), keyEquivalent: "Z"))
-        editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(title: loc("Couper", en: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
-        editMenu.addItem(NSMenuItem(title: loc("Copier", en: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
-        editMenu.addItem(NSMenuItem(title: loc("Coller", en: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(NSMenuItem(title: loc("Tout sélectionner", en: "Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
-        editItem.submenu = editMenu
-        mainMenu.addItem(editItem)
-
-        NSApp.mainMenu = mainMenu
-    }
-
-    private func setupStatusItem() {
-        // Claudio himself in the menu bar. Variable length: the bust is
-        // wider than it is tall, a square would squash it.
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = ClaudioMascot.menuBarImage()
-        item.button?.setAccessibilityLabel("Claudio")
-
-        let menu = NSMenu()
-
-        // At the top: the single entry point, which contains all the others.
-        let palette = NSMenuItem(title: PaletteCatalog.menuTitle,
-                                 action: #selector(paletteFromMenu), keyEquivalent: "")
-        palette.target = self
-        menu.addItem(palette)
-        menu.addItem(.separator())
-
-        for action in ClaudioAction.allCases {
-            let item = NSMenuItem(title: action.menuTitle, action: #selector(actionFromMenu(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = action.rawValue
-            menu.addItem(item)
-        }
-
-        let free = NSMenuItem(title: ClaudioRequest.freeMenuTitle,
-                              action: #selector(freeActionFromMenu), keyEquivalent: "")
-        free.target = self
-        menu.addItem(free)
-
-        // Not a transformation of the selection: it reads what plays, and
-        // Claude says a few words about it.
-        let whatsPlaying = NSMenuItem(title: ListeningSession.menuTitle,
-                                      action: #selector(whatsPlayingFromMenu), keyEquivalent: "")
-        whatsPlaying.target = self
-        menu.addItem(whatsPlaying)
-
-        // No dictation entry: this menu lists titles without their
-        // shortcuts, and dictation is a key held down — a click could only
-        // ever open the microphone without a way to close it. Its shortcuts
-        // and its history live in Settings ▸ Dictation.
-
-        // The custom instructions already launched, to relaunch with one
-        // gesture on the current selection. Its content is rebuilt on open.
-        let recentsMenu = NSMenu()
-        recentsMenu.autoenablesItems = false
-        recentsMenu.delegate = self
-        let recentsItem = NSMenuItem(title: loc("Récentes", en: "Recent"),
-                                     action: nil, keyEquivalent: "")
-        recentsItem.submenu = recentsMenu
-        menu.addItem(recentsItem)
-        self.recentsMenu = recentsMenu
-        self.recentsItem = recentsItem
-
-        // The last few dictations, to paste one again at the cursor when its
-        // first paste landed in the wrong place: a way back to a text, not a
-        // way to dictate. Also rebuilt on open.
-        let dictationsMenu = NSMenu()
-        dictationsMenu.autoenablesItems = false
-        dictationsMenu.delegate = self
-        let dictationsItem = NSMenuItem(title: RecentDictationsMenu.menuTitle,
-                                        action: nil, keyEquivalent: "")
-        dictationsItem.submenu = dictationsMenu
-        menu.addItem(dictationsItem)
-        self.recentDictationsMenu = dictationsMenu
-        self.recentDictationsItem = dictationsItem
-
-        menu.addItem(.separator())
-
-        let settings = NSMenuItem(title: loc("Réglages…", en: "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        menu.delegate = self
-        item.menu = menu
-        statusItem = item
-        statusMenu = menu
-    }
-
-    // MARK: - History ("Recent")
-
-    /// When the main menu opens, "Recent ▸" and "Recent dictations ▸" only
-    /// appear if there's something in them. When a submenu itself opens,
-    /// it's repopulated: its history may have changed since last time.
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        if menu === statusMenu {
-            recentsItem?.isHidden = TransformHistory.shared.recents.entries.isEmpty
-            recentDictationsItem?.isHidden = DictationHistory.shared.recents.entries.isEmpty
-        } else if menu === recentsMenu {
-            rebuildRecentsMenu(menu)
-        } else if menu === recentDictationsMenu {
-            rebuildRecentDictationsMenu(menu)
-        }
-    }
-
-    private func rebuildRecentsMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-        for entry in TransformHistory.shared.recents.entries {
-            let item = NSMenuItem(title: AppDelegate.recentTitle(entry.instruction),
-                                  action: #selector(recentFromMenu(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = entry.instruction
-            item.toolTip = entry.instruction  // the truncated label, in full on hover
-            menu.addItem(item)
-        }
-        guard !menu.items.isEmpty else { return }
-        menu.addItem(.separator())
-        let clear = NSMenuItem(title: loc("Vider l'historique", en: "Clear history"),
-                               action: #selector(clearRecents), keyEquivalent: "")
-        clear.target = self
-        menu.addItem(clear)
-    }
-
-    /// The instruction for a menu row: on a single line, truncated so it
-    /// doesn't stretch the menu.
-    private static func recentTitle(_ instruction: String) -> String {
-        let flat = instruction.replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespaces)
-        let limit = 48
-        guard flat.count > limit else { return flat }
-        return String(flat.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…"
-    }
-
-    @objc private func recentFromMenu(_ sender: NSMenuItem) {
-        guard let instruction = sender.representedObject as? String else { return }
-        afterMenuCloses { $0.triggerRecent(instruction: instruction) }
-    }
-
-    @objc private func clearRecents() {
-        TransformHistory.shared.clear()
-    }
-
-    // MARK: - Dictations ("Recent dictations")
-
-    /// Which dictations and under which titles is `RecentDictationsMenu`'s
-    /// call; this only makes the rows. No "Clear" here: Settings has it.
-    private func rebuildRecentDictationsMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-        for row in RecentDictationsMenu(DictationHistory.shared.recents).items {
-            let item = NSMenuItem(title: row.title,
-                                  action: #selector(recentDictationFromMenu(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = row.text
-            item.toolTip = row.text  // the truncated title, in full on hover
-            menu.addItem(item)
-        }
+    private var statusMenuActions: StatusMenuActions {
+        StatusMenuActions(
+            palette: { [weak self] in self?.coordinator.triggerPalette() },
+            action: { [weak self] action in self?.coordinator.trigger(action: action) },
+            freeAction: { [weak self] in self?.coordinator.triggerFreeAction() },
+            whatsPlaying: { [weak self] in self?.listening.trigger() },
+            recent: { [weak self] instruction in self?.coordinator.triggerRecent(instruction: instruction) },
+            recentDictation: { [weak self] text in self?.pasteAgain(text) },
+            openSettings: { [weak self] in self?.settingsController.show() }
+        )
     }
 
     /// Pastes the dictation again at the cursor of the app in front, or
     /// copies it when that app is Claudio. Any panel still on screen has the
     /// keyboard, so they all close before the keystroke.
-    @objc private func recentDictationFromMenu(_ sender: NSMenuItem) {
-        guard let text = sender.representedObject as? String else { return }
+    private func pasteAgain(_ text: String) {
         let paster = RecentDictationPaster(closePanels: { [weak self] in
             self?.coordinator.dismiss()
             self?.dictation.dismiss()
             self?.listening.dismiss()
         })
         Task { await paster.paste(text) }
-    }
-
-    private func updateMenuTitle(_ feed: UpdateChecker.Feed) -> String {
-        loc("Mise à jour \(feed.version) disponible…", en: "Update \(feed.version) available…")
-    }
-
-    /// "Update X available…" item at the top of the status menu.
-    private func showUpdateMenuItem(_ feed: UpdateChecker.Feed) {
-        guard let menu = statusMenu else { return }
-        if let existing = menu.item(withTag: updateMenuItemTag) {
-            existing.title = updateMenuTitle(feed)
-            existing.representedObject = feed.url
-            return
-        }
-        let item = NSMenuItem(title: updateMenuTitle(feed),
-                              action: #selector(installUpdate(_:)), keyEquivalent: "")
-        item.target = self
-        item.tag = updateMenuItemTag
-        item.representedObject = feed.url
-        menu.insertItem(item, at: 0)
-        menu.insertItem(.separator(), at: 1)
-    }
-
-    /// Installs the update in place of the app then relaunches, after
-    /// explicit consent: replacing the installed app isn't trivial.
-    @objc private func installUpdate(_ sender: NSMenuItem) {
-        guard let feed = UpdateChecker.shared.availableUpdate else { return }
-
-        let confirm = NSAlert()
-        confirm.messageText = loc("Installer Claudio \(feed.version) ?", en: "Install Claudio \(feed.version)?")
-        confirm.informativeText = loc("Claudio télécharge la nouvelle version, remplace l'app installée, puis redémarre.",
-                                      en: "Claudio downloads the new version, replaces the installed app, then restarts.")
-        confirm.addButton(withTitle: loc("Installer et redémarrer", en: "Install and restart"))
-        confirm.addButton(withTitle: loc("Annuler", en: "Cancel"))
-        NSApp.activate(ignoringOtherApps: true)
-        guard confirm.runModal() == .alertFirstButtonReturn else { return }
-
-        let title = sender.title
-        sender.title = loc("Téléchargement de la mise à jour…", en: "Downloading the update…")
-        sender.isEnabled = false
-        Task { @MainActor in
-            do {
-                let newApp = try await UpdateInstaller.prepare(from: feed.url)
-                try UpdateInstaller.installAndRelaunch(newApp)
-            } catch {
-                sender.title = title
-                sender.isEnabled = true
-                let failed = NSAlert()
-                failed.messageText = loc("Mise à jour impossible", en: "Update failed")
-                failed.informativeText = error.localizedDescription
-                failed.addButton(withTitle: "OK")
-                failed.addButton(withTitle: loc("Télécharger dans le navigateur", en: "Download in the browser"))
-                NSApp.activate(ignoringOtherApps: true)
-                if failed.runModal() == .alertSecondButtonReturn {
-                    NSWorkspace.shared.open(feed.url)
-                }
-            }
-        }
-    }
-
-    @objc private func actionFromMenu(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let action = ClaudioAction(rawValue: raw) else { return }
-        afterMenuCloses { $0.trigger(action: action) }
-    }
-
-    @objc private func freeActionFromMenu() {
-        afterMenuCloses { $0.triggerFreeAction() }
-    }
-
-    @objc private func paletteFromMenu() {
-        afterMenuCloses { $0.triggerPalette() }
-    }
-
-    /// Nothing to capture here, but the same beat all the same: the panel
-    /// takes the keyboard once the menu is gone and the app in front is
-    /// back, exactly as it does from the shortcut.
-    @objc private func whatsPlayingFromMenu() {
-        afterMenuCloses { [weak self] _ in self?.listening.trigger() }
-    }
-
-    /// Lets the menu close and the previous app regain focus before
-    /// triggering: the selection capture targets the source app, not Claudio.
-    private func afterMenuCloses(_ trigger: @escaping @MainActor (CorrectionCoordinator) -> Void) {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            guard let self else { return }
-            trigger(self.coordinator)
-        }
-    }
-
-    @objc private func openSettings() {
-        settingsController.show()
     }
 }

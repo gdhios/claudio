@@ -65,7 +65,7 @@ final class SpokenInstructionCoordinator {
     private let microphone: MicrophoneGate
     private let pauser: MediaPauser
     private let pausesMedia: @MainActor () -> Bool
-    private let durations: DictationCoordinator.MessageDurations
+    private let durations: PanelMessageDurations
     private let now: @MainActor () -> Date
 
     private var press = Press.none
@@ -93,7 +93,7 @@ final class SpokenInstructionCoordinator {
          microphone: MicrophoneGate = .system,
          pauser: MediaPauser = MediaPauser(),
          pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
-         durations: DictationCoordinator.MessageDurations = .standard,
+         durations: PanelMessageDurations = .standard,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine
         self.panel = panel

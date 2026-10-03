@@ -22,9 +22,9 @@ final class ListeningCoordinator {
     var onOpen: (() -> Void)?
 
     private let source: NowPlayingSource
-    private let client: DictationCoordinator.ClientFactory
+    private let client: TextStreamClientFactory.Maker
     private let makePanel: PanelMaker
-    private let durations: DictationCoordinator.MessageDurations
+    private let durations: PanelMessageDurations
     private let galette: GaletteService
     private let artwork: ArtworkSource
     private let facts: FactsSource
@@ -59,9 +59,9 @@ final class ListeningCoordinator {
     private var archiveAsked = false
 
     init(source: NowPlayingSource = .system,
-         client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
+         client: @escaping TextStreamClientFactory.Maker = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = ListeningCoordinator.systemPanel,
-         durations: DictationCoordinator.MessageDurations = .standard,
+         durations: PanelMessageDurations = .standard,
          galette: GaletteService = .system,
          artwork: ArtworkSource = .system,
          facts: FactsSource = .system,

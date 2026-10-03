@@ -21,7 +21,7 @@ struct RecentDictationPaster {
     var announce: @MainActor (RecentDictationOutcome) -> Void = { ClipboardToast.shared.show($0) }
     /// Time for the menu to finish closing before the keystroke, as the
     /// menu's other entries wait before they act.
-    var menuClosing: Duration = .milliseconds(250)
+    var menuClosing: Duration = Constants.menuCloseDelay
 
     func paste(_ text: String) async {
         // Read first. Claudio is an accessory app, and opening its menu

@@ -21,23 +21,6 @@ final class DictationCoordinator {
     /// as Claudio runs.
     nonisolated static let longestLockedDictation: Duration = .seconds(5 * 60)
 
-    /// How long a panel that has nothing left to do but speak stays on
-    /// screen. Injected so a test can watch one close itself without waiting
-    /// four seconds for it.
-    struct MessageDurations: Sendable {
-        /// "Nothing heard": a glance is enough.
-        var empty: Duration = .milliseconds(1500)
-        /// A failure: long enough to read a sentence and reach the button it
-        /// may carry, short enough that the panel doesn't outlive the
-        /// dictation. Esc and the next press still cut it short.
-        var failure: Duration = .seconds(4)
-
-        static let standard = MessageDurations()
-    }
-
-    /// Builds the client that answers for a model, `nil` when none can: the
-    /// Claude key is missing, or the choice names no model at all.
-    typealias ClientFactory = @MainActor (ModelChoice) -> TextStreamClient?
     /// Puts the session on screen and hands back the panel to keep. `nil`
     /// when there is no screen to put it on.
     typealias PanelMaker = @MainActor (DictationSession, DictationCoordinator) -> ResultPanel?
@@ -45,7 +28,7 @@ final class DictationCoordinator {
     private let engine: SpeechEngine
     private let model: @MainActor () -> ModelChoice
     private let vocabulary: @MainActor () -> DictationVocabulary
-    private let client: ClientFactory
+    private let client: TextStreamClientFactory.Maker
     private let pasting: PasteService
     private let microphone: MicrophoneGate
     private let makePanel: PanelMaker
@@ -54,7 +37,7 @@ final class DictationCoordinator {
     private let pausesMedia: @MainActor () -> Bool
     /// Whether dictation is switched on at all.
     private let isEnabled: @MainActor () -> Bool
-    private let durations: MessageDurations
+    private let durations: PanelMessageDurations
     /// `longestLockedDictation`, unless a test can't wait five minutes.
     private let lockedLimit: Duration
     private let now: @MainActor () -> Date
@@ -104,7 +87,7 @@ final class DictationCoordinator {
          vocabulary: @escaping @MainActor () -> DictationVocabulary = {
              DictationVocabulary(parsing: AppSettings.dictationVocabulary)
          },
-         client: @escaping ClientFactory = TextStreamClientFactory.make(for:),
+         client: @escaping TextStreamClientFactory.Maker = TextStreamClientFactory.make(for:),
          pasting: PasteService = .system,
          microphone: MicrophoneGate = .system,
          panel: @escaping PanelMaker = DictationCoordinator.systemPanel,
@@ -112,7 +95,7 @@ final class DictationCoordinator {
          pauser: MediaPauser = MediaPauser(),
          pausesMedia: @escaping @MainActor () -> Bool = { AppSettings.dictationPausesMedia },
          isEnabled: @escaping @MainActor () -> Bool = { AppSettings.dictationEnabled() },
-         durations: MessageDurations = .standard,
+         durations: PanelMessageDurations = .standard,
          lockedLimit: Duration = DictationCoordinator.longestLockedDictation,
          now: @escaping @MainActor () -> Date = Date.init) {
         self.engine = engine

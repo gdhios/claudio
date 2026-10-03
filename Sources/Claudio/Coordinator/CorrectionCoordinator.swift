@@ -56,20 +56,20 @@ final class CorrectionCoordinator {
     private var target: PasteTarget?
     /// How long a panel that has nothing left to say stays up. Injected so a
     /// test can watch one close itself without waiting a second and a half.
-    private let durations: DictationCoordinator.MessageDurations
+    private let durations: PanelMessageDurations
     private let pasting: PasteService
     private let captureSelection: @MainActor () async -> String?
     private let source: NowPlayingSource
-    private let makeClient: DictationCoordinator.ClientFactory
+    private let makeClient: TextStreamClientFactory.Maker
     private let makePanel: PanelMaker
     private let galette: GaletteService
     private let history: TransformHistory
 
-    init(durations: DictationCoordinator.MessageDurations = .standard,
+    init(durations: PanelMessageDurations = .standard,
          pasting: PasteService = .system,
          selection: @escaping @MainActor () async -> String? = SelectionCapture.capture,
          source: NowPlayingSource = .system,
-         client: @escaping DictationCoordinator.ClientFactory = TextStreamClientFactory.make(for:),
+         client: @escaping TextStreamClientFactory.Maker = TextStreamClientFactory.make(for:),
          panel: @escaping PanelMaker = CorrectionCoordinator.systemPanel,
          galette: GaletteService = .system,
          history: TransformHistory = .shared) {
