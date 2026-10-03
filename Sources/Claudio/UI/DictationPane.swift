@@ -64,8 +64,7 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Maintiens le raccourci de dictée et parle : au relâchement, le texte se colle là où était le curseur. Tapé une fois, il écoute jusqu'au prochain appui. Le second raccourci écoute dans l'autre langue. Les deux se règlent dans l'onglet Raccourcis. La langue n'est jamais devinée, et son modèle doit être installé sur le Mac (Réglages Système → Clavier → Dictée).",
                      en: "Hold the dictation shortcut and speak: on release, the text lands where the cursor was. Tapped once, it listens until the next press. The second shortcut listens in the other language. Both are set in the Shortcuts tab. The language is never guessed, and its model has to be installed on this Mac (System Settings → Keyboard → Dictation)."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -100,8 +99,7 @@ struct DictationPane: View {
                        en: "No effect while the cleanup model is “Raw”: the dictation is pasted exactly as it was heard.")
                  : loc("Chaque raccourci décide de ce que sa dictée devient : mise au propre, traduite en anglais, ou tournée en prompt — en un seul appel au modèle.",
                        en: "Each shortcut decides what its dictation becomes: cleaned up, translated to English, or turned into a prompt — in a single model call."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -130,8 +128,7 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Un nom ou terme par ligne ; « entendu → écrit » corrige ce que la dictée écrit de travers.",
                      en: "One name or term per line; “heard → written” fixes what dictation spells wrong."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -147,8 +144,7 @@ struct DictationPane: View {
         } footer: {
             Text(loc("La musique reprend dès que Claudio a fini d'écouter ; ce qui était déjà en pause y reste.",
                      en: "Music resumes as soon as Claudio stops listening; anything already paused stays paused."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -161,8 +157,7 @@ struct DictationPane: View {
                 .onChange(of: model) { ModelSlot.dictation.set(model) }
 
             Text("\(model.costHint). \(model == .raw ? loc("La transcription est collée telle qu'elle a été entendue : sans ponctuation, avec les hésitations.", en: "The transcript is pasted exactly as it was heard: no punctuation, hesitations and all.") : loc("Le modèle ponctue la transcription et retire les hésitations, sans jamais reformuler. S'il échoue, le brut est collé quand même.", en: "The model punctuates the transcript and drops the hesitations, never rephrasing. If it fails, the raw text is pasted anyway."))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
 
             if localModels.isEmpty {
                 NoLocalModelHint()
@@ -182,27 +177,13 @@ struct DictationPane: View {
                     // follows the app's updates.
                     AppSettings.dictationSystemPrompt = isCustomized ? promptText : nil
                 }
-            HStack {
-                if isCustomized {
-                    Label(loc("Personnalisé", en: "Customised"), systemImage: "pencil")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                } else {
-                    Label(loc("Prompt par défaut", en: "Default prompt"), systemImage: "checkmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(loc("Réinitialiser", en: "Reset")) {
-                    AppSettings.dictationSystemPrompt = nil
-                    promptText = DictationCleanup.defaultSystemPrompt
-                }
-                .disabled(!isCustomized)
+            PromptStatusRow(isCustomized: isCustomized) {
+                AppSettings.dictationSystemPrompt = nil
+                promptText = DictationCleanup.defaultSystemPrompt
             }
             Text(loc("Envoyé au modèle avec la transcription. Sans effet si le modèle est « Brut ».",
                      en: "Sent to the model along with the transcript. Has no effect when the model is “Raw”."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -212,8 +193,7 @@ struct DictationPane: View {
         Section {
             if entries.isEmpty {
                 Text(loc("Aucune dictée pour l'instant.", en: "No dictation yet."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             } else {
                 ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                     row(entry)
@@ -234,8 +214,7 @@ struct DictationPane: View {
         } footer: {
             Text(loc("Les 50 dernières dictées, sur ce Mac seulement : le texte entendu et sa version nettoyée, jamais l'audio.",
                      en: "The last 50 dictations, on this Mac only: the text heard and its cleaned-up version, never the audio."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 
@@ -248,8 +227,7 @@ struct DictationPane: View {
                 Text(languageName(entry.language))
                 Spacer()
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .settingsNote()
 
             Text(entry.pastedText)
                 .font(.callout)

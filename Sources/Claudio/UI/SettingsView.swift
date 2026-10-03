@@ -164,8 +164,7 @@ private struct GeneralPane: View {
                 .onChange(of: language) { AppSettings.language = language }
                 Text(loc("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné, ou dans celle de ta demande quand rien n'est sélectionné.",
                          en: "Applies to Claudio's own labels. What Claude sends back always follows the language of the selected text, or of your request when nothing is selected."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Panneau", en: "Panel")) {
@@ -180,8 +179,7 @@ private struct GeneralPane: View {
                     .foregroundStyle(.secondary)
                 Text(loc("S'applique au texte du panneau flottant : le résultat, la consigne et les actions de la palette. Le panneau s'élargit avec le texte, et le changement vaut pour le panneau suivant.",
                          en: "Applies to the floating panel: the result, the instruction field and the palette actions. The panel widens with the text, and the change takes effect on the next panel."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Modèle", en: "Model")) {
@@ -189,8 +187,7 @@ private struct GeneralPane: View {
                                value: loc("réglable par raccourci", en: "set per shortcut"))
                 Text(loc("Le modèle se choisit pour chaque raccourci dans l'onglet Modèles : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
                          en: "The model is chosen per shortcut in the Models tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Dépense", en: "Spending")) {
@@ -210,13 +207,11 @@ private struct GeneralPane: View {
                 }
                 Text(loc("Le total est calculé sur ta machine à partir des jetons facturés par appel, et repart à zéro chaque jour. Le décompte qui fait foi reste celui de console.anthropic.com.",
                          en: "The total is computed on your Mac from the tokens billed per call, and starts over every day. The count that matters is still the one on console.anthropic.com."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
                 if costCounterEnabled, ledger.day.unpricedActions > 0 {
                     Text(loc("* \(ledger.day.unpricedActions) appel\(ledger.day.unpricedActions > 1 ? "s" : "") à un modèle dont cette version de Claudio ne connaît pas le tarif : compté\(ledger.day.unpricedActions > 1 ? "s" : "") pour zéro, le total est un plancher.",
                              en: "* \(ledger.day.unpricedActions) call\(ledger.day.unpricedActions > 1 ? "s" : "") to a model whose price this version of Claudio doesn't know, counted as zero: the total is a floor."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .settingsNote()
                 }
             }
         }
@@ -274,8 +269,7 @@ private struct APIKeyPane: View {
                     }
                 Text(loc("Requis uniquement si ta clé est « liée à l'identité » (erreur 400 sinon). Console → Réglages → Workspaces → copier l'ID de l'espace.",
                          en: "Only needed if your key is “identity-bound” (otherwise you get a 400). Console → Settings → Workspaces → copy the workspace ID."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
         }
         .formStyle(.grouped)
@@ -313,24 +307,21 @@ private struct OllamaPane: View {
                 }
                 Text(loc("Ollama tourne sur ta machine, ou sur un autre Mac du réseau local. Rien n'est envoyé ailleurs qu'à cette adresse, et un appel local ne coûte rien. Sans authentification : Ollama n'en propose pas.",
                          en: "Ollama runs on this Mac, or on another Mac on your local network. Nothing is sent anywhere but this address, and a local call costs nothing. No authentication: Ollama doesn't offer any."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Modèles détectés", en: "Models found")) {
                 if models.isEmpty {
                     Text(loc("Aucun modèle détecté. Teste la connexion, et tire un modèle avec « ollama pull qwen2.5:14b ».",
                              en: "No model found. Test the connection, then pull one with “ollama pull qwen2.5:14b”."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .settingsNote()
                 } else {
                     ForEach(models, id: \.self) { model in
                         Text(model).monospaced()
                     }
                     Text(loc("Ces modèles se choisissent action par action dans l'onglet Prompts.",
                              en: "Pick one of these per action in the Prompts tab."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .settingsNote()
                 }
             }
         }
@@ -415,35 +406,24 @@ private struct ShortcutsPane: View {
         Form {
             Section {
                 // At the top: the palette, which gives access to everything else.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: PaletteCatalog.symbolName,
-                              color: PaletteCatalog.tint, size: 22)
-                    Text(PaletteCatalog.menuTitle)
-                    Spacer()
+                ShortcutRow(symbol: PaletteCatalog.symbolName, tint: PaletteCatalog.tint,
+                            title: PaletteCatalog.menuTitle) {
                     KeyboardShortcuts.Recorder("", name: .actionPalette)
                 }
                 ForEach(ClaudioAction.allCases, id: \.self) { action in
-                    HStack(spacing: 10) {
-                        IconBadge(systemName: action.symbolName, color: action.tint, size: 22)
-                        Text(action.menuTitle)
-                        Spacer()
+                    ShortcutRow(symbol: action.symbolName, tint: action.tint, title: action.menuTitle) {
                         KeyboardShortcuts.Recorder("", name: action.shortcutName)
                     }
                 }
                 // Outside the catalog: its instruction is entered in the panel.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: ClaudioRequest.awaitingInstruction.origin.symbolName,
-                              color: ClaudioRequest.awaitingInstruction.origin.tint, size: 22)
-                    Text(ClaudioRequest.freeMenuTitle)
-                    Spacer()
+                ShortcutRow(symbol: ClaudioRequest.awaitingInstruction.origin.symbolName,
+                            tint: ClaudioRequest.awaitingInstruction.origin.tint,
+                            title: ClaudioRequest.freeMenuTitle) {
                     KeyboardShortcuts.Recorder("", name: .freeAction)
                 }
                 // Outside the catalog too, and needs no selection at all.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: ListeningSession.symbolName,
-                              color: ListeningSession.tint, size: 22)
-                    Text(ListeningSession.menuTitle)
-                    Spacer()
+                ShortcutRow(symbol: ListeningSession.symbolName, tint: ListeningSession.tint,
+                            title: ListeningSession.menuTitle) {
                     KeyboardShortcuts.Recorder("", name: .whatsPlaying)
                 }
             } header: {
@@ -451,8 +431,7 @@ private struct ShortcutsPane: View {
             } footer: {
                 Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire. Sans sélection, elle devient une demande à Claudio, et Entrée colle sa réponse au curseur. Avec ou sans sélection, elle emporte le morceau en cours s'il y en a un, même en pause ; les autres actions, jamais. « Qu'est-ce que j'écoute ? » se passe aussi de sélection : Claudio lit le morceau en cours et Claude te le présente.",
                          en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it. With nothing selected, it becomes a request to Claudio, and Enter pastes the answer at the cursor. Selection or not, it takes the current track along if there is one, even paused; the other actions never do. “What's playing?” needs no selection either: Claudio reads the track playing and Claude tells you about it."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section {
@@ -461,21 +440,16 @@ private struct ShortcutsPane: View {
                     .onChange(of: dictationEnabled) {
                         HotkeySetup.setDictationEnabled(dictationEnabled)
                     }
-                HStack(spacing: 10) {
-                    IconBadge(systemName: SettingsSection.dictation.symbolName,
-                              color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter", en: "Dictate"))
-                    Spacer()
+                ShortcutRow(symbol: SettingsSection.dictation.symbolName,
+                            tint: SettingsSection.dictation.color,
+                            title: loc("Dicter", en: "Dictate")) {
                     // A key combination, or a right-hand modifier held alone.
                     DictationShortcutField(shortcut: .dictate)
                 }
                 .id(Self.dictationRows)
                 .disabled(!dictationEnabled)
-                HStack(spacing: 10) {
-                    IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter dans l'autre langue",
-                             en: "Dictate in the other language"))
-                    Spacer()
+                ShortcutRow(symbol: "globe", tint: SettingsSection.dictation.color,
+                            title: loc("Dicter dans l'autre langue", en: "Dictate in the other language")) {
                     DictationShortcutField(shortcut: .dictateOtherLanguage)
                 }
                 .disabled(!dictationEnabled)
@@ -484,8 +458,7 @@ private struct ShortcutsPane: View {
             } footer: {
                 Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée. Décochée, la dictée rend les deux touches à tes autres outils.",
                          en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab. Switched off, dictation releases both keys and leaves them to your other tools."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section {
@@ -495,19 +468,13 @@ private struct ShortcutsPane: View {
                         HotkeySetup.setWindowShortcutsEnabled(windowShortcutsEnabled)
                     }
                 ForEach(WindowLayout.allCases, id: \.self) { layout in
-                    HStack(spacing: 10) {
-                        IconBadge(systemName: layout.symbolName, color: .indigo, size: 22)
-                        Text(layout.title)
-                        Spacer()
+                    ShortcutRow(symbol: layout.symbolName, tint: .indigo, title: layout.title) {
                         KeyboardShortcuts.Recorder("", name: layout.shortcutName)
                     }
                     .disabled(!windowShortcutsEnabled)
                 }
                 // Not a layout: this one keeps the placement and changes display.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: "display.2", color: .indigo, size: 22)
-                    Text(loc("Écran suivant", en: "Next display"))
-                    Spacer()
+                ShortcutRow(symbol: "display.2", tint: .indigo, title: loc("Écran suivant", en: "Next display")) {
                     KeyboardShortcuts.Recorder("", name: .windowNextScreen)
                 }
                 .disabled(!windowShortcutsEnabled)
@@ -516,11 +483,27 @@ private struct ShortcutsPane: View {
             } footer: {
                 Text(loc("Cale la fenêtre du premier plan sur ⌃⌥⌘ : flèches pour les moitiés, ↩ pour maximiser, 7/9/1/3 pour les coins, 5 pour centrer et ⇟ pour l'envoyer sur l'écran suivant en gardant sa place. Si un autre outil (Raycast, Rectangle…) tient déjà ces touches, coupe-le sur celles-ci ou change les raccourcis ici.",
                          en: "Snaps the frontmost window on ⌃⌥⌘: arrows for halves, ↩ to maximize, 7/9/1/3 for the corners, 5 to center and ⇟ to send it to the next display, keeping its placement. If another tool (Raycast, Rectangle…) already owns these keys, disable it on them or change the shortcuts here."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// A shortcut's row: its icon, its name, and the field that records it.
+private struct ShortcutRow<Field: View>: View {
+    let symbol: String
+    let tint: Color
+    let title: String
+    @ViewBuilder let field: Field
+
+    var body: some View {
+        HStack(spacing: 10) {
+            IconBadge(systemName: symbol, color: tint, size: 22)
+            Text(title)
+            Spacer()
+            field
+        }
     }
 }
 
@@ -570,27 +553,13 @@ private struct PromptsPane: View {
                         AppSettings.setCustomSystemPrompt(isCustomized ? promptText : nil,
                                                           for: selectedAction)
                     }
-                HStack {
-                    if isCustomized {
-                        Label(loc("Personnalisé", en: "Customised"), systemImage: "pencil")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    } else {
-                        Label(loc("Prompt par défaut", en: "Default prompt"), systemImage: "checkmark.circle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(loc("Réinitialiser", en: "Reset")) {
-                        AppSettings.setCustomSystemPrompt(nil, for: selectedAction)
-                        promptText = selectedAction.defaultSystem
-                    }
-                    .disabled(!isCustomized)
+                PromptStatusRow(isCustomized: isCustomized) {
+                    AppSettings.setCustomSystemPrompt(nil, for: selectedAction)
+                    promptText = selectedAction.defaultSystem
                 }
                 Text(loc("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part, balisé <texte_source> pour les actions de prompt : ce prompt ne définit que la tâche. Les prompts par défaut sont écrits en français, et demandent à Claude de répondre dans la langue du texte sélectionné.",
                          en: "Changes take effect immediately. The selected text is sent separately, wrapped in <texte_source> for the prompt actions: this prompt only defines the task. The default prompts are written in French, and ask Claude to answer in the language of the selected text."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
         }
         .formStyle(.grouped)
@@ -618,12 +587,10 @@ private struct AboutPane: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Claudio").font(.title3.bold())
                         Text(loc("Version \(version)", en: "Version \(version)"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .settingsNote()
                         Text(loc("Des actions IA sur votre texte sélectionné, partout sur macOS.",
                                  en: "AI actions on your selected text, anywhere on macOS."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .settingsNote()
                     }
                 }
                 .padding(.vertical, 4)
@@ -662,12 +629,11 @@ private struct AboutPane: View {
                     }
                 }
                 if let updateMessage {
-                    Text(updateMessage).font(.caption).foregroundStyle(.secondary)
+                    Text(updateMessage).settingsNote()
                 }
                 Text(loc("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée. L'installation remplace l'app en place et relance Claudio, sans rien laisser dans les Téléchargements.",
                          en: "Checked automatically once a day: a plain read of version.json on claudio.okonoma.com, nothing sent. Installing replaces the app in place and relaunches Claudio, leaving nothing in Downloads."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section {
@@ -685,8 +651,7 @@ private struct AboutPane: View {
             Section {
                 Text(loc("Fait main en Swift. Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.",
                          en: "Hand-made in Swift. Independent project, not affiliated with Anthropic. Claude is a trademark of Anthropic, PBC."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
         }
         .formStyle(.grouped)

@@ -70,8 +70,7 @@ struct ModelChoiceCaption: View {
 
     var body: some View {
         Text("\(choice.costHint). \(choice == defaultChoice ? loc("Modèle par défaut pour cette action.", en: "Default model for this action.") : loc("Modèle personnalisé, le défaut est \(defaultChoice.displayName).", en: "Custom model; the default is \(defaultChoice.displayName)."))")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .settingsNote()
     }
 }
 
@@ -80,7 +79,6 @@ struct NoLocalModelHint: View {
     var body: some View {
         Text(loc("Aucun modèle local détecté : règle le serveur dans l'onglet Local (Ollama).",
                  en: "No local model found: set the server up in the Local (Ollama) tab."))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .settingsNote()
     }
 }

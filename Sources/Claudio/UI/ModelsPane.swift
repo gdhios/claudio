@@ -19,8 +19,7 @@ struct ModelsPane: View {
             } footer: {
                 Text(loc("Les prompts de ces actions se règlent dans l'onglet Prompts.",
                          en: "These actions' prompts are set in the Prompts tab."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Action libre", en: "Custom action")) {
@@ -39,8 +38,7 @@ struct ModelsPane: View {
             Section {
                 Text(loc("Les modèles Claude viennent de la liste de l'API, relue une fois par jour à l'ouverture des Réglages ; « nouveau » marque ceux que cette version de Claudio n'embarquait pas. Le local est gratuit et ne sort pas de ta machine.",
                          en: "The Claude models come from the API's list, read once a day when Settings open; “new” marks those this version of Claudio didn't ship with. Local models are free and never leave your Mac."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
                 if localModels.isEmpty {
                     NoLocalModelHint()
                 }
