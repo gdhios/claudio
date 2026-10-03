@@ -364,7 +364,7 @@ final class DictationCoordinator {
         // In a task of its own, because `dismiss()` cancelled this one and a
         // cancelled task turns the paste's activation delay into no delay.
         await Task { [weak self] in
-            _ = await self?.pasting.paste(text, target)
+            await self?.pasting.paste(text, target)
         }.value
     }
 
@@ -483,12 +483,10 @@ final class DictationCoordinator {
     /// to go.
     func copyText() {
         guard let session, !session.finalText.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(session.finalText, forType: .string)
+        NSPasteboard.general.setText(session.finalText)
         session.justCopied = true
         Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: Constants.closeAfterCopyDelay)
             guard self?.session === session, session.justCopied else { return }
             self?.dismiss()
         }

@@ -303,3 +303,17 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         )
     }
 }
+
+extension ClaudioAction {
+    /// Default model: Haiku everywhere (minimal latency), except for the
+    /// expert prompt where the design work justifies Sonnet.
+    var defaultModel: ClaudioModel {
+        switch self {
+        case .expertPrompt: .sonnet5
+        default: .haiku45
+        }
+    }
+
+    /// Effective engine: custom (Settings) otherwise the Claude default.
+    var model: ModelChoice { AppSettings.customModel(for: self) ?? .claude(defaultModel) }
+}

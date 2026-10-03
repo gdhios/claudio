@@ -1226,10 +1226,9 @@ private final class Bench {
                     PasteTarget(app: self?.targetApp, clipboard: nil, appName: self?.targetAppName)
                 },
                 paste: { [weak self] text, _ in
-                    guard let self else { return false }
+                    guard let self else { return }
                     pasted.append(text)
                     panelOpenAtPaste.append(coordinator.session != nil)
-                    return targetApp != nil
                 }
             ),
             microphone: MicrophoneGate(

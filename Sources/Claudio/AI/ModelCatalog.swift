@@ -54,10 +54,6 @@ final class ModelCatalog: ObservableObject {
         !bundled.contains(model) && models.contains(model)
     }
 
-    func model(withID id: String) -> ClaudioModel? {
-        models.first { $0.id == id }
-    }
-
     // MARK: - Refresh
 
     /// The last successful fetch, `nil` when there was none.
@@ -94,26 +90,16 @@ final class ModelCatalog: ObservableObject {
     struct FetchedModel: Codable, Equatable, Sendable {
         let id: String
         let displayName: String?
-        let createdAt: Date?
     }
 
-    /// Reads a `GET /v1/models` answer: `data[]` with `id`, `display_name`
-    /// and `created_at`. Throws when the answer isn't one.
+    /// Reads a `GET /v1/models` answer: `data[]` with `id` and
+    /// `display_name`. Throws when the answer isn't one. The dates are
+    /// ignored: the order comes from the ids (`merge`).
     static func parse(_ data: Data) throws -> [FetchedModel] {
-        struct Answer: Decodable {
-            struct Entry: Decodable {
-                let id: String
-                let displayName: String?
-                let createdAt: Date?
-            }
-            let data: [Entry]
-        }
+        struct Answer: Decodable { let data: [FetchedModel] }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(Answer.self, from: data).data.map {
-            FetchedModel(id: $0.id, displayName: $0.displayName, createdAt: $0.createdAt)
-        }
+        return try decoder.decode(Answer.self, from: data).data
     }
 
     // MARK: - Merging

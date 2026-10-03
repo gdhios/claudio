@@ -26,8 +26,8 @@ final class ClaudioModelTests: XCTestCase {
     func testTheIdentifierIsTheIdentity() {
         XCTAssertEqual(ClaudioModel(id: "claude-sonnet-5-5"),
                        ClaudioModel(id: "claude-sonnet-5-5", displayName: "Claude Sonnet 5.5"))
-        XCTAssertEqual(ClaudioModel.sonnet55.rawValue, "claude-sonnet-5-5")
-        XCTAssertEqual(ClaudioModel.opus55.rawValue, "claude-opus-5-5")
+        XCTAssertEqual(ClaudioModel.sonnet55.id, "claude-sonnet-5-5")
+        XCTAssertEqual(ClaudioModel.opus55.id, "claude-opus-5-5")
     }
 
     /// Only Claude identifiers are models: anything else is a setting

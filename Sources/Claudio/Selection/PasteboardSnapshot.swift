@@ -29,3 +29,12 @@ struct PasteboardSnapshot {
         if !objects.isEmpty { pasteboard.writeObjects(objects) }
     }
 }
+
+extension NSPasteboard {
+    /// Replaces the whole clipboard with `text`: the one way every copy and
+    /// paste in the app writes it.
+    func setText(_ text: String) {
+        clearContents()
+        setString(text, forType: .string)
+    }
+}

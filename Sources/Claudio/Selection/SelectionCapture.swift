@@ -34,12 +34,12 @@ enum SelectionCapture {
         Keystroke.simulate(virtualKey: Keystroke.keyC, flags: .maskCommand)
 
         let deadline = Date().addingTimeInterval(Constants.copyTimeout)
-        while Date() < deadline {
+        while Date() < deadline, !Task.isCancelled {
             if pasteboard.changeCount != before {
                 let text = pasteboard.string(forType: .string)
                 return (text?.isEmpty == false) ? text : nil
             }
-            try? await Task.sleep(nanoseconds: Constants.copyPollIntervalNs)
+            try? await Task.sleep(for: Constants.copyPollInterval)
         }
         return nil  // nothing was copied: probably no selection
     }

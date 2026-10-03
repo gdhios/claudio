@@ -16,11 +16,11 @@ final class ClaudioCatalogTests: XCTestCase {
     /// Identifiers go straight into the API's `model` field: a typo here is an
     /// immediate failure for every action of that model.
     func testTheModelIdentifiersAreTheAPIs() {
-        XCTAssertEqual(ClaudioModel.haiku45.rawValue, "claude-haiku-4-5")
-        XCTAssertEqual(ClaudioModel.sonnet5.rawValue, "claude-sonnet-5")
-        XCTAssertEqual(ClaudioModel.sonnet55.rawValue, "claude-sonnet-5-5")
-        XCTAssertEqual(ClaudioModel.opus5.rawValue, "claude-opus-5")
-        XCTAssertEqual(ClaudioModel.opus55.rawValue, "claude-opus-5-5")
+        XCTAssertEqual(ClaudioModel.haiku45.id, "claude-haiku-4-5")
+        XCTAssertEqual(ClaudioModel.sonnet5.id, "claude-sonnet-5")
+        XCTAssertEqual(ClaudioModel.sonnet55.id, "claude-sonnet-5-5")
+        XCTAssertEqual(ClaudioModel.opus5.id, "claude-opus-5")
+        XCTAssertEqual(ClaudioModel.opus55.id, "claude-opus-5-5")
     }
 
     /// Haiku everywhere (minimal latency), Sonnet for prompt design.

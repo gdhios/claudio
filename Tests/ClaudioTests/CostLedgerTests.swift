@@ -8,24 +8,24 @@ final class CostLedgerTests: XCTestCase {
 
     /// Anthropic's published rates per million tokens, input / output.
     func testTheRatesAreThePublishedOnes() {
-        XCTAssertEqual(ClaudioModel.haiku45.inputPricePerMTok, 1)
-        XCTAssertEqual(ClaudioModel.haiku45.outputPricePerMTok, 5)
-        XCTAssertEqual(ClaudioModel.sonnet5.inputPricePerMTok, 2)
-        XCTAssertEqual(ClaudioModel.sonnet5.outputPricePerMTok, 10)
-        XCTAssertEqual(ClaudioModel.opus5.inputPricePerMTok, 5)
-        XCTAssertEqual(ClaudioModel.opus5.outputPricePerMTok, 25)
-        XCTAssertEqual(ClaudioModel.sonnet55.inputPricePerMTok, 2)
-        XCTAssertEqual(ClaudioModel.sonnet55.outputPricePerMTok, 10)
-        XCTAssertEqual(ClaudioModel.opus55.inputPricePerMTok, 4)
-        XCTAssertEqual(ClaudioModel.opus55.outputPricePerMTok, 20)
+        XCTAssertEqual(ClaudioModel.haiku45.pricing?.input, 1)
+        XCTAssertEqual(ClaudioModel.haiku45.pricing?.output, 5)
+        XCTAssertEqual(ClaudioModel.sonnet5.pricing?.input, 2)
+        XCTAssertEqual(ClaudioModel.sonnet5.pricing?.output, 10)
+        XCTAssertEqual(ClaudioModel.opus5.pricing?.input, 5)
+        XCTAssertEqual(ClaudioModel.opus5.pricing?.output, 25)
+        XCTAssertEqual(ClaudioModel.sonnet55.pricing?.input, 2)
+        XCTAssertEqual(ClaudioModel.sonnet55.pricing?.output, 10)
+        XCTAssertEqual(ClaudioModel.opus55.pricing?.input, 4)
+        XCTAssertEqual(ClaudioModel.opus55.pricing?.output, 20)
     }
 
     /// A million tokens on each side = the sum of the two rates.
     func testAMillionTokensOnEachSideCostsTheSumOfBothRates() {
         for model in ClaudioModel.bundled {
             XCTAssertEqual(model.cost(inputTokens: 1_000_000, outputTokens: 1_000_000),
-                           model.inputPricePerMTok! + model.outputPricePerMTok!,
-                           accuracy: 1e-9, model.rawValue)
+                           model.pricing!.input + model.pricing!.output,
+                           accuracy: 1e-9, model.id)
         }
     }
 

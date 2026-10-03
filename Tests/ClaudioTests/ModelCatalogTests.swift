@@ -59,7 +59,7 @@ final class ModelCatalogTests: XCTestCase {
     /// A dated snapshot with no alias in the list is a model like another.
     func testADatedSnapshotWithoutAnAliasStays() {
         let fetched = [ModelCatalog.FetchedModel(id: "claude-opus-4-1-20250805",
-                                                 displayName: "Claude Opus 4.1", createdAt: nil)]
+                                                 displayName: "Claude Opus 4.1")]
         let merged = ModelCatalog.merge(bundled: [], fetched: fetched)
         XCTAssertEqual(merged.map(\.id), ["claude-opus-4-1-20250805"])
     }

@@ -24,9 +24,6 @@ struct ClaudioModel: Hashable, Sendable {
 
     // MARK: - Identifier
 
-    /// `rawValue` kept for the settings that were written with it.
-    var rawValue: String { id }
-
     /// `nil` unless the text is a Claude identifier: settings only ever held
     /// those, and the API only answers for those.
     init?(rawValue: String) {
@@ -50,11 +47,9 @@ struct ClaudioModel: Hashable, Sendable {
     static let opus55 = ClaudioModel(id: "claude-opus-5-5")
 
     /// The list without network: grouped by family, newest first. Every
-    /// model here has a row in the price table. The API's list adds to it
+    /// model here has a row in `known`. The API's list adds to it
     /// (`ModelCatalog`), never replaces it.
     static let bundled: [ClaudioModel] = [haiku45, sonnet55, sonnet5, opus55, opus5]
-
-    var isBundled: Bool { Self.bundled.contains(self) }
 
     // MARK: - Family and version
 
@@ -153,41 +148,7 @@ struct ClaudioModel: Hashable, Sendable {
         }
     }
 
-    // MARK: - Temperature
-
-    /// `temperature` is accepted by the old models and rejected (400) by
-    /// every model since 4.6: it only goes to this closed list, never to a
-    /// model this version doesn't know.
-    static let temperatureModelIDs: Set<String> = ["claude-haiku-4-5"]
-
-    var supportsTemperature: Bool { Self.temperatureModelIDs.contains(id) }
-
-    // MARK: - Thinking
-
-    /// Claudio asks one short answer and uses no tool: thinking only spends
-    /// the answer's budget, and a `thinking` block alone in 400 tokens is an
-    /// empty card. The 5 models think by default, each with its own switch
-    /// (platform.claude.com/docs, thinking-troubleshooting, read 2026-10-03):
-    /// `between_tools` on Sonnet 5.5, `disabled` on Sonnet 5 and Opus 5. A
-    /// wrong value is a 400, so the switch only goes to this closed list.
-    /// Haiku 4.5 doesn't think unless asked, and a newcomer gets nothing.
-    static let thinkingOffTypeByModelID: [String: String] = [
-        "claude-sonnet-5-5": "between_tools",
-        "claude-sonnet-5": "disabled",
-        "claude-opus-5": "disabled",
-    ]
-
-    /// The `thinking.type` that turns thinking off on this model, `nil`
-    /// when the model has no such switch.
-    var thinkingOffType: String? { Self.thinkingOffTypeByModelID[id] }
-
-    /// The models that cannot stop thinking: the request lowers their
-    /// effort instead and gives the budget headroom.
-    static let alwaysThinkingModelIDs: Set<String> = ["claude-opus-5-5"]
-
-    var alwaysThinks: Bool { Self.alwaysThinkingModelIDs.contains(id) }
-
-    // MARK: - Pricing
+    // MARK: - What this version knows of each model
 
     /// Dollars per million tokens, input and output.
     struct Pricing: Hashable, Sendable {
@@ -195,21 +156,47 @@ struct ClaudioModel: Hashable, Sendable {
         let output: Double
     }
 
-    /// Anthropic's public pricing by exact identifier, taken from
-    /// platform.claude.com/docs (read 2026-09-25): refresh when it changes.
-    /// A model missing here has no price, not its family's.
-    static let pricingTable: [String: Pricing] = [
-        "claude-haiku-4-5": Pricing(input: 1, output: 5),
-        "claude-sonnet-5": Pricing(input: 2, output: 10),
-        "claude-sonnet-5-5": Pricing(input: 2, output: 10),
-        "claude-opus-5": Pricing(input: 5, output: 25),
-        "claude-opus-5-5": Pricing(input: 4, output: 20),
+    /// What one model accepts and costs. A wrong value is a 400 or a wrong
+    /// bill, so these only apply to the closed list below: a model this
+    /// version has never heard of gets no price, no `temperature` and no
+    /// thinking switch.
+    struct Traits: Sendable {
+        /// Anthropic's public pricing, platform.claude.com/docs (read
+        /// 2026-09-25): refresh when it changes. Never the family's.
+        var pricing: Pricing
+        /// `temperature` is accepted by the old models and rejected (400) by
+        /// every model since 4.6.
+        var acceptsTemperature = false
+        /// The `thinking.type` that turns thinking off
+        /// (platform.claude.com/docs, thinking-troubleshooting, read
+        /// 2026-10-03). Claudio asks one short answer and uses no tool:
+        /// thinking only spends the answer's budget, and a `thinking` block
+        /// alone in 400 tokens is an empty card. Haiku 4.5 doesn't think
+        /// unless asked.
+        var thinkingOffType: String?
+        /// Cannot stop thinking: the request lowers its effort instead and
+        /// gives the budget headroom.
+        var alwaysThinks = false
+    }
+
+    static let known: [String: Traits] = [
+        "claude-haiku-4-5": Traits(pricing: Pricing(input: 1, output: 5), acceptsTemperature: true),
+        "claude-sonnet-5": Traits(pricing: Pricing(input: 2, output: 10), thinkingOffType: "disabled"),
+        "claude-sonnet-5-5": Traits(pricing: Pricing(input: 2, output: 10), thinkingOffType: "between_tools"),
+        "claude-opus-5": Traits(pricing: Pricing(input: 5, output: 25), thinkingOffType: "disabled"),
+        "claude-opus-5-5": Traits(pricing: Pricing(input: 4, output: 20), alwaysThinks: true),
     ]
 
-    var pricing: Pricing? { Self.pricingTable[id] }
+    private var traits: Traits? { Self.known[id] }
 
-    var inputPricePerMTok: Double? { pricing?.input }
-    var outputPricePerMTok: Double? { pricing?.output }
+    var supportsTemperature: Bool { traits?.acceptsTemperature ?? false }
+    /// `nil` when the model has no such switch.
+    var thinkingOffType: String? { traits?.thinkingOffType }
+    var alwaysThinks: Bool { traits?.alwaysThinks ?? false }
+    /// A model missing from the table has no price.
+    var pricing: Pricing? { traits?.pricing }
+
+    // MARK: - Pricing
 
     /// Cost of a call in dollars, based on the tokens actually billed. An
     /// unpriced model costs nothing on paper: the ledger counts the call
@@ -237,18 +224,4 @@ struct ClaudioModel: Hashable, Sendable {
         guard let pricing else { return nil }
         return "\(shortName) \(Money.formatRounded(pricing.input)) / \(Money.formatRounded(pricing.output))"
     }
-}
-
-extension ClaudioAction {
-    /// Default model: Haiku everywhere (minimal latency), except for the
-    /// expert prompt where the design work justifies Sonnet.
-    var defaultModel: ClaudioModel {
-        switch self {
-        case .expertPrompt: .sonnet5
-        default: .haiku45
-        }
-    }
-
-    /// Effective engine: custom (Settings) otherwise the Claude default.
-    var model: ModelChoice { AppSettings.customModel(for: self) ?? .claude(defaultModel) }
 }

@@ -16,7 +16,7 @@ struct RecentDictationPaster {
     /// keyboard without Claudio being active, and the ⌘V would land in it.
     var closePanels: @MainActor () -> Void = {}
     /// Where the text goes when there is nowhere to paste it.
-    var copy: @MainActor (String) -> Void = RecentDictationPaster.copyToClipboard
+    var copy: @MainActor (String) -> Void = { NSPasteboard.general.setText($0) }
     /// Says what the click did, once it is done.
     var announce: @MainActor (RecentDictationOutcome) -> Void = { ClipboardToast.shared.show($0) }
     /// Time for the menu to finish closing before the keystroke, as the
@@ -52,13 +52,7 @@ struct RecentDictationPaster {
         // from here, and the text on the clipboard is the way out if it didn't.
         var keeping = target
         keeping.clipboard = nil
-        _ = await pasting.paste(text, keeping)
+        await pasting.paste(text, keeping)
         announce(.pasted)
-    }
-
-    static func copyToClipboard(_ text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
     }
 }

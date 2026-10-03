@@ -410,7 +410,6 @@ private final class Bench {
                 capture: { PasteTarget() },
                 paste: { [weak self] text, _ in
                     self?.pasted.append(text)
-                    return true
                 }
             ),
             selection: { [weak self] in

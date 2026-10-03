@@ -18,8 +18,8 @@ final class ModelChoiceTests: XCTestCase {
         for model in ClaudioModel.bundled {
             XCTAssertEqual(ModelChoice.claude(model).cost(inputTokens: 200, outputTokens: 200),
                            model.cost(inputTokens: 200, outputTokens: 200),
-                           accuracy: 1e-12, model.rawValue)
-            XCTAssertFalse(ModelChoice.claude(model).isLocal, model.rawValue)
+                           accuracy: 1e-12, model.id)
+            XCTAssertFalse(ModelChoice.claude(model).isLocal, model.id)
         }
     }
 
@@ -49,8 +49,8 @@ final class ModelChoiceTests: XCTestCase {
     func testAClaudeChoiceReadsBackAfterWriting() {
         for model in ClaudioModel.bundled {
             let choice = ModelChoice.claude(model)
-            XCTAssertEqual(choice.storageValue, "claude:\(model.rawValue)")
-            XCTAssertEqual(ModelChoice(storageValue: choice.storageValue), choice, model.rawValue)
+            XCTAssertEqual(choice.storageValue, "claude:\(model.id)")
+            XCTAssertEqual(ModelChoice(storageValue: choice.storageValue), choice, model.id)
         }
     }
 

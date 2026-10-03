@@ -72,7 +72,7 @@ enum ModelChoice: Sendable, Hashable {
     /// is the model ID, as is: an Ollama ID contains ":".
     var storageValue: String {
         switch self {
-        case .claude(let model): "claude:\(model.rawValue)"
+        case .claude(let model): "claude:\(model.id)"
         case .ollama(let name): "ollama:\(name)"
         case .raw: "raw"
         }

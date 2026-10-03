@@ -83,7 +83,7 @@ struct AnthropicClient: TextStreamClient {
         text: String, system: String, model: ClaudioModel, maxTokens: Int
     ) -> [String: Any] {
         var body: [String: Any] = [
-            "model": model.rawValue,
+            "model": model.id,
             "max_tokens": maxTokens,
             "system": system,
             "stream": true,

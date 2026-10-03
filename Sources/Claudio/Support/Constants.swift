@@ -1,9 +1,7 @@
 import AppKit
 
 enum Constants {
-    static let appName = "Claudio"
-
-    // The model is chosen per action (ClaudioModel + Settings → Prompts).
+    /// Sent only to the models that accept it (`ClaudioModel.Traits`).
     static let temperature = 0.2
 
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
@@ -25,18 +23,20 @@ enum Constants {
     static let workspaceIDEnvVar = "ANTHROPIC_WORKSPACE_ID"
 
     // Selection capture via simulated ⌘C
-    static let copyPollIntervalNs: UInt64 = 20_000_000        // 20 ms between two pasteboard polls
-    static let copyTimeout: TimeInterval = 0.3                // give up if nothing was copied
+    static let copyPollInterval: Duration = .milliseconds(20)  // between two pasteboard polls
+    static let copyTimeout: TimeInterval = 0.3                  // give up if nothing was copied
 
     // Automatic paste
-    static let activationDelayNs: UInt64 = 150_000_000        // delay after reactivating the target app
-    static let clipboardRestoreDelayNs: UInt64 = 500_000_000  // delay before restoring the clipboard
-                                                              // (increase if an app reads the pasteboard slowly)
-    static let restoreClipboardAfterPaste = true
+    static let activationDelay: Duration = .milliseconds(150)   // after reactivating the target app
+    static let clipboardRestoreDelay: Duration = .milliseconds(500)  // before restoring the clipboard
+                                                                // (increase if an app reads the pasteboard slowly)
 
     // Update: a plain read of version.json on the site (no data sent).
     static let updateFeedURL = URL(string: "https://claudio.okonoma.com/version.json")!
     static let updateCheckInterval: TimeInterval = 24 * 3600
+
+    /// A panel closes this long after a copy, time to see "Copied".
+    static let closeAfterCopyDelay: Duration = .milliseconds(900)
 
     // Panel: fixed width, height adapted to content (bounded text area).
     static let panelWidth: CGFloat = 460

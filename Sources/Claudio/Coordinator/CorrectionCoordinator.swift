@@ -356,13 +356,11 @@ final class CorrectionCoordinator {
 
     func copyResult() {
         guard let session, !session.correctedText.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(session.correctedText, forType: .string)
+        NSPasteboard.general.setText(session.correctedText)
         session.justCopied = true
         target?.clipboard = nil  // the user wants this content: don't restore over it
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 900_000_000)
+            try? await Task.sleep(for: Constants.closeAfterCopyDelay)
             if self?.session === session, session.justCopied {
                 self?.dismiss()
             }
@@ -383,7 +381,7 @@ final class CorrectionCoordinator {
         dismiss()
 
         Task { @MainActor [pasting] in
-            _ = await pasting.paste(text, target)
+            await pasting.paste(text, target)
         }
     }
 

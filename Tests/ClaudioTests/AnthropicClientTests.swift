@@ -199,9 +199,9 @@ final class AnthropicClientTests: XCTestCase {
         for model in ClaudioModel.bundled + [ClaudioModel(id: "claude-haiku-9")] {
             let body = AnthropicClient.makeBody(text: "t", system: "s", model: model, maxTokens: 64)
             if model.supportsTemperature {
-                XCTAssertEqual(body["temperature"] as? Double, Constants.temperature, model.rawValue)
+                XCTAssertEqual(body["temperature"] as? Double, Constants.temperature, model.id)
             } else {
-                XCTAssertNil(body["temperature"], model.rawValue)
+                XCTAssertNil(body["temperature"], model.id)
             }
         }
         // The guard itself: only Haiku 4.5 supports it today.

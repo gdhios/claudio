@@ -366,12 +366,10 @@ final class ListeningCoordinator {
     /// the panel goes, as the other panels do after a copy.
     func copyTrack() {
         guard let session, let track = session.track else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(track.copyLine, forType: .string)
+        NSPasteboard.general.setText(track.copyLine)
         session.justCopied = true
         Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: Constants.closeAfterCopyDelay)
             guard self?.session === session, session.justCopied else { return }
             self?.dismiss()
         }

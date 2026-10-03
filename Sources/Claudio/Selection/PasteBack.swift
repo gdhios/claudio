@@ -8,7 +8,7 @@ struct PasteTarget {
     /// frontmost: there is then nowhere to paste.
     var app: NSRunningApplication?
     /// The clipboard as it was, put back after the paste. `nil` leaves the
-    /// pasted text on it.
+    /// pasted text on it (a test's target).
     var clipboard: PasteboardSnapshot?
     /// That app's name as macOS shows it, `nil` when it has none. A snapshot
     /// like the clipboard's, taken with the app itself: what a dictation is
@@ -36,29 +36,23 @@ enum PasteBack {
     static func captureTarget() -> PasteTarget {
         let app = frontmostApp()
         return PasteTarget(app: app,
-                           clipboard: Constants.restoreClipboardAfterPaste ? PasteboardSnapshot.capture() : nil,
+                           clipboard: PasteboardSnapshot.capture(),
                            appName: app?.localizedName,
                            appBundleID: app?.bundleIdentifier)
     }
 
-    /// Pastes into the target, and says whether anything could receive the
-    /// text: `false` when Claudio itself was frontmost. The caller then keeps
-    /// its panel open rather than dropping the text into nowhere.
-    @discardableResult
-    static func paste(_ text: String, into target: PasteTarget) async -> Bool {
+    /// Pastes into the target, then puts the clipboard back.
+    static func paste(_ text: String, into target: PasteTarget) async {
         target.app?.activate()
-        try? await Task.sleep(nanoseconds: Constants.activationDelayNs)
+        try? await Task.sleep(for: Constants.activationDelay)
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        NSPasteboard.general.setText(text)
         Keystroke.simulate(virtualKey: Keystroke.keyV, flags: .maskCommand)
 
         if let snapshot = target.clipboard {
-            try? await Task.sleep(nanoseconds: Constants.clipboardRestoreDelayNs)
+            try? await Task.sleep(for: Constants.clipboardRestoreDelay)
             snapshot.restore()
         }
-        return target.app != nil
     }
 }
 
@@ -72,7 +66,7 @@ struct PasteService {
     /// it and explains itself when it's missing.
     var isAllowed: @MainActor () -> Bool
     var capture: @MainActor () -> PasteTarget
-    var paste: @MainActor (String, PasteTarget) async -> Bool
+    var paste: @MainActor (String, PasteTarget) async -> Void
 
     static let system = PasteService(isAllowed: AccessibilityPermission.ensureGranted,
                                      capture: PasteBack.captureTarget,

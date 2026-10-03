@@ -106,7 +106,6 @@ private final class PasterBench {
                 paste: { [weak self] text, target in
                     self?.steps.append(.paste(text))
                     self?.restoredClipboards.append(target.clipboard != nil)
-                    return true
                 }
             ),
             closePanels: { [weak self] in self?.steps.append(.closePanels) },

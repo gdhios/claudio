@@ -275,8 +275,7 @@ struct DictationPane: View {
 
     private func copy(_ text: String) {
         guard !text.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        NSPasteboard.general.setText(text)
     }
 
     // MARK: - Opening the pane
