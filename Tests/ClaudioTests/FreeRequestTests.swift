@@ -14,8 +14,7 @@ final class FreeRequestTests: XCTestCase {
                                         album: "LOVE TRIP",
                                         appName: "Spotify",
                                         bundleID: "com.spotify.client",
-                                        isPlaying: false,
-                                        duration: 245.3)
+                                        isPlaying: false)
 
     private let trackBlock = """
         <morceau_en_cours>

@@ -1,10 +1,11 @@
 import AppKit
 
-/// "Search in Claude": the card hands the subject to Claude in the browser,
-/// where he searches the web before answering — no key, no API cost, and
-/// a text that reads its sources rather than its memory. The link is a new
-/// conversation on claude.ai with the prompt in `q`, written in the
-/// interface's language since it is read there, not by the API.
+/// "Search in Claude": the card hands the subject to Claude, in Claude
+/// Desktop when it is on this Mac and in the browser otherwise, where he
+/// searches the web before answering: no key, no API cost, and a text that
+/// reads its sources rather than its memory. The link is a new conversation
+/// with the prompt in `q`, written in the interface's language since it is
+/// read there, not by the API.
 enum ClaudeSearch {
     static let baseURL = URL(string: "https://claude.ai/new")!
     /// Claude Desktop's own scheme, as Anthropic documents it ("Open Claude
@@ -34,13 +35,13 @@ enum ClaudeSearch {
                        language: AppLanguage = AppSettings.language) -> String {
         let english = language.showsEnglish
         var parts: [String] = []
-        let facts = [subject.firstReleaseDate.map { String($0.prefix(4)) },
+        let facts = [subject.firstReleaseDate?.year,
                      subject.type.map { TrackFacts.typeName($0, english: english) }]
             .compactMap { $0 }
         let detail = facts.isEmpty ? "" : " (\(facts.joined(separator: ", ")))"
         // The track's own line names its album as context, with the year.
         let album = [subject.title.map { english ? "album “\($0)”" : "album « \($0) »" },
-                     subject.firstReleaseDate.map { String($0.prefix(4)) }].compactMap { $0 }
+                     subject.firstReleaseDate?.year].compactMap { $0 }
         let context = album.isEmpty ? "" : " (\(album.joined(separator: ", ")))"
         switch (subject.kind, english) {
         case (.track, false):

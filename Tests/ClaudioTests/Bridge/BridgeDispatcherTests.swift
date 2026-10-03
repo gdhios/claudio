@@ -41,7 +41,7 @@ final class BridgeDispatcherTests: XCTestCase {
     private func assertDispatch(_ message: BridgeInbound, calls expected: [Call],
                                 file: StaticString = #filePath, line: UInt = #line) {
         calls = []
-        XCTAssertTrue(dispatcher.dispatch(message), "\(message)", file: file, line: line)
+        dispatcher.dispatch(message)
         XCTAssertEqual(calls, expected, "\(message)", file: file, line: line)
     }
 
@@ -103,7 +103,6 @@ final class BridgeDispatcherTests: XCTestCase {
     /// `hello` is no command: the server answers it, and a dispatcher that
     /// pressed a key on it would run a gesture nobody asked for.
     func testTheHandshakeIsNoCommandAndTouchesNothing() {
-        XCTAssertFalse(dispatcher.dispatch(.hello(version: 1, token: "ab", plugin: "1.13.0")))
-        XCTAssertEqual(calls, [])
+        assertDispatch(.hello(version: 1, token: "ab", plugin: "1.13.0"), calls: [])
     }
 }

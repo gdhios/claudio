@@ -1,9 +1,12 @@
 import Foundation
 
-/// MusicBrainz is asked once per thing: what it said is kept on disk under
-/// the thing's normalized name. A result holds three months; a miss a
-/// week, the record may be added meanwhile. One small JSON file per kind
-/// of thing, read and written whole: a few hundred entries at most.
+/// MusicBrainz, and Deezer behind it, are asked once per thing: what they
+/// said is kept on disk under the key each kind of thing defines (a
+/// track's normalized title and artist, an artist's id or normalized name).
+/// A result holds three months; a miss a week, the record may be added
+/// meanwhile. One small JSON file per kind of thing, read and written
+/// whole, what has expired dropped at each write: a few hundred entries
+/// at most.
 struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     enum Lookup: Equatable, Sendable {
         case facts(Value)
@@ -29,6 +32,11 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     private struct Entry: Codable {
         var facts: Value?
         var fetchedAt: Date
+
+        /// Past its lifetime: a result's three months, a miss's week.
+        func hasExpired(at now: Date) -> Bool {
+            now.timeIntervalSince(fetchedAt) >= (facts == nil ? FactsCache.missLifetime : FactsCache.resultLifetime)
+        }
     }
 
     /// Case, accents, width, spacing and the version tails players add
@@ -40,17 +48,13 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     }
 
     func lookup(key: String, now: Date) -> Lookup {
-        guard let entry = load()[key] else { return .unknown }
-        let age = now.timeIntervalSince(entry.fetchedAt)
-        if let facts = entry.facts {
-            return age < Self.resultLifetime ? .facts(facts) : .unknown
-        }
-        return age < Self.missLifetime ? .miss : .unknown
+        guard let entry = load()[key], !entry.hasExpired(at: now) else { return .unknown }
+        return entry.facts.map(Lookup.facts) ?? .miss
     }
 
-    /// `nil` facts record a miss.
+    /// `nil` facts record a miss. What has expired goes with the write.
     func store(_ facts: Value?, key: String, at now: Date) {
-        var entries = load()
+        var entries = load().filter { !$0.value.hasExpired(at: now) }
         entries[key] = Entry(facts: facts, fetchedAt: now)
         save(entries)
     }
@@ -98,11 +102,17 @@ typealias ArtistFactsCache = FactsCache<ArtistFacts>
 extension FactsCache where Value == ArtistFacts {
     static var standard: ArtistFactsCache { standard(file: "musicbrainz-artists.json") }
 
-    func lookup(artistNamed name: String, now: Date) -> Lookup {
-        lookup(key: Self.normalize(name), now: now)
+    /// The subject's artist by their MusicBrainz id when it has one, by
+    /// name otherwise: two artists may share a name, never an id.
+    static func key(for subject: MusicSubject) -> String {
+        subject.artistMBID ?? normalize(subject.artist)
     }
 
-    func store(_ facts: ArtistFacts?, forArtist name: String, at now: Date) {
-        store(facts, key: Self.normalize(name), at: now)
+    func lookup(_ subject: MusicSubject, now: Date) -> Lookup {
+        lookup(key: Self.key(for: subject), now: now)
+    }
+
+    func store(_ facts: ArtistFacts?, for subject: MusicSubject, at now: Date) {
+        store(facts, key: Self.key(for: subject), at: now)
     }
 }

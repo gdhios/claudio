@@ -20,8 +20,10 @@ final class NowPlayingTrackTests: XCTestCase {
                                               album: "LOVE TRIP",
                                               appName: "Spotify",
                                               bundleID: "com.spotify.client",
-                                              isPlaying: true,
-                                              duration: 245.3))
+                                              isPlaying: true))
+        // Equality is the track's: what the player is doing is read apart.
+        XCTAssertEqual(track.appName, "Spotify")
+        XCTAssertTrue(track.isPlaying)
     }
 
     /// Paused, the track is still the one the Now Playing widget shows: the
@@ -43,12 +45,11 @@ final class NowPlayingTrackTests: XCTestCase {
                                               album: nil,
                                               appName: nil,
                                               bundleID: nil,
-                                              isPlaying: true,
-                                              duration: nil))
+                                              isPlaying: true))
+        XCTAssertNil(track.appName)
+        XCTAssertTrue(track.isPlaying)
     }
 
-    /// No title, nothing playing — even when a player is known: an app that
-    /// played something once stays the Now Playing client with nothing in it.
     /// The way back to the player: its name on the button when macOS gave
     /// the app behind the track, nothing for a card from a link.
     func testThePlayerIsNamedWhenMacOSGaveTheApp() {
@@ -58,6 +59,8 @@ final class NowPlayingTrackTests: XCTestCase {
         XCTAssertNil(NowPlayingTrack(title: "Bleu", bundleID: "com.spotify.client").playerName)
     }
 
+    /// No title, nothing playing — even when a player is known: an app that
+    /// played something once stays the Now Playing client with nothing in it.
     func testNoTitleMeansNothingPlaying() {
         XCTAssertNil(NowPlayingTrack(printed: #"{"playing":false,"app":"Music"}"#))
         XCTAssertNil(NowPlayingTrack(printed: #"{"title":"","artist":"RA MU","app":"Spotify"}"#))
@@ -71,6 +74,28 @@ final class NowPlayingTrackTests: XCTestCase {
         for printed in ["", "\n", "undefined", "null", "[]", "{", "true",
                         "execution error: Error: TypeError: undefined is not an object (-2700)"] {
             XCTAssertNil(NowPlayingTrack(printed: printed), printed)
+        }
+    }
+
+    /// Paused or playing, it is the same track: "Try again" after a pause
+    /// keeps the card's cover and facts. Another title, artist, album or
+    /// player is another track.
+    func testAPausedTrackIsTheSameTrack() {
+        let playing = NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client")
+        var paused = playing
+        paused.isPlaying = false
+        XCTAssertEqual(playing, paused)
+
+        for other in [NowPlayingTrack(title: "Ljubljana", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Bleu", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Live",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Music", bundleID: "com.apple.Music")] {
+            XCTAssertNotEqual(playing, other)
         }
     }
 

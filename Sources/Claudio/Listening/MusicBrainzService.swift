@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// Asks MusicBrainz about a track under its rules and the panel's budget:
 /// the cache first, then the recording search, then the release group,
@@ -13,7 +13,8 @@ actor MusicBrainzService {
     /// four seconds held in Galette's measurements of 2026-09-07, 1.1 s
     /// drew 503s.
     static let searchSpacing: TimeInterval = 4
-    /// About one request per second per IP, for everything.
+    /// MusicBrainz's rule: about one request per second per IP, whatever
+    /// is asked. Deezer's requests aren't held to it, nor counted in it.
     static let requestSpacing: TimeInterval = 1.1
     /// Past this the facts aren't worth waiting for: MusicBrainz is a
     /// bonus under the card, not the card.
@@ -49,15 +50,16 @@ actor MusicBrainzService {
 
     static let shared = MusicBrainzService(
         transport: { try await URLSession.shared.data(for: $0) },
-        version: MusicBrainzLookup.appVersion,
+        version: Bundle.main.shortVersion,
         cache: .standard,
         artists: .standard)
 
     /// The facts, `nil` when neither base has them, or they failed or took
     /// too long. MusicBrainz first; Deezer when it had nothing and the
     /// player named the album — a record three days old isn't in a
-    /// community base yet. A miss is cached once both have answered, a
-    /// failure never: the next listen may find the service back.
+    /// community base yet. A miss is cached once both have answered; a
+    /// failure never, nor a half answer whose second question failed: the
+    /// next listen may find the service back.
     func facts(for track: NowPlayingTrack) async -> TrackFacts? {
         switch cache.lookup(track, now: now()) {
         case .facts(let facts): return facts
@@ -68,8 +70,11 @@ actor MusicBrainzService {
         guard let searched = await send(MusicBrainzLookup.searchURL(title: track.title, artist: track.artist),
                                         search: true, deadline: deadline) else { return nil }
         if var facts = MusicBrainzLookup.parseSearch(searched, playerAlbum: track.album) {
-            if let groupID = facts.releaseGroupID,
-               let group = await send(MusicBrainzLookup.releaseGroupURL(id: groupID), search: false, deadline: deadline) {
+            if let groupID = facts.releaseGroupID {
+                // The search's guess is shown, never kept in place of
+                // the release group's own record.
+                guard let group = await send(MusicBrainzLookup.releaseGroupURL(id: groupID),
+                                             search: false, deadline: deadline) else { return facts }
                 facts = MusicBrainzLookup.parseReleaseGroup(group, into: facts)
             }
             cache.store(facts, for: track, at: now())
@@ -80,13 +85,14 @@ actor MusicBrainzService {
             return nil
         }
         guard let found = await send(DeezerLookup.albumSearchURL(artist: artist, album: album),
-                                     search: false, deadline: deadline) else { return nil }
-        guard let id = DeezerLookup.parseAlbumSearch(found, artist: artist),
-              let record = await send(DeezerLookup.albumURL(id: id), search: false, deadline: deadline),
-              let facts = DeezerLookup.parseAlbum(record) else {
+                                     search: false, throttled: false, deadline: deadline) else { return nil }
+        guard let id = DeezerLookup.parseAlbumSearch(found, artist: artist) else {
             cache.store(nil, for: track, at: now())
             return nil
         }
+        guard let record = await send(DeezerLookup.albumURL(id: id), search: false, throttled: false,
+                                      deadline: deadline) else { return nil }
+        let facts = DeezerLookup.parseAlbum(record)
         cache.store(facts, for: track, at: now())
         return facts
     }
@@ -96,7 +102,7 @@ actor MusicBrainzService {
     /// has one — the record, no search — by name otherwise. Past the
     /// budget, the artist without their releases is still handed over.
     func artist(for subject: MusicSubject) async -> ArtistFacts? {
-        switch artists.lookup(artistNamed: subject.artist, now: now()) {
+        switch artists.lookup(subject, now: now()) {
         case .facts(let facts): return facts
         case .miss: return nil
         case .unknown: break
@@ -113,22 +119,23 @@ actor MusicBrainzService {
             found = MusicBrainzLookup.parseArtistSearch(data)
         }
         guard var facts = found else {
-            artists.store(nil, forArtist: subject.artist, at: now())
+            artists.store(nil, for: subject, at: now())
             return nil
         }
         if let groups = await send(MusicBrainzLookup.releaseGroupsURL(artist: facts.artistID),
                                    search: false, deadline: deadline) {
             facts = MusicBrainzLookup.parseReleaseGroups(groups, into: facts)
-            artists.store(facts, forArtist: subject.artist, at: now())
+            artists.store(facts, for: subject, at: now())
         }
         return facts
     }
 
     /// One request, after its turn in the cadence and within the budget.
-    /// `nil` on any failure.
-    private func send(_ url: URL, search: Bool, deadline: Date) async -> Data? {
+    /// A search keeps the search index's cadence too; a request that isn't
+    /// `throttled` (Deezer's) keeps neither. `nil` on any failure.
+    private func send(_ url: URL, search: Bool, throttled: Bool = true, deadline: Date) async -> Data? {
         var wait: TimeInterval = 0
-        if let lastRequest {
+        if throttled, let lastRequest {
             wait = max(wait, Self.requestSpacing - now().timeIntervalSince(lastRequest))
         }
         if search, let lastSearch {
@@ -144,11 +151,9 @@ actor MusicBrainzService {
         var request = MusicBrainzLookup.request(url, version: version)
         request.timeoutInterval = remaining
         let sentAt = now()
-        lastRequest = sentAt
+        if throttled { lastRequest = sentAt }
         if search { lastSearch = sentAt }
-        guard let (data, response) = try? await transport(request),
-              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true
-        else { return nil }
+        guard let (data, response) = try? await transport(request), response.isSuccessful else { return nil }
         return data
     }
 }
@@ -177,27 +182,4 @@ struct FactsSource {
             guard !PreviewRun.isActive else { return nil }
             return await MusicBrainzService.shared.artist(for: subject)
         })
-
-    static let none = FactsSource(cached: { _ in nil }, fetch: { _ in nil })
-}
-
-/// The cover the Cover Art Archive holds for the release group the facts
-/// name: the fallback when the player gave none.
-@MainActor
-struct RemoteArtworkSource {
-    var image: @MainActor (TrackFacts) async -> NSImage?
-
-    static let archiveBaseURL = URL(string: "https://coverartarchive.org/")!
-
-    static func frontURL(releaseGroup id: String) -> URL {
-        archiveBaseURL.appendingPathComponent("release-group/\(id)/front-250")
-    }
-
-    static let system = RemoteArtworkSource { facts in
-        guard !PreviewRun.isActive, let id = facts.releaseGroupID else { return nil }
-        return await LocalArtwork.fetch(frontURL(releaseGroup: id),
-                                        userAgent: MusicBrainzLookup.userAgent(version: MusicBrainzLookup.appVersion))
-    }
-
-    static let none = RemoteArtworkSource { _ in nil }
 }

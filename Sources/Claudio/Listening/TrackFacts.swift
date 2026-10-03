@@ -34,9 +34,7 @@ struct TrackFacts: Equatable, Sendable, Codable {
 
     var originName: String { (origin ?? .musicBrainz).rawValue }
 
-    var year: String? {
-        firstReleaseDate.map { String($0.prefix(4)) }
-    }
+    var year: String? { firstReleaseDate?.year }
 
     /// The type as one word, the secondary one when there is one: a
     /// compilation is a compilation before it is an album.
@@ -85,21 +83,17 @@ struct TrackFacts: Equatable, Sendable, Codable {
 
     private static func sameTitle(_ a: String, _ b: String?) -> Bool {
         guard let b else { return false }
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
-        return a.trimmingCharacters(in: .whitespaces)
-            .compare(b.trimmingCharacters(in: .whitespaces), options: options) == .orderedSame
+        return a.trimmingCharacters(in: .whitespaces).isSameName(as: b.trimmingCharacters(in: .whitespaces))
     }
 
     /// The block Claude reads after the track: one line per known fact, in
     /// French like every prompt, the source named so the system prompt's
     /// rule applies to it.
     var promptBlock: String {
-        let fields: [(label: String, value: String?)] = [
+        PromptBlock.make("faits", attributes: "source=\"\(originName)\"", fields: [
             ("album d'origine", albumTitle),
             ("type", typeLabel(english: false)),
             ("première sortie", firstReleaseDate),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        return (["<faits source=\"\(originName)\">"] + lines + ["</faits>"]).joined(separator: "\n")
+        ])
     }
 }

@@ -9,13 +9,11 @@ extension NowPlayingTrack {
     /// One shape for every prompt that hears about the track: "What's
     /// playing?" asks about it, the custom action gets it as context.
     func promptBlock(tag: String) -> String {
-        let fields: [(label: String, value: String?)] = [
+        PromptBlock.make(tag, fields: [
             ("titre", title),
             ("artiste", artist),
             ("album", album),
             ("lecteur", appName),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        return (["<\(tag)>"] + lines + ["</\(tag)>"]).joined(separator: "\n")
+        ])
     }
 }

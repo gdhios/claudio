@@ -18,14 +18,9 @@ final class StreamDeckBridge {
         case connected(clients: Int)
     }
 
-    /// The app's own version, sent in the welcome. `swift run` has no
-    /// bundle, hence the fallback.
-    static var bundleVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
     private let dispatcher: BridgeDispatcher
     private let handshake: BridgeHandshakeFile
+    /// The app's own version, sent in the welcome.
     private let appVersion: String
 
     private var server: BridgeServer?
@@ -63,7 +58,7 @@ final class StreamDeckBridge {
 
     init(dispatcher: BridgeDispatcher,
          handshake: BridgeHandshakeFile = .init(),
-         appVersion: String = StreamDeckBridge.bundleVersion) {
+         appVersion: String = Bundle.main.shortVersion) {
         self.dispatcher = dispatcher
         self.handshake = handshake
         self.appVersion = appVersion
@@ -81,7 +76,7 @@ final class StreamDeckBridge {
         let publisher = BridgeStatePublisher(send: { [weak self] in self?.server?.broadcast($0) })
         let server = BridgeServer(
             token: token,
-            onCommand: { [weak self] message in _ = self?.dispatcher.dispatch(message) },
+            onCommand: { [weak self] message in self?.dispatcher.dispatch(message) },
             // Read at the handshake, never cached: a plugin starting
             // mid-dictation is told about the dictation.
             welcomeState: { [weak self] in self?.publisher?.current ?? .idle },

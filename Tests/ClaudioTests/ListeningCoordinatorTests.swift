@@ -213,6 +213,70 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.client.systems, [ListeningNotes.system(detail: .oneSentence)])
     }
 
+    // MARK: - "Try again" on another track
+
+    /// The player moved on between the failure and "Try again": the facts
+    /// still coming for the old track belong to a card that is gone, and
+    /// never land on the new one.
+    func testARetryOnAnotherTrackDropsTheOldTracksFacts() async throws {
+        let bench = Bench(answer: .failure(ModelFailure()), facts: Bench.facts, factsWait: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        await bench.settle { bench.factsRequests.count == 1 }
+
+        bench.track = .other
+        bench.cachedFacts = Bench.otherFacts
+        bench.coordinator.retry()
+        await bench.runs()
+        XCTAssertEqual(session.facts, Bench.otherFacts)
+
+        bench.answerFacts()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(session.facts, Bench.otherFacts, "the old track's facts land nowhere")
+    }
+
+    /// Same for the archive's cover of the old track: the new card, which
+    /// has none, stays without.
+    func testARetryOnAnotherTrackDropsTheOldTracksArchiveCover() async throws {
+        let bench = Bench(answer: .failure(ModelFailure()), facts: Bench.facts,
+                          remoteCover: Bench.cover, remoteCoverWaits: true)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        await bench.settle { bench.remoteCoverRequests.count == 1 }
+        XCTAssertEqual(bench.remoteCoverRequests, [Bench.facts])
+
+        bench.track = .other
+        bench.cachedFacts = Bench.otherFacts  // no release group: no cover of its own
+        bench.coordinator.retry()
+        await bench.runs()
+
+        bench.answerRemoteCover()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertNil(session.artwork, "the old track's cover lands nowhere")
+    }
+
+    /// Paused since the failure, it is still the same track: "Try again"
+    /// keeps its cover on the card rather than blink, and the card says
+    /// it's paused.
+    func testARetryOnThePausedTrackKeepsItsCover() async throws {
+        let bench = Bench(answer: .failure(ModelFailure()), artwork: Bench.cover)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        await bench.wait { session.artwork != nil }
+
+        var paused = NowPlayingTrack.sample
+        paused.isPlaying = false
+        bench.track = paused
+        bench.artworkWaits = true  // the cover asked again is still on its way
+        bench.coordinator.retry()
+        await bench.runs()
+        XCTAssertEqual(session.track?.isPlaying, false)
+        XCTAssertTrue(session.artwork === Bench.cover, "the same track keeps its cover")
+    }
+
     // MARK: - "Tell me more"
 
     /// A pill on the card: the notes make way for a long text about the
@@ -378,10 +442,6 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.facts?.summary(playerAlbum: "LOVE TRIP", english: false), "1982 · album")
     }
 
-    // MARK: - Galette
-
-    /// With Galette on the Mac, the card offers the artist, then the album.
-    /// Galette is looked for once, as the panel opens.
     // MARK: - The cover
 
     /// The cover is the player's own, read beside the card and never
@@ -427,6 +487,8 @@ final class ListeningCoordinatorTests: XCTestCase {
 
     // MARK: - Galette
 
+    /// With Galette on the Mac, the card offers the artist, then the album.
+    /// Galette is looked for once, as the panel opens.
     func testWithGaletteTheCardOffersTheArtistThenTheAlbum() async throws {
         let bench = Bench(galetteInstalled: true)
         bench.coordinator.trigger()
@@ -473,8 +535,13 @@ private extension NowPlayingTrack {
                                         album: "LOVE TRIP",
                                         appName: "Spotify",
                                         bundleID: "com.spotify.client",
-                                        isPlaying: true,
-                                        duration: 245.3)
+                                        isPlaying: true)
+    /// What the player plays by the time "Try again" reads it again.
+    static let other = NowPlayingTrack(title: "Plastic Love",
+                                       artist: "竹内まりや",
+                                       album: "VARIETY",
+                                       appName: "Spotify",
+                                       bundleID: "com.spotify.client")
 }
 
 /// One coordinator and the fakes it was built with.
@@ -485,6 +552,11 @@ private final class Bench: AsyncWaiting {
     static let cover = NSImage(size: NSSize(width: 1, height: 1))
     static let facts = TrackFacts(recordingID: "783dfef9", releaseGroupID: "3b03f2df", albumTitle: "LOVE TRIP",
                                   primaryType: "Album", secondaryTypes: [], firstReleaseDate: "1982-11-25")
+    /// `NowPlayingTrack.other`'s, from Deezer: no release group to ask the
+    /// archive a cover for.
+    static let otherFacts = TrackFacts(recordingID: "", releaseGroupID: nil, albumTitle: "VARIETY",
+                                       primaryType: "Album", secondaryTypes: [], firstReleaseDate: "1984-04-25",
+                                       origin: .deezer)
     static let artist = ArtistFacts(artistID: "c3a2c5d6", name: "間宮貴子", type: "Person", country: "JP",
                                     beginDate: nil, releases: [
                                         ArtistFacts.Release(id: "3b03f2df", title: "LOVE TRIP", primaryType: "Album",
@@ -496,8 +568,12 @@ private final class Bench: AsyncWaiting {
     var coordinator: ListeningCoordinator { built }
     private var built: ListeningCoordinator!
 
-    /// What the player says is playing, `nil` for nothing.
-    let track: NowPlayingTrack?
+    /// What the player says is playing, `nil` for nothing. Read at each
+    /// read: a test changes it to have the player move on.
+    var track: NowPlayingTrack?
+    /// What the cache already knows, whatever the track; changed by a test
+    /// along with the track.
+    var cachedFacts: TrackFacts?
     /// Reads wait for `answerRead()` instead of answering at once: that's
     /// the player still being read when Esc comes.
     let readsWait: Bool
@@ -527,8 +603,11 @@ private final class Bench: AsyncWaiting {
 
     private var waitingReads: [CheckedContinuation<NowPlayingTrack?, Never>] = []
     private var waitingArtwork: [CheckedContinuation<NSImage?, Never>] = []
+    private var waitingRemoteCovers: [CheckedContinuation<NSImage?, Never>] = []
     private let artwork: NSImage?
-    private let artworkWaits: Bool
+    /// Covers wait for `answerArtwork()`; read at each request.
+    var artworkWaits: Bool
+    private let remoteCover: NSImage?
 
     init(track: NowPlayingTrack? = .sample,
          answer: Result<String, Error> = .success(Bench.notes),
@@ -541,6 +620,7 @@ private final class Bench: AsyncWaiting {
          facts: TrackFacts? = nil,
          factsWait: Bool = false,
          remoteCover: NSImage? = nil,
+         remoteCoverWaits: Bool = false,
          artistFacts: ArtistFacts? = nil,
          artistWaits: Bool = false,
          claudeDesktop: Bool = false,
@@ -550,9 +630,11 @@ private final class Bench: AsyncWaiting {
          stopReason: String? = "end_turn",
          blockTypes: [String] = ["text"]) {
         self.track = track
+        self.cachedFacts = cachedFacts
         self.readsWait = readsWait
         self.artwork = artwork
         self.artworkWaits = artworkWaits
+        self.remoteCover = remoteCover
         let client = FakeTextStreamClient(answer)
         client.stopReason = stopReason
         client.blockTypes = blockTypes
@@ -562,7 +644,7 @@ private final class Bench: AsyncWaiting {
             source: NowPlayingSource { [weak self] in
                 guard let self else { return nil }
                 reads += 1
-                guard readsWait else { return track }
+                guard readsWait else { return self.track }
                 return await withCheckedContinuation { waitingReads.append($0) }
             },
             client: { [weak self] choice in
@@ -579,11 +661,11 @@ private final class Bench: AsyncWaiting {
             artwork: ArtworkSource { [weak self] track in
                 guard let self else { return nil }
                 artworkRequests.append(track)
-                guard artworkWaits else { return artwork }
+                guard self.artworkWaits else { return artwork }
                 return await withCheckedContinuation { waitingArtwork.append($0) }
             },
             facts: FactsSource(
-                cached: { _ in cachedFacts },
+                cached: { [weak self] _ in self?.cachedFacts },
                 fetch: { [weak self] track in
                     guard let self else { return nil }
                     factsRequests.append(track)
@@ -598,8 +680,10 @@ private final class Bench: AsyncWaiting {
                 }
             ),
             remoteArtwork: RemoteArtworkSource { [weak self] facts in
-                self?.remoteCoverRequests.append(facts)
-                return remoteCover
+                guard let self else { return nil }
+                remoteCoverRequests.append(facts)
+                guard remoteCoverWaits else { return remoteCover }
+                return await withCheckedContinuation { waitingRemoteCovers.append($0) }
             },
             preferences: { preferences },
             model: { model },
@@ -631,6 +715,13 @@ private final class Bench: AsyncWaiting {
         let waiting = waitingArtwork
         waitingArtwork = []
         for request in waiting { request.resume(returning: artwork) }
+    }
+
+    /// Hands the archive's cover to every request still waiting.
+    func answerRemoteCover() {
+        let waiting = waitingRemoteCovers
+        waitingRemoteCovers = []
+        for request in waiting { request.resume(returning: remoteCover) }
     }
 
     /// Answers every read still waiting, as the player finally does.

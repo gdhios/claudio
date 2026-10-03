@@ -1,18 +1,14 @@
 import Foundation
 
-/// What Claude is asked about the track playing: the prompt, the message,
-/// the model and the room its answer gets. Fixed rather than set in
-/// Settings — there is nothing here anyone should have to tune.
+/// What Claude is asked about the track playing: the message and the
+/// prompt, and the model the Models tab starts from. How much he says, and
+/// so the room his answer gets, is the Music tab's `ListeningDetail`.
 enum ListeningNotes {
     /// Sonnet rather than Haiku: here being right matters more than being
     /// fast, and Haiku knows less about little-known catalogues and invents
     /// more readily. Three sentences cost next to nothing either way.
     /// Sonnet 5.5 since 2026-10-02: same price as Sonnet 5.
     static let model: ModelChoice = .claude(.sonnet55)
-
-    /// The budget of the default detail: three short sentences fit many
-    /// times over, a runaway answer doesn't.
-    static let maxTokens = ListeningDetail.threeSentences.maxTokens
 
     /// The track as the player described it, tagged: only the fields it
     /// gave, and not whether it's paused. Facts already known follow in

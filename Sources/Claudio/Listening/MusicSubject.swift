@@ -35,13 +35,8 @@ struct MusicSubject: Hashable, Sendable {
     /// The album of the track playing: the one of origin when MusicBrainz
     /// said, the player's otherwise. `nil` without an album or an artist.
     static func album(of track: NowPlayingTrack, facts: TrackFacts?) -> MusicSubject? {
-        guard let artist = track.artist, let title = facts?.albumTitle ?? track.album else { return nil }
-        return MusicSubject(kind: .album, artist: artist, title: title,
-                            mbid: facts?.releaseGroupID,
-                            firstReleaseDate: facts?.firstReleaseDate,
-                            type: facts?.primaryType,
-                            artistID: facts?.artistID,
-                            track: track.title)
+        guard facts?.albumTitle ?? track.album != nil else { return nil }
+        return playing(.album, track, facts: facts)
     }
 
     static func artist(of track: NowPlayingTrack, facts: TrackFacts? = nil) -> MusicSubject? {
@@ -52,8 +47,14 @@ struct MusicSubject: Hashable, Sendable {
     /// The track itself: Claude knows a title where an album means little
     /// (Guillaume, 2026-10-03). The album and its facts come as context.
     static func track(of track: NowPlayingTrack, facts: TrackFacts?) -> MusicSubject? {
+        playing(.track, track, facts: facts)
+    }
+
+    /// The track playing and its album, with the facts in hand: what the
+    /// album's subject and the track's share. `nil` without an artist.
+    private static func playing(_ kind: Kind, _ track: NowPlayingTrack, facts: TrackFacts?) -> MusicSubject? {
         guard let artist = track.artist else { return nil }
-        return MusicSubject(kind: .track, artist: artist, title: facts?.albumTitle ?? track.album,
+        return MusicSubject(kind: kind, artist: artist, title: facts?.albumTitle ?? track.album,
                             mbid: facts?.releaseGroupID,
                             firstReleaseDate: facts?.firstReleaseDate,
                             type: facts?.primaryType,
@@ -101,7 +102,12 @@ struct MusicSubject: Hashable, Sendable {
     /// only them. The track playing opens it: the text's subject for a
     /// track, its anchor for an album or an artist.
     var promptBlock: String {
-        let fields: [(label: String, value: String?)] = [
+        let genre = switch kind {
+        case .album: "album"
+        case .artist: "artiste"
+        case .track: "morceau"
+        }
+        return PromptBlock.make("sujet", attributes: "genre=\"\(genre)\"", fields: [
             ("morceau", track),
             ("artiste", artist),
             ("album", title),
@@ -110,13 +116,6 @@ struct MusicSubject: Hashable, Sendable {
             ("label", label),
             ("pays", country),
             ("mbid", mbid),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        let genre = switch kind {
-        case .album: "album"
-        case .artist: "artiste"
-        case .track: "morceau"
-        }
-        return (["<sujet genre=\"\(genre)\">"] + lines + ["</sujet>"]).joined(separator: "\n")
+        ])
     }
 }

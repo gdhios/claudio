@@ -14,28 +14,25 @@ struct NowPlayingTrack: Sendable, Equatable {
     /// `false` when the player says it's paused. Paused, the track is still
     /// the widget's, and the panel still answers.
     var isPlaying: Bool
-    /// In seconds.
-    var duration: TimeInterval?
 
     init(title: String,
          artist: String? = nil,
          album: String? = nil,
          appName: String? = nil,
          bundleID: String? = nil,
-         isPlaying: Bool = true,
-         duration: TimeInterval? = nil) {
+         isPlaying: Bool = true) {
         self.title = title
         self.artist = artist
         self.album = album
         self.appName = appName
         self.bundleID = bundleID
         self.isPlaying = isPlaying
-        self.duration = duration
     }
 
     /// Reads what `NowPlayingSource.script` printed: one JSON object, whose
     /// fields the player didn't give are simply absent. `nil` means nothing
-    /// is playing — no title, or an answer that doesn't read.
+    /// is playing — no title, or an answer that doesn't read. The duration
+    /// it also prints isn't kept: nothing reads it.
     ///
     /// Each field is read on its own: a value of a type some later macOS
     /// gives instead drops that field, not the whole track.
@@ -44,9 +41,7 @@ struct NowPlayingTrack: Sendable, Equatable {
               let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         func text(_ key: String) -> String? {
-            guard let value = (fields[key] as? String)?
-                .trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
-            return value
+            (fields[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
         }
         // A player that played something once can stay the Now Playing
         // client with nothing in it: without a title there is no track.
@@ -57,8 +52,15 @@ struct NowPlayingTrack: Sendable, Equatable {
                   appName: text("app"),
                   bundleID: text("bundle"),
                   // The card only says "paused" when the player does.
-                  isPlaying: fields["playing"] as? Bool ?? true,
-                  duration: fields["duration"] as? Double)
+                  isPlaying: fields["playing"] as? Bool ?? true)
+    }
+
+    /// The same track, whatever the player is doing with it: paused or
+    /// playing, a read finds the card it left, cover and facts included.
+    /// The app's name goes with its bundle id.
+    static func == (lhs: NowPlayingTrack, rhs: NowPlayingTrack) -> Bool {
+        lhs.title == rhs.title && lhs.artist == rhs.artist && lhs.album == rhs.album
+            && lhs.bundleID == rhs.bundleID
     }
 
     /// The player's name for the button that brings it forward: only when

@@ -54,6 +54,26 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(cache.lookup(recent, now: clock.now), .facts(facts!))
     }
 
+    /// Deezer isn't MusicBrainz: its questions go at once, outside
+    /// MusicBrainz's one-a-second cadence, and don't count in it.
+    func testDeezerIsNotHeldToMusicBrainzsCadence() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        transport.answers["/album/1001749391"] = DeezerLookupTests.album
+        transport.delayBeforeAnswering = 0.3
+        let service = makeService()
+
+        _ = await service.facts(for: recent)
+        let sent = transport.sentAt.map { $0.timeIntervalSince(transport.sentAt[0]) }
+        XCTAssertEqual(sent.count, 3)
+        XCTAssertEqual(sent[1], 0.3, accuracy: 0.001, "Deezer's search goes as soon as MusicBrainz answered")
+        XCTAssertEqual(sent[2], 0.6, accuracy: 0.001, "and its record as soon as the search did")
+
+        _ = await service.artist(for: MusicSubject(kind: .artist, artist: "Benjamin Adamson", mbid: artistID))
+        XCTAssertEqual(transport.sentAt[3].timeIntervalSince(transport.sentAt[0]), 1.1, accuracy: 0.001,
+                       "MusicBrainz's next question counts from its own last one")
+    }
+
     /// Without an album from the player there is nothing to ask Deezer
     /// for; and a track MusicBrainz knows never reaches Deezer.
     func testDeezerIsNotAskedWithoutAnAlbumNorBehindAMatch() async {
@@ -87,12 +107,25 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(cache.lookup(other, now: clock.now), .unknown)
     }
 
+    /// Deezer found the album but its record never came: that is a
+    /// failure, not a miss, and nothing is kept.
+    func testADeezerRecordThatFailsIsNoMiss() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        let service = makeService()  // the album's record answers 404
+
+        let facts = await service.facts(for: recent)
+        XCTAssertNil(facts)
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/recording", "/search/album", "/album/1001749391"])
+        XCTAssertEqual(cache.lookup(recent, now: clock.now), .unknown)
+    }
+
     // MARK: - The artist, before the long text
 
     private let artistID = "0df6d50f-7e43-4c6a-8220-61932b67c9c5"
 
     /// With the artist's id in hand: their record, then their release
-    /// groups; no search. The result is kept under the artist's name.
+    /// groups; no search. The result is kept under the artist's id.
     func testAKnownArtistIsLookedUpThenBrowsed() async {
         transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
         transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
@@ -103,10 +136,24 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(facts?.name, "The Supermen Lovers")
         XCTAssertEqual(facts?.releases.map(\.title), ["Starlight", "The Player", "Body Double", "Staralight 20th anniversary edition"])
         XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist/\(artistID)", "/ws/2/release-group"])
-        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: clock.now), .facts(facts!))
+        XCTAssertEqual(artists.lookup(subject, now: clock.now), .facts(facts!))
 
         _ = await service.artist(for: subject)
         XCTAssertEqual(transport.requests.count, 2, "the cache answered")
+    }
+
+    /// Two artists may share a name, never an id: a namesake known by
+    /// their own id is looked up, not answered with the other's facts.
+    func testANamesakeIsNotAnsweredWithTheOthersFacts() async {
+        transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
+        transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
+        let service = makeService()
+        _ = await service.artist(for: MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: artistID))
+
+        let namesake = "5e1f7a2b-9c3d-4e8f-a1b2-c3d4e5f60718"
+        let other = await service.artist(for: MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: namesake))
+        XCTAssertNil(other, "MusicBrainz doesn't know the namesake here")
+        XCTAssertEqual(transport.requests.last?.url?.path, "/ws/2/artist/\(namesake)")
     }
 
     /// Without an id, the artist is searched by name — on the search
@@ -122,9 +169,10 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist", "/ws/2/release-group"])
 
         transport.answers["/ws/2/artist"] = #"{"count":0,"offset":0,"artists":[]}"#
-        let missed = await service.artist(for: MusicSubject(kind: .artist, artist: "Nobody"))
+        let nobody = MusicSubject(kind: .artist, artist: "Nobody")
+        let missed = await service.artist(for: nobody)
         XCTAssertNil(missed)
-        XCTAssertEqual(artists.lookup(artistNamed: "Nobody", now: clock.now), .miss)
+        XCTAssertEqual(artists.lookup(nobody, now: clock.now), .miss)
         XCTAssertGreaterThanOrEqual(transport.sentAt[2].timeIntervalSince(transport.sentAt[0]), 4,
                                     "two searches keep the index's cadence")
     }
@@ -200,7 +248,8 @@ final class MusicBrainzServiceTests: XCTestCase {
     }
 
     /// The budget: a service that takes its time is left to it. The facts
-    /// the search already gave are kept rather than lost to the budget.
+    /// the search already gave are shown rather than lost to the budget,
+    /// but not kept: the next listen asks for the release group again.
     func testPastTheBudgetTheReleaseGroupIsNotWaitedFor() async {
         transport.answers["/ws/2/recording"] = MusicBrainzLookupTests.search
         transport.answers["/ws/2/release-group/3b03f2df-1fc0-4572-8b90-8f952a2a9fcb"] = MusicBrainzLookupTests.releaseGroup
@@ -210,6 +259,19 @@ final class MusicBrainzServiceTests: XCTestCase {
         let facts = await service.facts(for: track)
         XCTAssertEqual(facts?.releaseGroupID, "3b03f2df-1fc0-4572-8b90-8f952a2a9fcb")
         XCTAssertEqual(transport.requests.count, 1, "no time left for the release group")
+        XCTAssertEqual(cache.lookup(track, now: clock.now), .unknown)
+    }
+
+    /// The release group failed: the search's guess is shown, never kept
+    /// for three months in place of the record's own facts.
+    func testAReleaseGroupThatFailsLeavesNothingKept() async {
+        transport.answers["/ws/2/recording"] = MusicBrainzLookupTests.search
+        let service = makeService()  // the release group answers 404
+
+        let facts = await service.facts(for: track)
+        XCTAssertEqual(facts?.releaseGroupID, "3b03f2df-1fc0-4572-8b90-8f952a2a9fcb")
+        XCTAssertEqual(transport.requests.count, 2)
+        XCTAssertEqual(cache.lookup(track, now: clock.now), .unknown)
     }
 }
 

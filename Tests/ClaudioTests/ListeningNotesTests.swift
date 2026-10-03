@@ -13,8 +13,7 @@ final class ListeningNotesTests: XCTestCase {
                                     album: "LOVE TRIP",
                                     appName: "Spotify",
                                     bundleID: "com.spotify.client",
-                                    isPlaying: false,
-                                    duration: 245.3)
+                                    isPlaying: false)
         XCTAssertEqual(ListeningNotes.userMessage(for: track), """
             <morceau>
             titre : 真夜中のジョーク
@@ -61,7 +60,6 @@ final class ListeningNotesTests: XCTestCase {
     /// budget follows.
     func testTheDetailSetsTheAskAndTheBudget() {
         XCTAssertEqual(ListeningDetail.allCases.map(\.maxTokens), [150, 400, 900])
-        XCTAssertEqual(ListeningNotes.maxTokens, ListeningDetail.threeSentences.maxTokens)
         XCTAssertTrue(ListeningNotes.system(language: .french, detail: .oneSentence).contains("en une phrase"))
         XCTAssertTrue(ListeningNotes.system(language: .french, detail: .threeSentences).contains("en trois phrases courtes au plus"))
         XCTAssertTrue(ListeningNotes.system(language: .french, detail: .paragraph).contains("en un paragraphe"))
