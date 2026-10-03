@@ -49,10 +49,12 @@ final class ListeningCoordinator {
     /// Reads the player, then streams the notes: cancelled by Esc, by the
     /// next trigger, and by a retry.
     private(set) var cycle: Task<Void, Never>?
-    /// Fetches the cover beside the cycle, never holding it up: cancelled
-    /// with it.
+    /// The player's cover, the facts and the archive's cover, fetched beside
+    /// the cycle and never holding it up: dropped by the next read of the
+    /// player, and by `dismiss()`.
     private var coverFetch: Task<Void, Never>?
     private var factsFetch: Task<Void, Never>?
+    private var archiveFetch: Task<Void, Never>?
     /// The archive is asked for a cover once the player has given none and
     /// the facts name a release group, whichever comes last — and once.
     private var playerCoverSettled = false
@@ -113,6 +115,9 @@ final class ListeningCoordinator {
         // Esc or another trigger while the player was answering: its answer
         // belongs to a panel that is gone.
         guard self.session === session, !Task.isCancelled else { return }
+        // Whatever was still coming belongs to the last read: on another
+        // track it would land on the wrong card.
+        cancelSideFetches()
         // A retry that finds another track drops the old cover and facts;
         // the same track keeps them rather than blink.
         if session.track != track {
@@ -146,7 +151,6 @@ final class ListeningCoordinator {
     /// and the image takes its place whenever it arrives — if this is still
     /// the panel it was asked for.
     private func fetchCover(of track: NowPlayingTrack, for session: ListeningSession) {
-        coverFetch?.cancel()
         coverFetch = Task { [weak self, artwork] in
             let image = await artwork.image(track)
             guard let self, self.session === session, !Task.isCancelled else { return }
@@ -162,7 +166,6 @@ final class ListeningCoordinator {
     /// the next listen of the track.
     private func fetchFacts(of track: NowPlayingTrack, for session: ListeningSession,
                             preferences: ListeningPreferences) {
-        factsFetch?.cancel()
         factsFetch = Task { [weak self, facts] in
             let found = await facts.fetch(track)
             guard let self, self.session === session, !Task.isCancelled else { return }
@@ -174,16 +177,24 @@ final class ListeningCoordinator {
     /// The archive's cover, once: when the player has given none, the
     /// facts name a release group, and the cover is wanted at all.
     private func considerArchiveCover(for session: ListeningSession, preferences: ListeningPreferences) {
-        guard preferences.showsArtwork, preferences.musicBrainz, !archiveAsked,
-              playerCoverSettled || !preferences.showsArtwork,
+        guard preferences.showsArtwork, preferences.musicBrainz, !archiveAsked, playerCoverSettled,
               session.artwork == nil,
               let facts = session.facts, facts.releaseGroupID != nil else { return }
         archiveAsked = true
-        Task { [weak self, remoteArtwork] in
+        archiveFetch = Task { [weak self, remoteArtwork] in
             let image = await remoteArtwork.image(facts)
-            guard let self, self.session === session, session.artwork == nil else { return }
+            guard let self, self.session === session, !Task.isCancelled, session.artwork == nil else { return }
             session.artwork = image
         }
+    }
+
+    private func cancelSideFetches() {
+        coverFetch?.cancel()
+        coverFetch = nil
+        factsFetch?.cancel()
+        factsFetch = nil
+        archiveFetch?.cancel()
+        archiveFetch = nil
     }
 
     /// The card is up by now, and worth something without Claude: whatever
@@ -391,10 +402,7 @@ final class ListeningCoordinator {
     func dismiss() {
         cycle?.cancel()
         cycle = nil
-        coverFetch?.cancel()
-        coverFetch = nil
-        factsFetch?.cancel()
-        factsFetch = nil
+        cancelSideFetches()
         panel?.orderOut(nil)
         panel = nil
         session = nil
