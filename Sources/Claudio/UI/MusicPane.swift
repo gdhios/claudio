@@ -3,9 +3,9 @@ import SwiftUI
 /// The Music tab: what "What's playing?" asks Claude — which model, how
 /// much — what completes his notes: the MusicBrainz facts, the cover; and
 /// the long text's own model. The models are the same settings as the
-/// Models tab's rows. Not here, on
-/// purpose: the notes' language (the interface's), their system prompt
-/// (it carries the "invent nothing" rule), the sources' budget.
+/// Models tab's rows. Not here, on purpose: the notes' language (the
+/// interface's), their system prompt (it carries the "invent nothing"
+/// rule), the sources' budget.
 @MainActor
 struct MusicPane: View {
     // A preview shows fixed settings rather than this Mac's: the shot has to

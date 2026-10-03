@@ -2,7 +2,8 @@ import XCTest
 @testable import Claudio
 
 /// What Claude is asked when someone wants more than three sentences: a
-/// long text about the album or the artist, the facts in hand first.
+/// long text about the track, its album or its artist, the facts in hand
+/// first.
 final class ListeningEssayTests: XCTestCase {
 
     func testTheSubjectGoesOutAsItsBlock() {

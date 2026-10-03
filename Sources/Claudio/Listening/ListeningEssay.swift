@@ -1,9 +1,10 @@
 import Foundation
 
 /// What Claude is asked when someone wants more than three sentences: a
-/// long text about the album or the artist on the card — from a pill on it,
-/// or from Galette's "Tell me more" link. Its own model: the text answers
-/// for the facts, a small one set on the notes mustn't write it.
+/// long text about the track on the card, its album or its artist, from a
+/// pill on the card or from Galette's "Tell me more" link. Its own model:
+/// the text answers for the facts, a small one set on the notes mustn't
+/// write it.
 enum ListeningEssay {
     /// Two hundred and fifty words fit; a runaway answer doesn't.
     static let maxTokens = 900

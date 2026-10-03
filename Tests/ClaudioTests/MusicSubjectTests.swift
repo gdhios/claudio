@@ -1,8 +1,9 @@
 import XCTest
 @testable import Claudio
 
-/// What "Tell me more" is about: an album or an artist, built from the
-/// card and its facts, or read from a `claudio://music` link.
+/// What "Tell me more" is about: the track, its album or its artist, built
+/// from the card and its facts; or an album or an artist read from a
+/// `claudio://music` link.
 final class MusicSubjectTests: XCTestCase {
 
     private let track = NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子",

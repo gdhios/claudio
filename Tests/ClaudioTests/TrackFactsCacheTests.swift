@@ -81,8 +81,8 @@ final class TrackFactsCacheTests: XCTestCase {
     }
 
     /// An artist is kept under their MusicBrainz id when the subject has
-    /// one — two artists may share a name, never an id — under their
-    /// normalized name otherwise.
+    /// one, under their normalized name otherwise: two artists may share a
+    /// name, never an id.
     func testAnArtistIsKeyedByTheirIDWhenKnown() {
         XCTAssertEqual(ArtistFactsCache.key(for: MusicSubject(kind: .artist, artist: "Nirvana", mbid: "5b11f4ce")),
                        "5b11f4ce")

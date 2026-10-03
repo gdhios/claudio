@@ -50,8 +50,6 @@ final class NowPlayingTrackTests: XCTestCase {
         XCTAssertTrue(track.isPlaying)
     }
 
-    /// No title, nothing playing — even when a player is known: an app that
-    /// played something once stays the Now Playing client with nothing in it.
     /// The way back to the player: its name on the button when macOS gave
     /// the app behind the track, nothing for a card from a link.
     func testThePlayerIsNamedWhenMacOSGaveTheApp() {
@@ -61,6 +59,8 @@ final class NowPlayingTrackTests: XCTestCase {
         XCTAssertNil(NowPlayingTrack(title: "Bleu", bundleID: "com.spotify.client").playerName)
     }
 
+    /// No title, nothing playing — even when a player is known: an app that
+    /// played something once stays the Now Playing client with nothing in it.
     func testNoTitleMeansNothingPlaying() {
         XCTAssertNil(NowPlayingTrack(printed: #"{"playing":false,"app":"Music"}"#))
         XCTAssertNil(NowPlayingTrack(printed: #"{"title":"","artist":"RA MU","app":"Spotify"}"#))

@@ -1,8 +1,8 @@
 import Foundation
 
-/// What Claude is asked about the track playing: the prompt, the message,
-/// the model and the room its answer gets. Fixed rather than set in
-/// Settings — there is nothing here anyone should have to tune.
+/// What Claude is asked about the track playing: the message and the
+/// prompt, and the model the Models tab starts from. How much he says, and
+/// so the room his answer gets, is the Music tab's `ListeningDetail`.
 enum ListeningNotes {
     /// Sonnet rather than Haiku: here being right matters more than being
     /// fast, and Haiku knows less about little-known catalogues and invents

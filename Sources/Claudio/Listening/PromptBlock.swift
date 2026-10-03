@@ -1,9 +1,9 @@
 import Foundation
 
 /// The shape every music block of a prompt shares: the opening tag, one
-/// "label : value" line per field that has a value — none for the others,
-/// a line saying a field is unknown would invite a guess — then whatever
-/// else the block lists, and the closing tag.
+/// "label : value" line per field that has a value, then whatever else
+/// the block lists, and the closing tag. No line for a field without a
+/// value: a line saying it is unknown would invite a guess.
 enum PromptBlock {
     typealias Field = (label: String, value: String?)
 

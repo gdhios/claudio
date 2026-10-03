@@ -57,9 +57,9 @@ actor MusicBrainzService {
     /// The facts, `nil` when neither base has them, or they failed or took
     /// too long. MusicBrainz first; Deezer when it had nothing and the
     /// player named the album — a record three days old isn't in a
-    /// community base yet. A miss is cached once both have answered, a
-    /// failure never — nor a half answer, the second question of either
-    /// base failed: the next listen may find the service back.
+    /// community base yet. A miss is cached once both have answered; a
+    /// failure never, nor a half answer whose second question failed: the
+    /// next listen may find the service back.
     func facts(for track: NowPlayingTrack) async -> TrackFacts? {
         switch cache.lookup(track, now: now()) {
         case .facts(let facts): return facts
@@ -132,7 +132,7 @@ actor MusicBrainzService {
 
     /// One request, after its turn in the cadence and within the budget.
     /// A search keeps the search index's cadence too; a request that isn't
-    /// `throttled` — Deezer's — keeps neither. `nil` on any failure.
+    /// `throttled` (Deezer's) keeps neither. `nil` on any failure.
     private func send(_ url: URL, search: Bool, throttled: Bool = true, deadline: Date) async -> Data? {
         var wait: TimeInterval = 0
         if throttled, let lastRequest {

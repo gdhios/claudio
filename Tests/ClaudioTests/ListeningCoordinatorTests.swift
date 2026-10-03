@@ -442,10 +442,6 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.facts?.summary(playerAlbum: "LOVE TRIP", english: false), "1982 · album")
     }
 
-    // MARK: - Galette
-
-    /// With Galette on the Mac, the card offers the artist, then the album.
-    /// Galette is looked for once, as the panel opens.
     // MARK: - The cover
 
     /// The cover is the player's own, read beside the card and never
@@ -491,6 +487,8 @@ final class ListeningCoordinatorTests: XCTestCase {
 
     // MARK: - Galette
 
+    /// With Galette on the Mac, the card offers the artist, then the album.
+    /// Galette is looked for once, as the panel opens.
     func testWithGaletteTheCardOffersTheArtistThenTheAlbum() async throws {
         let bench = Bench(galetteInstalled: true)
         bench.coordinator.trigger()
