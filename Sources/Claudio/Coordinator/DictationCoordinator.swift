@@ -44,9 +44,6 @@ final class DictationCoordinator {
 
     private var panel: ResultPanel?
     private var target: PasteTarget?
-    /// The vocabulary read on the press, for whatever ends the dictation:
-    /// a transcript is kept as the speaker spells it, however it stopped.
-    private var pressVocabulary: DictationVocabulary = .empty
     /// When the dictation under way entered the history, `nil` until it has.
     /// Whatever ends it later — a close, a failure, the cleanup coming back —
     /// finds it there already and writes no second line.
@@ -179,16 +176,12 @@ final class DictationCoordinator {
         // into is still the frontmost one.
         target = pasting.capture()
 
-        let session = DictationSession(language: language, model: model(), output: output)
+        let session = DictationSession(language: language, model: model(), output: output,
+                                       vocabulary: vocabulary())
         self.session = session
-        // Read on the press, like the language and the model: the engine,
-        // the replacements and the prompt all get this one, whatever
-        // Settings says by the time the key comes up.
-        let vocabulary = self.vocabulary()
-        pressVocabulary = vocabulary
         panel = makePanel(session, self)
         cycle = Task { [weak self] in
-            await self?.listen(session: session, vocabulary: vocabulary)
+            await self?.listen(session: session)
         }
         // Music talking over the voice is what makes dictation hard: what
         // plays pauses for as long as the microphone listens. Asked after the
@@ -255,13 +248,13 @@ final class DictationCoordinator {
 
     // MARK: - The cycle
 
-    private func listen(session: DictationSession, vocabulary: DictationVocabulary) async {
+    private func listen(session: DictationSession) async {
         // Cancelled between the press and the first turn of the loop: the
         // microphone must not even open.
         guard self.session === session else { return }
 
         for await event in engine.start(locale: session.language.locale,
-                                        contextualStrings: vocabulary.terms) {
+                                        contextualStrings: session.vocabulary.terms) {
             guard self.session === session else { return }
             switch event {
             case .partial(let text), .final(let text):
@@ -282,12 +275,12 @@ final class DictationCoordinator {
         // The stream ends after the final, and on a cancellation: only the
         // first of the two still has a session to finish.
         guard self.session === session, !Task.isCancelled else { return }
-        await finish(session: session, vocabulary: vocabulary)
+        await finish(session: session)
     }
 
     /// From the final transcript to the pasted text: fix the vocabulary,
     /// clean up, remember, paste.
-    private func finish(session: DictationSession, vocabulary: DictationVocabulary) async {
+    private func finish(session: DictationSession) async {
         // The stream is over, so is the microphone. A release or a press
         // resumed the music already; an engine that stopped by itself —
         // likelier minutes into a locked dictation — didn't, and the panel
@@ -303,7 +296,7 @@ final class DictationCoordinator {
         // The speaker's own spellings, before anything else reads the text:
         // the model cleans up what they wrote, Raw pastes it, and it is the
         // raw text the history keeps.
-        let raw = vocabulary.applyingReplacements(to: heard)
+        let raw = session.vocabulary.applyingReplacements(to: heard)
         session.transcript = raw
 
         // Written down before the model is asked anything. Closing the panel
@@ -319,7 +312,7 @@ final class DictationCoordinator {
             // app itself: a Slack message, an email and a command line aren't
             // cleaned up the same way — and the last one not at all.
             cleaned = await cleanUp(raw,
-                                    keeping: vocabulary.terms,
+                                    keeping: session.vocabulary.terms,
                                     landingIn: target.map {
                                         DictationDestination(name: $0.appName,
                                                              bundleID: $0.appBundleID)
@@ -421,7 +414,7 @@ final class DictationCoordinator {
         guard !heard.isEmpty else { return nil }
         let date = now()
         recordedAt = date
-        history.record(raw: raw ?? pressVocabulary.applyingReplacements(to: heard),
+        history.record(raw: raw ?? session.vocabulary.applyingReplacements(to: heard),
                        cleaned: nil, language: session.language, at: date)
         return date
     }
@@ -497,6 +490,5 @@ final class DictationCoordinator {
         session = nil
         target = nil
         recordedAt = nil
-        pressVocabulary = .empty
     }
 }

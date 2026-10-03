@@ -30,6 +30,11 @@ final class DictationSession: ObservableObject {
     /// What this dictation is becoming: cleaned up, translated, turned into
     /// a prompt. The shortcut's own, read on the press like the language.
     let output: DictationOutput
+    /// The speaker's terms and replacements, read on the press like the
+    /// rest: the engine, the replacements and the prompt all get this one,
+    /// whatever Settings says by the time the key comes up, and however the
+    /// dictation ends.
+    let vocabulary: DictationVocabulary
 
     @Published var phase: Phase = .listening
     /// The key was tapped rather than held: listening goes on with the key
@@ -57,10 +62,12 @@ final class DictationSession: ObservableObject {
 
     init(language: DictationLanguage,
          model: ModelChoice,
-         output: DictationOutput = .cleanup) {
+         output: DictationOutput = .cleanup,
+         vocabulary: DictationVocabulary = .empty) {
         self.language = language
         self.model = model
         self.output = output
+        self.vocabulary = vocabulary
     }
 
     /// What the panel shows and what gets pasted: the cleaned-up text once
