@@ -93,9 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         UpdateChecker.shared.startPeriodicChecks()
 
-        // First launch without a key: open Settings directly.
+        // First launch without a key: open Settings directly, on the tab
+        // where the key goes.
         if KeychainStore.currentAPIKey() == nil {
-            settingsController.show()
+            settingsController.show(initialSection: .apiKey)
         }
     }
 
