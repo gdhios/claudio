@@ -2,7 +2,7 @@ import Foundation
 
 /// The "Recent dictations" submenu of the menu bar, as a value: the last few
 /// dictations, each under a one-line title, with the text a click pastes
-/// again. `AppDelegate` turns it into menu items; nothing here touches AppKit.
+/// again. `StatusMenu` turns it into menu items; nothing here touches AppKit.
 struct RecentDictationsMenu: Equatable {
     struct Item: Equatable {
         /// What the row shows: the text on one line, cut short.
@@ -30,12 +30,8 @@ struct RecentDictationsMenu: Equatable {
         }
     }
 
-    /// A dictation as a menu row: one line, every run of whitespace a single
-    /// space, cut with "…" past `titleLength`. Counted in Swift characters —
-    /// an accent with its letter, a whole emoji — so a cut never splits one.
+    /// A dictation as a menu row: one line, cut with "…" past `titleLength`.
     static func title(for text: String) -> String {
-        let flat = text.collapsingWhitespace()
-        guard flat.count > titleLength else { return flat }
-        return flat.prefix(titleLength - 1).trimmingCharacters(in: .whitespaces) + "…"
+        text.menuRowTitle(length: titleLength)
     }
 }

@@ -133,7 +133,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private func rebuildRecents() {
         recentsMenu.removeAllItems()
         for entry in TransformHistory.shared.recents.entries {
-            let item = add(Self.recentTitle(entry.instruction), #selector(recentFromMenu(_:)), to: recentsMenu)
+            let item = add(entry.instruction.menuRowTitle(length: Self.recentTitleLength),
+                           #selector(recentFromMenu(_:)), to: recentsMenu)
             item.representedObject = entry.instruction
             item.toolTip = entry.instruction  // the truncated label, in full on hover
         }
@@ -153,15 +154,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    /// The instruction for a menu row: on a single line, truncated so it
-    /// doesn't stretch the menu.
-    private static func recentTitle(_ instruction: String) -> String {
-        let flat = instruction.replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespaces)
-        let limit = 48
-        guard flat.count > limit else { return flat }
-        return String(flat.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…"
-    }
+    /// Characters in a recent instruction's row, "…" included.
+    private static let recentTitleLength = 48
 
     // MARK: - Update
 
