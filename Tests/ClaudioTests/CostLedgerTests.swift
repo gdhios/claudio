@@ -35,39 +35,27 @@ final class CostLedgerTests: XCTestCase {
                        0.0012, accuracy: 1e-9)
         XCTAssertEqual(ClaudioModel.opus5.cost(inputTokens: 200, outputTokens: 200),
                        0.006, accuracy: 1e-9)
-        withLanguage(.french) {
-            XCTAssertEqual(ClaudioModel.haiku45.costHint, "≈ 0,12 $ pour 100 actions courtes")
-            XCTAssertEqual(ClaudioModel.opus5.costHint, "≈ 0,60 $ pour 100 actions courtes")
-        }
+        useLanguage(.french)
+        XCTAssertEqual(ClaudioModel.haiku45.costHint, "≈ 0,12 $ pour 100 actions courtes")
+        XCTAssertEqual(ClaudioModel.opus5.costHint, "≈ 0,60 $ pour 100 actions courtes")
     }
 
     func testMonetaryFormat() {
-        withLanguage(.french) {
-            XCTAssertEqual(Money.format(0), "0,00 $")
-            XCTAssertEqual(Money.format(0.0012), "< 0,01 $")
-            XCTAssertEqual(Money.format(0.42), "0,42 $")
-            XCTAssertEqual(Money.format(12.5), "12,50 $")
-            XCTAssertEqual(Money.formatRounded(5), "5 $")
-        }
+        useLanguage(.french)
+        XCTAssertEqual(Money.format(0), "0,00 $")
+        XCTAssertEqual(Money.format(0.0012), "< 0,01 $")
+        XCTAssertEqual(Money.format(0.42), "0,42 $")
+        XCTAssertEqual(Money.format(12.5), "12,50 $")
+        XCTAssertEqual(Money.formatRounded(5), "5 $")
     }
 
     /// In English the dollar sign comes first and the separator is the period.
     func testMonetaryFormatEnglish() {
-        withLanguage(.english) {
-            XCTAssertEqual(Money.format(0), "$0.00")
-            XCTAssertEqual(Money.format(0.0012), "< $0.01")
-            XCTAssertEqual(Money.format(12.5), "$12.50")
-            XCTAssertEqual(Money.formatRounded(5), "$5")
-        }
-    }
-
-    /// For the length of one assertion, the language is the one under test,
-    /// and the machine's setting is restored to what it was.
-    private func withLanguage(_ language: AppLanguage, _ body: () -> Void) {
-        let previous = AppSettings.language
-        AppSettings.language = language
-        body()
-        AppSettings.language = previous
+        useLanguage(.english)
+        XCTAssertEqual(Money.format(0), "$0.00")
+        XCTAssertEqual(Money.format(0.0012), "< $0.01")
+        XCTAssertEqual(Money.format(12.5), "$12.50")
+        XCTAssertEqual(Money.formatRounded(5), "$5")
     }
 
     // MARK: - Daily total
@@ -81,7 +69,8 @@ final class CostLedgerTests: XCTestCase {
         jour = jour.adding(0.32, at: noon.addingTimeInterval(3600))
         XCTAssertEqual(jour.total, 0.42, accuracy: 1e-9)
         XCTAssertEqual(jour.actions, 2)
-        withLanguage(.french) { XCTAssertEqual(jour.formattedTotal, "0,42 $") }
+        useLanguage(.french)
+        XCTAssertEqual(jour.formattedTotal, "0,42 $")
     }
 
     func testTheTotalStartsOverAtZeroTheNextDay() {
@@ -141,9 +130,8 @@ final class CostLedgerTests: XCTestCase {
         XCTAssertEqual(ledger.day.actions, 2)
         XCTAssertEqual(ledger.day.unpricedActions, 1)
         XCTAssertEqual(ledger.day.total, 0.0012, accuracy: 1e-9)
-        withLanguage(.french) {
-            XCTAssertEqual(ledger.day.formattedTotal, "< 0,01 $*")
-        }
+        useLanguage(.french)
+        XCTAssertEqual(ledger.day.formattedTotal, "< 0,01 $*")
 
         // The star survives a restart, and the day's rollover clears it.
         let reopened = CostLedger(defaults: defaults, now: noon)
