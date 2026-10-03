@@ -18,9 +18,6 @@ struct ArtworkSource {
               let url = LocalArtwork.url(printed: printed) else { return nil }
         return await LocalArtwork.fetch(url)
     }
-
-    /// No cover, ever: the card as it was before this existed.
-    static let none = ArtworkSource { _ in nil }
 }
 
 /// The cover as the player knows it. MediaRemote names the cover (an

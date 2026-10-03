@@ -338,8 +338,7 @@ private extension NowPlayingTrack {
                                         album: "LOVE TRIP",
                                         appName: "Spotify",
                                         bundleID: "com.spotify.client",
-                                        isPlaying: false,
-                                        duration: 245.3)
+                                        isPlaying: false)
 }
 
 /// One coordinator and the fakes it was built with.

@@ -10,10 +10,6 @@ enum ListeningNotes {
     /// Sonnet 5.5 since 2026-10-02: same price as Sonnet 5.
     static let model: ModelChoice = .claude(.sonnet55)
 
-    /// The budget of the default detail: three short sentences fit many
-    /// times over, a runaway answer doesn't.
-    static let maxTokens = ListeningDetail.threeSentences.maxTokens
-
     /// The track as the player described it, tagged: only the fields it
     /// gave, and not whether it's paused. Facts already known follow in
     /// their own block, so Claude has them before its first word.

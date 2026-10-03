@@ -91,7 +91,7 @@ enum PreviewSamples {
     static func sampleTrack(playing: Bool) -> NowPlayingTrack {
         NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP",
                         appName: "Spotify", bundleID: "com.spotify.client",
-                        isPlaying: playing, duration: 245)
+                        isPlaying: playing)
     }
 
     /// Galette as if installed, so its buttons show on every machine: the

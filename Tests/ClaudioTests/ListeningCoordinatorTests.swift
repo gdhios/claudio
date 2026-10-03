@@ -537,8 +537,7 @@ private extension NowPlayingTrack {
                                         album: "LOVE TRIP",
                                         appName: "Spotify",
                                         bundleID: "com.spotify.client",
-                                        isPlaying: true,
-                                        duration: 245.3)
+                                        isPlaying: true)
     /// What the player plays by the time "Try again" reads it again.
     static let other = NowPlayingTrack(title: "Plastic Love",
                                        artist: "竹内まりや",

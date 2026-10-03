@@ -182,8 +182,6 @@ struct FactsSource {
             guard !PreviewRun.isActive else { return nil }
             return await MusicBrainzService.shared.artist(for: subject)
         })
-
-    static let none = FactsSource(cached: { _ in nil }, fetch: { _ in nil })
 }
 
 /// The cover the Cover Art Archive holds for the release group the facts
@@ -203,6 +201,4 @@ struct RemoteArtworkSource {
         return await LocalArtwork.fetch(frontURL(releaseGroup: id),
                                         userAgent: MusicBrainzLookup.userAgent(version: Bundle.main.shortVersion))
     }
-
-    static let none = RemoteArtworkSource { _ in nil }
 }

@@ -20,12 +20,10 @@ final class NowPlayingTrackTests: XCTestCase {
                                               album: "LOVE TRIP",
                                               appName: "Spotify",
                                               bundleID: "com.spotify.client",
-                                              isPlaying: true,
-                                              duration: 245.3))
+                                              isPlaying: true))
         // Equality is the track's: what the player is doing is read apart.
         XCTAssertEqual(track.appName, "Spotify")
         XCTAssertTrue(track.isPlaying)
-        XCTAssertEqual(track.duration, 245.3)
     }
 
     /// Paused, the track is still the one the Now Playing widget shows: the
@@ -47,11 +45,9 @@ final class NowPlayingTrackTests: XCTestCase {
                                               album: nil,
                                               appName: nil,
                                               bundleID: nil,
-                                              isPlaying: true,
-                                              duration: nil))
+                                              isPlaying: true))
         XCTAssertNil(track.appName)
         XCTAssertTrue(track.isPlaying)
-        XCTAssertNil(track.duration)
     }
 
     /// No title, nothing playing — even when a player is known: an app that

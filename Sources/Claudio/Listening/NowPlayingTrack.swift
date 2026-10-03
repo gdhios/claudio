@@ -14,28 +14,25 @@ struct NowPlayingTrack: Sendable, Equatable {
     /// `false` when the player says it's paused. Paused, the track is still
     /// the widget's, and the panel still answers.
     var isPlaying: Bool
-    /// In seconds.
-    var duration: TimeInterval?
 
     init(title: String,
          artist: String? = nil,
          album: String? = nil,
          appName: String? = nil,
          bundleID: String? = nil,
-         isPlaying: Bool = true,
-         duration: TimeInterval? = nil) {
+         isPlaying: Bool = true) {
         self.title = title
         self.artist = artist
         self.album = album
         self.appName = appName
         self.bundleID = bundleID
         self.isPlaying = isPlaying
-        self.duration = duration
     }
 
     /// Reads what `NowPlayingSource.script` printed: one JSON object, whose
     /// fields the player didn't give are simply absent. `nil` means nothing
-    /// is playing — no title, or an answer that doesn't read.
+    /// is playing — no title, or an answer that doesn't read. The duration
+    /// it also prints isn't kept: nothing reads it.
     ///
     /// Each field is read on its own: a value of a type some later macOS
     /// gives instead drops that field, not the whole track.
@@ -55,8 +52,7 @@ struct NowPlayingTrack: Sendable, Equatable {
                   appName: text("app"),
                   bundleID: text("bundle"),
                   // The card only says "paused" when the player does.
-                  isPlaying: fields["playing"] as? Bool ?? true,
-                  duration: fields["duration"] as? Double)
+                  isPlaying: fields["playing"] as? Bool ?? true)
     }
 
     /// The same track, whatever the player is doing with it: paused or
