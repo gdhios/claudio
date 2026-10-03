@@ -13,7 +13,8 @@ actor MusicBrainzService {
     /// four seconds held in Galette's measurements of 2026-09-07, 1.1 s
     /// drew 503s.
     static let searchSpacing: TimeInterval = 4
-    /// About one request per second per IP, for everything.
+    /// MusicBrainz's rule: about one request per second per IP, whatever
+    /// is asked. Deezer's requests aren't held to it, nor counted in it.
     static let requestSpacing: TimeInterval = 1.1
     /// Past this the facts aren't worth waiting for: MusicBrainz is a
     /// bonus under the card, not the card.
@@ -84,13 +85,13 @@ actor MusicBrainzService {
             return nil
         }
         guard let found = await send(DeezerLookup.albumSearchURL(artist: artist, album: album),
-                                     search: false, deadline: deadline) else { return nil }
+                                     search: false, throttled: false, deadline: deadline) else { return nil }
         guard let id = DeezerLookup.parseAlbumSearch(found, artist: artist) else {
             cache.store(nil, for: track, at: now())
             return nil
         }
-        guard let record = await send(DeezerLookup.albumURL(id: id), search: false, deadline: deadline)
-        else { return nil }
+        guard let record = await send(DeezerLookup.albumURL(id: id), search: false, throttled: false,
+                                      deadline: deadline) else { return nil }
         let facts = DeezerLookup.parseAlbum(record)
         cache.store(facts, for: track, at: now())
         return facts
@@ -130,10 +131,11 @@ actor MusicBrainzService {
     }
 
     /// One request, after its turn in the cadence and within the budget.
-    /// `nil` on any failure.
-    private func send(_ url: URL, search: Bool, deadline: Date) async -> Data? {
+    /// A search keeps the search index's cadence too; a request that isn't
+    /// `throttled` — Deezer's — keeps neither. `nil` on any failure.
+    private func send(_ url: URL, search: Bool, throttled: Bool = true, deadline: Date) async -> Data? {
         var wait: TimeInterval = 0
-        if let lastRequest {
+        if throttled, let lastRequest {
             wait = max(wait, Self.requestSpacing - now().timeIntervalSince(lastRequest))
         }
         if search, let lastSearch {
@@ -149,7 +151,7 @@ actor MusicBrainzService {
         var request = MusicBrainzLookup.request(url, version: version)
         request.timeoutInterval = remaining
         let sentAt = now()
-        lastRequest = sentAt
+        if throttled { lastRequest = sentAt }
         if search { lastSearch = sentAt }
         guard let (data, response) = try? await transport(request),
               (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true

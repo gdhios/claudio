@@ -54,6 +54,26 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(cache.lookup(recent, now: clock.now), .facts(facts!))
     }
 
+    /// Deezer isn't MusicBrainz: its questions go at once, outside
+    /// MusicBrainz's one-a-second cadence, and don't count in it.
+    func testDeezerIsNotHeldToMusicBrainzsCadence() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        transport.answers["/album/1001749391"] = DeezerLookupTests.album
+        transport.delayBeforeAnswering = 0.3
+        let service = makeService()
+
+        _ = await service.facts(for: recent)
+        let sent = transport.sentAt.map { $0.timeIntervalSince(transport.sentAt[0]) }
+        XCTAssertEqual(sent.count, 3)
+        XCTAssertEqual(sent[1], 0.3, accuracy: 0.001, "Deezer's search goes as soon as MusicBrainz answered")
+        XCTAssertEqual(sent[2], 0.6, accuracy: 0.001, "and its record as soon as the search did")
+
+        _ = await service.artist(for: MusicSubject(kind: .artist, artist: "Benjamin Adamson", mbid: artistID))
+        XCTAssertEqual(transport.sentAt[3].timeIntervalSince(transport.sentAt[0]), 1.1, accuracy: 0.001,
+                       "MusicBrainz's next question counts from its own last one")
+    }
+
     /// Without an album from the player there is nothing to ask Deezer
     /// for; and a track MusicBrainz knows never reaches Deezer.
     func testDeezerIsNotAskedWithoutAnAlbumNorBehindAMatch() async {
