@@ -55,6 +55,25 @@ final class ClaudeSearchTests: XCTestCase {
         XCTAssertTrue(withFacts.contains("France") || withFacts.contains("FR"), withFacts)
     }
 
+    /// The track subject asks about the title first, with its album as
+    /// context; the album and the artist say what is playing.
+    func testTheTrackPlayingIsInEveryPrompt() {
+        let track = MusicSubject(kind: .track, artist: "The Supermen Lovers", title: "The Player",
+                                 firstReleaseDate: "2002-03-01", type: "Album", track: "Starlight")
+        let french = ClaudeSearch.prompt(for: track, artist: nil, language: .french)
+        XCTAssertTrue(french.contains("le morceau « Starlight » de The Supermen Lovers (album « The Player », 2002)"), french)
+        XCTAssertTrue(french.contains("puis l'album et l'artiste en quelques mots"), french)
+        let english = ClaudeSearch.prompt(for: track, artist: nil, language: .english)
+        XCTAssertTrue(english.contains("the track “Starlight” by The Supermen Lovers (album “The Player”, 2002)"), english)
+
+        var listening = album
+        listening.track = "Starlight"
+        let anchored = ClaudeSearch.prompt(for: listening, artist: nil, language: .french)
+        XCTAssertTrue(anchored.contains("par quoi commencer. J'écoute « Starlight ». Ne cite rien"), anchored)
+        XCTAssertTrue(ClaudeSearch.prompt(for: listening, artist: nil, language: .english).contains("I'm listening to “Starlight”."))
+        XCTAssertFalse(ClaudeSearch.prompt(for: album, artist: nil, language: .french).contains("J'écoute"))
+    }
+
     func testThePromptFollowsTheInterfaceLanguage() {
         let english = ClaudeSearch.prompt(for: album, artist: facts, language: .english)
         XCTAssertTrue(english.hasPrefix("Search the web before answering"), english)

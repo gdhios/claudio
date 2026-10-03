@@ -38,6 +38,8 @@ final class ClaudioURLTests: XCTestCase {
     func testAnIncompleteMusicLinkOpensNothing() {
         XCTAssertNil(parse("claudio://music?kind=album&artist=Takako%20Mamiya"))
         XCTAssertNil(parse("claudio://music?kind=album&title=LOVE%20TRIP"))
+        // A link names an album or an artist; the track is the card's own.
+        XCTAssertNil(parse("claudio://music?kind=track&artist=Takako%20Mamiya&title=LOVE%20TRIP"))
         XCTAssertNil(parse("claudio://music?kind=playlist&artist=X&title=Y"))
         XCTAssertNil(parse("claudio://music"))
     }

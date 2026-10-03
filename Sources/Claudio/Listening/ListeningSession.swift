@@ -113,11 +113,13 @@ final class ListeningSession: ObservableObject {
         phase = .done
     }
 
-    /// The pills that lead to the long text: the album and the artist the
-    /// card knows, while the notes are what's on screen.
+    /// The pills that lead to the long text: the track, its album and its
+    /// artist, while the notes are what's on screen.
     var subjects: [MusicSubject] {
         guard essaySubject == nil, let track else { return [] }
-        return [MusicSubject.album(of: track, facts: facts), MusicSubject.artist(of: track, facts: facts)].compactMap { $0 }
+        return [MusicSubject.track(of: track, facts: facts),
+                MusicSubject.album(of: track, facts: facts),
+                MusicSubject.artist(of: track, facts: facts)].compactMap { $0 }
     }
 
     /// The whole answer replaces what streamed on the way.

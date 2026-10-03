@@ -38,7 +38,15 @@ enum ClaudeSearch {
                      subject.type.map { TrackFacts.typeName($0, english: english) }]
             .compactMap { $0 }
         let detail = facts.isEmpty ? "" : " (\(facts.joined(separator: ", ")))"
+        // The track's own line names its album as context, with the year.
+        let album = [subject.title.map { english ? "album “\($0)”" : "album « \($0) »" },
+                     subject.firstReleaseDate.map { String($0.prefix(4)) }].compactMap { $0 }
+        let context = album.isEmpty ? "" : " (\(album.joined(separator: ", ")))"
         switch (subject.kind, english) {
+        case (.track, false):
+            parts.append("Cherche sur le web avant de répondre, puis présente-moi le morceau « \(subject.track ?? "") » de \(subject.artist)\(context) : ce qu'il raconte, ce qui le distingue, sa place dans l'album et chez l'artiste, puis l'album et l'artiste en quelques mots.")
+        case (.track, true):
+            parts.append("Search the web before answering, then introduce the track “\(subject.track ?? "")” by \(subject.artist)\(context): what it is about, what sets it apart, its place on the album and in the artist's path, then the album and the artist in a few words.")
         case (.album, false):
             parts.append("Cherche sur le web avant de répondre, puis présente-moi l'album « \(subject.title ?? "") » de \(subject.artist)\(detail) : contexte de sortie, ce qui le distingue, accueil, par quoi commencer.")
         case (.album, true):
@@ -47,6 +55,10 @@ enum ClaudeSearch {
             parts.append("Cherche sur le web avant de répondre, puis présente-moi l'artiste \(subject.artist) : parcours, ce qui le caractérise, par quoi commencer.")
         case (.artist, true):
             parts.append("Search the web before answering, then introduce the artist \(subject.artist): their path, what characterises them, where to start.")
+        }
+        // What is playing anchors the album's or the artist's answer.
+        if subject.kind != .track, let track = subject.track {
+            parts.append(english ? "I'm listening to “\(track)”." : "J'écoute « \(track) ».")
         }
         if let artist {
             var known: [String] = []

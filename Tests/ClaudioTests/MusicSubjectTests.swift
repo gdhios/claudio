@@ -18,17 +18,46 @@ final class MusicSubjectTests: XCTestCase {
         let subject = MusicSubject.album(of: track, facts: facts)
         XCTAssertEqual(subject, MusicSubject(kind: .album, artist: "間宮貴子", title: "LOVE TRIP",
                                              mbid: "3b03f2df-1fc0", firstReleaseDate: "1982-11-25", type: "Album",
-                                             artistID: "c3a2c5d6-1"))
+                                             artistID: "c3a2c5d6-1", track: "真夜中のジョーク"))
         XCTAssertEqual(MusicSubject.album(of: track, facts: nil)?.title, "City Pop Essentials")
         XCTAssertNil(MusicSubject.album(of: NowPlayingTrack(title: "Clip", artist: "X"), facts: nil))
         XCTAssertNil(MusicSubject.album(of: NowPlayingTrack(title: "Clip", album: "A"), facts: nil))
     }
 
     func testTheArtistSubjectNeedsAnArtist() {
-        XCTAssertEqual(MusicSubject.artist(of: track), MusicSubject(kind: .artist, artist: "間宮貴子"))
+        XCTAssertEqual(MusicSubject.artist(of: track),
+                       MusicSubject(kind: .artist, artist: "間宮貴子", track: "真夜中のジョーク"))
         XCTAssertEqual(MusicSubject.artist(of: track, facts: facts),
-                       MusicSubject(kind: .artist, artist: "間宮貴子", artistID: "c3a2c5d6-1"))
+                       MusicSubject(kind: .artist, artist: "間宮貴子", artistID: "c3a2c5d6-1", track: "真夜中のジョーク"))
         XCTAssertNil(MusicSubject.artist(of: NowPlayingTrack(title: "Clip")))
+    }
+
+    /// The track itself, first of the subjects: Claude knows a title where
+    /// an album means little. It carries the album and its facts as
+    /// context, and needs a title and an artist.
+    func testTheTrackSubjectIsTheTitlePlaying() {
+        XCTAssertEqual(MusicSubject.track(of: track, facts: facts),
+                       MusicSubject(kind: .track, artist: "間宮貴子", title: "LOVE TRIP",
+                                    mbid: "3b03f2df-1fc0", firstReleaseDate: "1982-11-25", type: "Album",
+                                    artistID: "c3a2c5d6-1", track: "真夜中のジョーク"))
+        XCTAssertEqual(MusicSubject.track(of: track, facts: nil)?.title, "City Pop Essentials")
+        XCTAssertNil(MusicSubject.track(of: NowPlayingTrack(title: "Clip"), facts: nil))
+        let subject = MusicSubject.track(of: track, facts: facts)!
+        XCTAssertEqual(subject.buttonTitle, "Sur le morceau")
+        XCTAssertEqual(subject.searchTitle, "Le morceau")
+        XCTAssertEqual(subject.card, NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子",
+                                                     album: "LOVE TRIP", appName: "Galette"))
+        XCTAssertNil(subject.facts)
+    }
+
+    /// The card offers the track first, then its album, then its artist.
+    @MainActor
+    func testTheSubjectsStartWithTheTrack() {
+        let session = ListeningSession()
+        session.track = track
+        session.facts = facts
+        XCTAssertEqual(session.subjects.map(\.kind), [.track, .album, .artist])
+        XCTAssertEqual(session.subjects.map(\.track), Array(repeating: "真夜中のジョーク", count: 3))
     }
 
     /// The artist's MusicBrainz id, wherever the subject got it: the
@@ -46,6 +75,16 @@ final class MusicSubjectTests: XCTestCase {
         XCTAssertEqual(album.card, NowPlayingTrack(title: "LOVE TRIP", artist: "間宮貴子", appName: "Galette"))
         let artist = MusicSubject(kind: .artist, artist: "間宮貴子")
         XCTAssertEqual(artist.card, NowPlayingTrack(title: "間宮貴子", appName: "Galette"))
+    }
+
+    /// The track playing opens every block built from the card, so Claude
+    /// anchors the album's or the artist's text on it; a track subject is
+    /// its own genre.
+    func testTheTrackPlayingOpensTheBlock() {
+        let album = MusicSubject.album(of: track, facts: nil)!
+        XCTAssertTrue(album.promptBlock.hasPrefix("<sujet genre=\"album\">\nmorceau : 真夜中のジョーク\nartiste : 間宮貴子\n"), album.promptBlock)
+        let subject = MusicSubject.track(of: track, facts: facts)!
+        XCTAssertTrue(subject.promptBlock.hasPrefix("<sujet genre=\"morceau\">\nmorceau : 真夜中のジョーク\nartiste : 間宮貴子\nalbum : LOVE TRIP\n"), subject.promptBlock)
     }
 
     /// Claude's block: the facts in hand, and only them.

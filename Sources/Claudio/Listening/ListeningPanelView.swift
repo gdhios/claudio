@@ -137,14 +137,14 @@ struct ListeningPanelView: View {
                 trackText(track)
             }
             .animation(.easeOut(duration: 0.18), value: session.artwork == nil)
-            HStack(spacing: 10) {
-                if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
-                                                onOpen: onOpenInGalette) {
-                    buttons
-                }
-                if showsSubjectPills {
-                    subjectPills
-                }
+            // Two rows: the ways to Galette, then the ways to Claude. Side
+            // by side, the three subjects and the search overflowed the card.
+            if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
+                                            onOpen: onOpenInGalette) {
+                buttons
+            }
+            if showsSubjectPills {
+                subjectPills
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -53,7 +53,8 @@ enum ClaudioURL: Equatable {
         guard let kind = value("kind").flatMap(MusicSubject.Kind.init(rawValue:)),
               let artist = value("artist") else { return nil }
         let title = value("title")
-        if kind == .album, title == nil { return nil }
+        // A link names an album or an artist; the track is the card's own.
+        if kind == .track || (kind == .album && title == nil) { return nil }
         return MusicSubject(kind: kind, artist: artist, title: kind == .album ? title : nil,
                             mbid: value("mbid"), firstReleaseDate: value("date"), type: value("type"),
                             label: value("label"), country: value("country"))
