@@ -76,7 +76,7 @@ final class StreamDeckBridge {
         let publisher = BridgeStatePublisher(send: { [weak self] in self?.server?.broadcast($0) })
         let server = BridgeServer(
             token: token,
-            onCommand: { [weak self] message in _ = self?.dispatcher.dispatch(message) },
+            onCommand: { [weak self] message in self?.dispatcher.dispatch(message) },
             // Read at the handshake, never cached: a plugin starting
             // mid-dictation is told about the dictation.
             welcomeState: { [weak self] in self?.publisher?.current ?? .idle },

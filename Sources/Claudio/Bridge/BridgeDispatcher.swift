@@ -19,12 +19,11 @@ struct BridgeDispatcher {
     var openSettings: () -> Void
 
     /// Routes one command. `hello` is not a command: the server answers it
-    /// itself, so this returns `false` for it, and for anything else the
-    /// server is the one to handle.
-    func dispatch(_ message: BridgeInbound) -> Bool {
+    /// itself, and it reaches nothing here.
+    func dispatch(_ message: BridgeInbound) {
         switch message {
         case .hello:
-            return false
+            break
         case .action(.catalog(let action)):
             triggerAction(action)
         case .action(.free):
@@ -46,6 +45,5 @@ struct BridgeDispatcher {
         case .openSettings:
             openSettings()
         }
-        return true
     }
 }

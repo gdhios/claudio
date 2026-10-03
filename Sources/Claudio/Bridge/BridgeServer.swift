@@ -37,8 +37,7 @@ final class BridgeServer {
     /// comes and goes without ever saying hello changes nothing on screen.
     private var announcedClientCount = 0
 
-    /// The port the listener landed on, once it is ready.
-    private(set) var port: UInt16?
+    /// Handed the port the listener landed on, once it is ready.
     var onReady: ((UInt16) -> Void)?
     var onClientCountChange: ((Int) -> Void)?
     /// The listener gave up. Whoever published the way in is the one that
@@ -92,7 +91,6 @@ final class BridgeServer {
         switch state {
         case .ready:
             guard let port = listener?.port?.rawValue else { return }
-            self.port = port
             // The handshake file is written from here: a port published
             // before the listener answers is a plugin knocking on nothing.
             onReady?(port)
@@ -120,7 +118,6 @@ final class BridgeServer {
         }
         listener?.cancel()
         listener = nil
-        port = nil
     }
 
     // MARK: - Connections
