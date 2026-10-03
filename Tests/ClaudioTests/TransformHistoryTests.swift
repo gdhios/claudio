@@ -62,8 +62,7 @@ final class TransformHistoryTests: XCTestCase {
 
     @MainActor
     func testTheStoreSurvivesARestart() {
-        let suite = "ClaudioTests.history.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = InMemoryDefaults()
 
         let magasin = TransformHistory(defaults: defaults, limit: 20)
         magasin.record("Traduis en espagnol", at: noon)
@@ -77,8 +76,7 @@ final class TransformHistoryTests: XCTestCase {
 
     @MainActor
     func testClearingTheStoreErasesStorage() {
-        let suite = "ClaudioTests.history.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = InMemoryDefaults()
 
         let magasin = TransformHistory(defaults: defaults, limit: 20)
         magasin.record("Traduis en espagnol", at: noon)
@@ -90,7 +88,7 @@ final class TransformHistoryTests: XCTestCase {
 
     @MainActor
     func testEmptyStorageStartsEmpty() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.history.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
         XCTAssertTrue(TransformHistory(defaults: defaults, limit: 20).recents.entries.isEmpty)
     }
 }

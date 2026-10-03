@@ -4,21 +4,18 @@ import XCTest
 /// Which lone modifier key each dictation shortcut is set to: one storage
 /// key per shortcut, holding the key's rawValue, absent for none. At stake:
 /// a key set today still dictates after an update, and one key never ends up
-/// on both shortcuts. Each test writes to a throwaway suite, never to this
-/// Mac's preferences.
+/// on both shortcuts. Each test writes to throwaway defaults held in
+/// memory, never to this Mac's preferences.
 final class AppSettingsLoneKeyTests: XCTestCase {
 
-    private var suiteName = ""
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
-        suiteName = "ClaudioTests.loneKeys.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        defaults = InMemoryDefaults()
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         super.tearDown()
     }

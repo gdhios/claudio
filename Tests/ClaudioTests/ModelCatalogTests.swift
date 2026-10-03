@@ -10,7 +10,7 @@ final class ModelCatalogTests: XCTestCase {
     private let noon = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
     private func freshDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "ClaudioTests.catalog.\(UUID().uuidString)")!
+        InMemoryDefaults()
     }
 
     /// A trimmed `GET /v1/models` answer, as the API shapes it.

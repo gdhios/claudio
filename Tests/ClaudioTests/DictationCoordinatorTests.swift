@@ -1175,7 +1175,7 @@ private final class Bench {
         self.media = media
         pauser = MediaPauser(playback: media.playback)
         history = DictationHistory(
-            defaults: UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+            defaults: InMemoryDefaults()
         )
         let client = self.client
         built = DictationCoordinator(

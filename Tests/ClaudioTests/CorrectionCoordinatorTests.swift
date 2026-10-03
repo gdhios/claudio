@@ -402,7 +402,7 @@ private final class Bench {
         let client = FakeAnswerClient(answers)
         self.client = client
         galette = FakeGalette(installed: galetteInstalled)
-        history = TransformHistory(defaults: UserDefaults(suiteName: "ClaudioTests.correction.\(UUID().uuidString)")!)
+        history = TransformHistory(defaults: InMemoryDefaults())
         built = CorrectionCoordinator(
             durations: .init(empty: .milliseconds(20), failure: .milliseconds(20)),
             pasting: PasteService(

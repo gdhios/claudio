@@ -105,7 +105,7 @@ final class CostLedgerTests: XCTestCase {
     /// as today's spend.
     @MainActor
     func testEmptyStorageStartsAtZero() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
         let ledger = CostLedger(defaults: defaults, now: noon)
         XCTAssertEqual(ledger.day.total, 0)
         XCTAssertEqual(ledger.day.actions, 0)
@@ -119,7 +119,7 @@ final class CostLedgerTests: XCTestCase {
         AppSettings.costCounterEnabled = true
         defer { AppSettings.costCounterEnabled = previous }
 
-        let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
         let ledger = CostLedger(defaults: defaults, now: noon)
 
         ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: noon)
@@ -141,7 +141,7 @@ final class CostLedgerTests: XCTestCase {
         AppSettings.costCounterEnabled = true
         defer { AppSettings.costCounterEnabled = previous }
 
-        let defaults = UserDefaults(suiteName: "ClaudioTests.cost.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
         let ledger = CostLedger(defaults: defaults, now: noon)
         ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: noon)
         ledger.record(model: .claude(ClaudioModel(id: "claude-sonnet-9")),
