@@ -1,13 +1,13 @@
 import SwiftUI
 
-// The parts the three floating panels share — correction, dictation and
-// "What's playing?": each panel keeps its own header, content and footer,
-// built from these.
+// The parts the three floating panels share (correction, dictation and
+// "What's playing?"), in the order a panel reads: its frame, its header,
+// its content, its footer. Each panel builds its own from these.
 
 extension View {
     /// The frame every panel wears: its width, its height reported to the
-    /// window so the window hugs it, and the dark rounded card with its
-    /// border, dark whatever the system mode.
+    /// window so the window hugs it, and the rounded card with its border,
+    /// dark whatever the system mode.
     func panelChrome(width: CGFloat,
                      onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)?) -> some View {
         frame(width: width)
@@ -52,6 +52,25 @@ private struct PanelHeightKey: PreferenceKey {
 struct PanelTextHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Panel close button: discreet in the header, becomes a circle on hover.
+struct PanelCloseButton: View {
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(hovered ? .white : .white.opacity(0.45))
+                .frame(width: 18, height: 18)
+                .background(Color.white.opacity(hovered ? 0.14 : 0), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help(loc("Fermer (Échap)", en: "Close (esc)"))
+    }
 }
 
 /// The header's pill while a panel works: a spinner, and what it's doing.
@@ -120,6 +139,8 @@ struct PanelMessage<Action: View>: View {
     let title: String
     let detail: String
     let textSize: PanelTextSize
+    /// Room above and below; under the listening card, which makes its
+    /// own, there is less above.
     var top: CGFloat = 26
     var bottom: CGFloat = 26
     @ViewBuilder let action: Action
@@ -186,24 +207,5 @@ struct CopyButton: View {
             }
         }
         .buttonStyle(PanelPillButtonStyle())
-    }
-}
-
-/// Panel close button: discreet in the header, becomes a circle on hover.
-struct PanelCloseButton: View {
-    let action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 8.5, weight: .bold))
-                .foregroundStyle(hovered ? .white : .white.opacity(0.45))
-                .frame(width: 18, height: 18)
-                .background(Color.white.opacity(hovered ? 0.14 : 0), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-        .help(loc("Fermer (Échap)", en: "Close (esc)"))
     }
 }

@@ -66,7 +66,6 @@ struct ResultPanelView: View {
         case .capturing:
             WorkingPill(loc("Capture…", en: "Reading…"))
         case .listeningInstruction:
-            // The dictation panel's own pill: the voice moving.
             ListeningPill(levels: session.levels,
                           label: session.listeningEnded
                               ? loc("Un instant…", en: "One moment…")
