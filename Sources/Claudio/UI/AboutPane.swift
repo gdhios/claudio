@@ -3,8 +3,10 @@ import SwiftUI
 struct AboutPane: View {
     @State private var checking = false
     @State private var installing = false
-    @State private var updateMessage: String?
-    @State private var pendingUpdate: UpdateChecker.Feed?
+    // What the daily check has already found: the way to install it is
+    // there when the tab opens, without checking again.
+    @State private var updateMessage = UpdateChecker.shared.availableUpdate.map(AboutPane.available)
+    @State private var pendingUpdate = UpdateChecker.shared.availableUpdate
 
     private var version: String { Bundle.main.shortVersion }
 
@@ -38,8 +40,7 @@ struct AboutPane: View {
                                                     en: "Claudio is up to date (version \(version)).")
                                 pendingUpdate = nil
                             case .updateAvailable(let feed):
-                                updateMessage = loc("Mise à jour \(feed.version) disponible.",
-                                                    en: "Update \(feed.version) available.")
+                                updateMessage = Self.available(feed)
                                 pendingUpdate = feed
                             case .failed:
                                 updateMessage = loc("Vérification impossible, réessayez plus tard.",
@@ -86,6 +87,10 @@ struct AboutPane: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    nonisolated private static func available(_ feed: UpdateChecker.Feed) -> String {
+        loc("Mise à jour \(feed.version) disponible.", en: "Update \(feed.version) available.")
     }
 
     /// Downloads, verifies and installs: on success, the app quits and
