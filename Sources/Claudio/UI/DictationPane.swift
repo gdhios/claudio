@@ -47,26 +47,18 @@ struct DictationPane: View {
             history
         }
         .formStyle(.grouped)
-        .onAppear { load() }
+        .task { await load() }
     }
 
     // MARK: - Languages
 
     private var languages: some View {
         Section {
-            Picker(loc("Langue principale", en: "Primary language"), selection: $primaryLanguage) {
-                ForEach(DictationLanguage.allCases, id: \.self) { language in
-                    Text(language.displayName).tag(language)
-                }
-            }
-            .onChange(of: primaryLanguage) { AppSettings.dictationPrimaryLanguage = primaryLanguage }
+            languagePicker(loc("Langue principale", en: "Primary language"), selection: $primaryLanguage)
+                .onChange(of: primaryLanguage) { AppSettings.dictationPrimaryLanguage = primaryLanguage }
 
-            Picker(loc("Autre langue", en: "Other language"), selection: $secondaryLanguage) {
-                ForEach(DictationLanguage.allCases, id: \.self) { language in
-                    Text(language.displayName).tag(language)
-                }
-            }
-            .onChange(of: secondaryLanguage) { AppSettings.dictationSecondaryLanguage = secondaryLanguage }
+            languagePicker(loc("Autre langue", en: "Other language"), selection: $secondaryLanguage)
+                .onChange(of: secondaryLanguage) { AppSettings.dictationSecondaryLanguage = secondaryLanguage }
         } header: {
             Text(loc("Langues", en: "Languages"))
         } footer: {
@@ -77,6 +69,14 @@ struct DictationPane: View {
         }
     }
 
+    private func languagePicker(_ title: String, selection: Binding<DictationLanguage>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(DictationLanguage.allCases, id: \.self) { language in
+                Text(language.displayName).tag(language)
+            }
+        }
+    }
+
     // MARK: - What the dictation becomes
 
     /// One choice per shortcut, next to the languages they go with: dictate
@@ -84,22 +84,12 @@ struct DictationPane: View {
     /// for plain cleanup. Greyed out under "Raw", which has no model to ask.
     private var outputs: some View {
         Section {
-            Picker(loc("Raccourci principal", en: "Main shortcut"), selection: $output) {
-                ForEach(DictationOutput.allCases, id: \.self) { choice in
-                    Text(choice.title).tag(choice)
-                }
-            }
-            .disabled(model == .raw)
-            .onChange(of: output) { AppSettings.dictationOutput = output }
+            outputPicker(loc("Raccourci principal", en: "Main shortcut"), selection: $output)
+                .onChange(of: output) { AppSettings.dictationOutput = output }
 
-            Picker(loc("Raccourci de l'autre langue", en: "Other-language shortcut"),
-                   selection: $secondaryOutput) {
-                ForEach(DictationOutput.allCases, id: \.self) { choice in
-                    Text(choice.title).tag(choice)
-                }
-            }
-            .disabled(model == .raw)
-            .onChange(of: secondaryOutput) { AppSettings.dictationSecondaryOutput = secondaryOutput }
+            outputPicker(loc("Raccourci de l'autre langue", en: "Other-language shortcut"),
+                         selection: $secondaryOutput)
+                .onChange(of: secondaryOutput) { AppSettings.dictationSecondaryOutput = secondaryOutput }
         } header: {
             Text(loc("Sortie", en: "Output"))
         } footer: {
@@ -113,6 +103,15 @@ struct DictationPane: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func outputPicker(_ title: String, selection: Binding<DictationOutput>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(DictationOutput.allCases, id: \.self) { choice in
+                Text(choice.title).tag(choice)
+            }
+        }
+        .disabled(model == .raw)
     }
 
     // MARK: - Vocabulary
@@ -283,9 +282,9 @@ struct DictationPane: View {
     /// A preview renders the same screen on every machine: it asks no
     /// server for its models, and shows a fixed history instead of whatever
     /// this Mac happens to have dictated.
-    private func load() {
+    private func load() async {
         entries = PreviewRun.isActive ? DictationPane.frozenHistory : DictationHistory.shared.recents.entries
-        Task { localModels = await LocalModels.discover() }
+        localModels = await LocalModels.discover()
     }
 
     /// A vocabulary nobody typed, for the preview: two terms and a

@@ -8,13 +8,12 @@ struct DictationWaveform: View {
     var barWidth: CGFloat = 3
     var spacing: CGFloat = 3
     var maxHeight: CGFloat = 32
-    var color: Color = ClaudioTheme.accent
 
     var body: some View {
         HStack(alignment: .center, spacing: spacing) {
             ForEach(Array(levels.enumerated()), id: \.offset) { index, level in
                 Capsule()
-                    .fill(color.opacity(opacity(at: index)))
+                    .fill(ClaudioTheme.accent.opacity(opacity(at: index)))
                     .frame(width: barWidth, height: height(for: level))
             }
         }
