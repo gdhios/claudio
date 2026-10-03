@@ -60,11 +60,14 @@ extension SpeechRun {
             request.endAudio()
             self?.armFinalWatchdog(gate)
         }
-        guard adopt(teardown: teardown, onStop: onStop) else {
+        switch adopt(teardown: teardown, onStop: onStop) {
+        case .running:
+            await startAudio(microphone, until: gate)
+        case .stopping:
+            sink.emitFinal()
+        case .cancelled:
             microphone.close()
             task.cancel()
-            return
         }
-        await startAudio(microphone, until: gate)
     }
 }

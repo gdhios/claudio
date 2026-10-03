@@ -106,8 +106,22 @@ final class SpeechGate: @unchecked Sendable {
 /// been registered so far; the driving task checks the flag at every step.
 /// `adopt` is the meeting point of the two: under the same lock, a cancel
 /// either happens before it — nothing was opened — or after it, and finds
-/// something to close.
+/// something to close. A stop that happens before it finds nothing to close
+/// either, and `adopt` says so: the microphone then never opens.
 final class SpeechRun: @unchecked Sendable {
+    /// Where a run stands once its setup is done, as `adopt` tells it.
+    enum State {
+        /// Nothing ended it during the setup: the microphone can open.
+        case running
+        /// `stop()` came during the setup. The key is already up and nothing
+        /// was heard: the run ends on its final, and the microphone stays
+        /// off — turned on now, it would stay on after the key.
+        case stopping
+        /// `cancel()` came during the setup: nothing was registered, and the
+        /// caller undoes its own setup.
+        case cancelled
+    }
+
     let sink: TranscriptSink
     private let lock = NSLock()
     private var cancelled = false
@@ -120,21 +134,15 @@ final class SpeechRun: @unchecked Sendable {
     var isCancelled: Bool { lock.withLock { cancelled } }
     var isStopping: Bool { lock.withLock { stopping } }
 
-    /// Registers what closing down means. Returns false when the run was
-    /// already cancelled: the caller then undoes its own setup and gives up.
-    func adopt(teardown: @escaping () -> Void, onStop: @escaping () -> Void) -> Bool {
-        lock.lock()
-        if cancelled {
-            lock.unlock()
-            return false
+    /// Registers what closing down means, and says where the run stands:
+    /// only a run still `.running` goes on to turn the microphone on.
+    func adopt(teardown: @escaping () -> Void, onStop: @escaping () -> Void) -> State {
+        lock.withLock {
+            if cancelled { return .cancelled }
+            self.teardown = teardown
+            self.onStop = onStop
+            return stopping ? .stopping : .running
         }
-        self.teardown = teardown
-        self.onStop = onStop
-        let alreadyStopping = stopping
-        lock.unlock()
-        // A `stop()` that arrived during the setup is honoured now.
-        if alreadyStopping { onStop() }
-        return true
     }
 
     /// Closes the microphone and lets the recognizer have its last word.

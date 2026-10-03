@@ -124,19 +124,21 @@ extension SpeechRun {
             Task { try? await analyzer.finalizeAndFinishThroughEndOfInput() }
             self?.armFinalWatchdog(gate)
         }
-        guard adopt(teardown: teardown, onStop: onStop) else {
+        switch adopt(teardown: teardown, onStop: onStop) {
+        case .running:
+            do {
+                try await analyzer.start(inputSequence: inputStream)
+            } catch {
+                sink.fail(.audioEngine(error.localizedDescription))
+                return
+            }
+            await startAudio(microphone, until: gate)
+        case .stopping:
+            sink.emitFinal()
+        case .cancelled:
             closeMicrophone()
             collector.cancel()
-            return
         }
-
-        do {
-            try await analyzer.start(inputSequence: inputStream)
-        } catch {
-            sink.fail(.audioEngine(error.localizedDescription))
-            return
-        }
-        await startAudio(microphone, until: gate)
     }
 
     /// The microphone rarely speaks the format the transcriber wants; this
