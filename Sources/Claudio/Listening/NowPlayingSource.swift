@@ -22,7 +22,6 @@ struct NowPlayingSource {
           title: v('kMRMediaRemoteNowPlayingInfoTitle'),
           artist: v('kMRMediaRemoteNowPlayingInfoArtist'),
           album: v('kMRMediaRemoteNowPlayingInfoAlbum'),
-          duration: v('kMRMediaRemoteNowPlayingInfoDuration'),
           playing: R.localIsPlaying,
           app: ObjC.unwrap(R.localNowPlayingPlayerPath.client.displayName),
           bundle: ObjC.unwrap(R.localNowPlayingPlayerPath.client.bundleIdentifier)

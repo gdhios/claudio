@@ -44,7 +44,7 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     static func normalize(_ text: String) -> String {
         TrackTitle.plain(text)
             .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
-            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            .collapsingWhitespace()
     }
 
     func lookup(key: String, now: Date) -> Lookup {

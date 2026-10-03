@@ -15,7 +15,7 @@ enum ModelSlot: Hashable, Sendable {
     case dictation
     /// The notes under the track playing.
     case listening
-    /// The long text "Tell me more" writes about the album or the artist:
+    /// The long text "Tell me more" writes about the track, the album or the artist:
     /// its own slot, so a small model on the notes never writes the text
     /// that answers for the facts.
     case essay
