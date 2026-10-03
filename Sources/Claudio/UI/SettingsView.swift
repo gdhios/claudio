@@ -50,7 +50,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
-        case .music: "music.note"
+        case .music: ListeningSession.symbolName
         case .streamDeck: "rectangle.grid.3x2.fill"
         case .prompts: "text.quote"
         case .about: "info"
@@ -65,7 +65,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
-        case .music: .mint
+        case .music: ListeningSession.tint
         case .streamDeck: .teal
         case .prompts: .orange
         case .about: .blue
