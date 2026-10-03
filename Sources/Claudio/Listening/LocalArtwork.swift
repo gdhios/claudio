@@ -20,6 +20,25 @@ struct ArtworkSource {
     }
 }
 
+/// The cover the Cover Art Archive holds for the release group the facts
+/// name: the fallback when the player gave none.
+@MainActor
+struct RemoteArtworkSource {
+    var image: @MainActor (TrackFacts) async -> NSImage?
+
+    static let archiveBaseURL = URL(string: "https://coverartarchive.org/")!
+
+    static func frontURL(releaseGroup id: String) -> URL {
+        archiveBaseURL.appendingPathComponent("release-group/\(id)/front-250")
+    }
+
+    static let system = RemoteArtworkSource { facts in
+        guard !PreviewRun.isActive, let id = facts.releaseGroupID else { return nil }
+        return await LocalArtwork.fetch(frontURL(releaseGroup: id),
+                                        userAgent: MusicBrainzLookup.userAgent(version: Bundle.main.shortVersion))
+    }
+}
+
 /// The cover as the player knows it. MediaRemote names the cover (an
 /// identifier, a MIME type, a size) but doesn't hand over its bytes: only
 /// the player can. Spotify's dictionary gives the URL of the track's cover;

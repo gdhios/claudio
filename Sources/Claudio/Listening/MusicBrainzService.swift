@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// Asks MusicBrainz about a track under its rules and the panel's budget:
 /// the cache first, then the recording search, then the release group,
@@ -182,23 +182,4 @@ struct FactsSource {
             guard !PreviewRun.isActive else { return nil }
             return await MusicBrainzService.shared.artist(for: subject)
         })
-}
-
-/// The cover the Cover Art Archive holds for the release group the facts
-/// name: the fallback when the player gave none.
-@MainActor
-struct RemoteArtworkSource {
-    var image: @MainActor (TrackFacts) async -> NSImage?
-
-    static let archiveBaseURL = URL(string: "https://coverartarchive.org/")!
-
-    static func frontURL(releaseGroup id: String) -> URL {
-        archiveBaseURL.appendingPathComponent("release-group/\(id)/front-250")
-    }
-
-    static let system = RemoteArtworkSource { facts in
-        guard !PreviewRun.isActive, let id = facts.releaseGroupID else { return nil }
-        return await LocalArtwork.fetch(frontURL(releaseGroup: id),
-                                        userAgent: MusicBrainzLookup.userAgent(version: Bundle.main.shortVersion))
-    }
 }
