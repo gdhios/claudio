@@ -345,8 +345,8 @@ final class SpokenInstructionCoordinatorTests: XCTestCase {
 /// to drive it: a clock it moves by hand, the session the panel handed back,
 /// and what each closure was asked.
 @MainActor
-private final class Bench {
-    let engine: FakeInstructionEngine
+private final class Bench: AsyncWaiting {
+    let engine: FakeSpeechEngine
     var coordinator: SpokenInstructionCoordinator { built }
     private var built: SpokenInstructionCoordinator!
 
@@ -385,7 +385,7 @@ private final class Bench {
          durations: PanelMessageDurations = .standard) {
         self.microphoneGranted = microphoneGranted
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
-        let engine = FakeInstructionEngine(events)
+        let engine = FakeSpeechEngine(events)
         self.engine = engine
         let media = FakeMediaPlayback(playing: playing, readsWait: readsWait)
         media.microphoneCloses = { engine.stops + engine.cancels }
@@ -452,24 +452,6 @@ private final class Bench {
         ceiling.cancel()
     }
 
-    /// Lets the coordinator's task run. Everything here is on the main actor
-    /// and nothing waits on the outside world, so a few turns are enough.
-    func settle(until reached: () -> Bool) async {
-        var turns = 0
-        while !reached(), turns < 500 {
-            await Task.yield()
-            turns += 1
-        }
-    }
-
-    /// Waits for something a timer decides rather than a turn of the loop: a
-    /// panel closing itself is the only thing here that takes real time.
-    func wait(seconds: TimeInterval = 2, until reached: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(seconds)
-        while !reached(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
-    }
 }
 
 private extension PanelMessageDurations {
@@ -479,65 +461,3 @@ private extension PanelMessageDurations {
                                                              failure: .milliseconds(5))
 }
 
-/// Replays a fixed list of events. The partials go out as soon as the engine
-/// starts, as a real one does while the key is held; the final waits for
-/// `stop()`, since it's the microphone closing that ends a session. A
-/// failure doesn't wait for anything.
-///
-/// `@unchecked Sendable`: everything it does happens on the main actor.
-private final class FakeInstructionEngine: SpeechEngine, @unchecked Sendable {
-    private let events: [TranscriptEvent]
-    private var continuation: AsyncStream<TranscriptEvent>.Continuation?
-
-    private(set) var starts = 0
-    private(set) var stops = 0
-    private(set) var cancels = 0
-    private(set) var startedLocales: [Locale] = []
-    /// The terms each start was biased towards, one list per start.
-    private(set) var startedContextualStrings: [[String]] = []
-
-    init(_ events: [TranscriptEvent]) { self.events = events }
-
-    func start(locale: Locale, contextualStrings: [String]) -> AsyncStream<TranscriptEvent> {
-        starts += 1
-        startedLocales.append(locale)
-        startedContextualStrings.append(contextualStrings)
-        let (stream, continuation) = AsyncStream.makeStream(of: TranscriptEvent.self)
-        self.continuation = continuation
-        for event in events {
-            switch event {
-            case .partial, .level:
-                continuation.yield(event)
-            case .failed:
-                continuation.yield(event)
-                continuation.finish()
-            case .final:
-                break
-            }
-        }
-        return stream
-    }
-
-    /// What the engine says later on, while the key is still held: a
-    /// failure, say, once the music has been paused.
-    func say(_ event: TranscriptEvent) {
-        continuation?.yield(event)
-        switch event {
-        case .final, .failed: continuation?.finish()
-        case .partial, .level: break
-        }
-    }
-
-    func stop() {
-        stops += 1
-        for case .final(let text) in events {
-            continuation?.yield(.final(text))
-        }
-        continuation?.finish()
-    }
-
-    func cancel() {
-        cancels += 1
-        continuation?.finish()
-    }
-}

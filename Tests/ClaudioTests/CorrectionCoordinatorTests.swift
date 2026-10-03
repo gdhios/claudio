@@ -158,11 +158,11 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// in it — with nothing selected, there is nothing to read again anyway.
     func testTryingAgainOnNothingSelectedSendsTheSameRequestWithoutCapturing() async throws {
         let bench = Bench(selection: nil, track: .sample,
-                          answers: [.failure(AnswerFailure()), .success(Bench.answer)])
+                          answers: [.failure(ModelFailure()), .success(Bench.answer)])
         bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
-        XCTAssertEqual(session.phase, .error(AnswerFailure().localizedDescription))
+        XCTAssertEqual(session.phase, .error(ModelFailure().localizedDescription))
 
         bench.coordinator.retry()
         await bench.runs()
@@ -350,7 +350,7 @@ private extension NowPlayingTrack {
 
 /// One coordinator and the fakes it was built with.
 @MainActor
-private final class Bench {
+private final class Bench: AsyncWaiting {
     static let answer = "Bonjour, je voulais savoir."
     /// `NowPlayingTrack.sample`, the way the model reads it.
     static let trackBlock = """
@@ -362,7 +362,7 @@ private final class Bench {
         </morceau_en_cours>
         """
 
-    let client: FakeAnswerClient
+    let client: FakeTextStreamClient
     /// Galette, missing unless the test installs it.
     let galette: FakeGalette
     var coordinator: CorrectionCoordinator { built }
@@ -399,7 +399,7 @@ private final class Bench {
         self.selection = selection
         self.track = track
         self.readsWait = readsWait
-        let client = FakeAnswerClient(answers)
+        let client = FakeTextStreamClient(answers)
         self.client = client
         galette = FakeGalette(installed: galetteInstalled)
         history = TransformHistory(defaults: InMemoryDefaults())
@@ -456,55 +456,5 @@ private final class Bench {
         ceiling.cancel()
     }
 
-    /// Lets the coordinator's tasks run: everything is on the main actor and
-    /// nothing waits on the outside world, so a few turns are enough.
-    func settle(until reached: () -> Bool) async {
-        var turns = 0
-        while !reached(), turns < 500 {
-            await Task.yield()
-            turns += 1
-        }
-    }
-
-    /// Waits for something a timer decides — the panel closing itself. The
-    /// ceiling keeps a panel that never closes from hanging the suite.
-    func wait(seconds: TimeInterval = 2, until reached: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(seconds)
-        while !reached(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
-    }
 }
 
-/// Answers in two pieces, one answer per call — the last one again once the
-/// list runs out — and keeps what each call was sent.
-///
-/// `@unchecked Sendable`: every call is awaited before a test reads it.
-private final class FakeAnswerClient: TextStreamClient, @unchecked Sendable {
-    private var answers: [Result<String, Error>]
-    private(set) var texts: [String] = []
-    private(set) var systems: [String] = []
-
-    init(_ answers: [Result<String, Error>]) { self.answers = answers }
-
-    var calls: Int { texts.count }
-
-    func streamCompletion(of text: String,
-                          system: String,
-                          maxTokens: Int,
-                          onDelta: @escaping @Sendable (String) async -> Void) async throws -> StreamResult {
-        texts.append(text)
-        systems.append(system)
-        let answer = answers.count > 1 ? answers.removeFirst() : answers[0]
-        let full = try answer.get()
-        let middle = full.index(full.startIndex, offsetBy: full.count / 2)
-        await onDelta(String(full[..<middle]))
-        await onDelta(String(full[middle...]))
-        return StreamResult(text: full, truncated: false, inputTokens: 0, outputTokens: 0)
-    }
-}
-
-/// What a model that isn't answering looks like from here.
-private struct AnswerFailure: LocalizedError {
-    var errorDescription: String? { "The API didn't answer" }
-}

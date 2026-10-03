@@ -458,7 +458,7 @@ final class DictationCoordinator {
     /// Copies what the panel shows: the way out when the paste had nowhere
     /// to go.
     func copyText() {
-        guard let session, !session.finalText.isEmpty else { return }
+        guard let session, session.canCopy else { return }
         NSPasteboard.general.setText(session.finalText)
         session.justCopied = true
         Task { [weak self] in

@@ -347,8 +347,10 @@ final class CorrectionCoordinator {
         }
     }
 
+    /// The Copy button and ⌘C, under the same condition: an answer that is
+    /// complete. Mid-stream, ⌘C would copy half of it and close the panel.
     func copyResult() {
-        guard let session, !session.correctedText.isEmpty else { return }
+        guard let session, session.canPaste else { return }
         NSPasteboard.general.setText(session.correctedText)
         session.justCopied = true
         target?.clipboard = nil  // the user wants this content: don't restore over it

@@ -84,12 +84,12 @@ final class ListeningCoordinatorTests: XCTestCase {
     /// Claude failing takes nothing away from what the player said: the
     /// card stays, the error goes under it.
     func testAClientErrorKeepsTheCard() async throws {
-        let bench = Bench(answer: .failure(NotesFailure()))
+        let bench = Bench(answer: .failure(ModelFailure()))
         bench.coordinator.trigger()
         let session = try XCTUnwrap(bench.coordinator.session)
 
         await bench.runs()
-        XCTAssertEqual(session.phase, .error(NotesFailure().localizedDescription))
+        XCTAssertEqual(session.phase, .error(ModelFailure().localizedDescription))
         XCTAssertEqual(session.track, .sample)
         XCTAssertEqual(bench.client.calls, 1)
         XCTAssertNotNil(bench.coordinator.session)
@@ -479,7 +479,7 @@ private extension NowPlayingTrack {
 
 /// One coordinator and the fakes it was built with.
 @MainActor
-private final class Bench {
+private final class Bench: AsyncWaiting {
     static let notes = "Takako Mamiya est une chanteuse japonaise de city pop. Love Trip est son seul album."
     /// The cover the fake player hands back, compared by identity.
     static let cover = NSImage(size: NSSize(width: 1, height: 1))
@@ -490,7 +490,7 @@ private final class Bench {
                                         ArtistFacts.Release(id: "3b03f2df", title: "LOVE TRIP", primaryType: "Album",
                                                             secondaryTypes: [], firstReleaseDate: "1982-11-25")])
 
-    let client: FakeNotesClient
+    let client: FakeTextStreamClient
     /// Galette, missing unless the test installs it.
     let galette: FakeGalette
     var coordinator: ListeningCoordinator { built }
@@ -553,7 +553,7 @@ private final class Bench {
         self.readsWait = readsWait
         self.artwork = artwork
         self.artworkWaits = artworkWaits
-        let client = FakeNotesClient(answer)
+        let client = FakeTextStreamClient(answer)
         client.stopReason = stopReason
         client.blockTypes = blockTypes
         self.client = client
@@ -654,25 +654,6 @@ private final class Bench {
         ceiling.cancel()
     }
 
-    /// Lets the coordinator's task run: everything is on the main actor and
-    /// nothing waits on the outside world, so a few turns are enough.
-    func settle(until reached: () -> Bool) async {
-        var turns = 0
-        while !reached(), turns < 500 {
-            await Task.yield()
-            turns += 1
-        }
-    }
-
-    /// Waits for something a timer decides — the panel closing itself. The
-    /// ceiling keeps a panel that never closes from hanging the suite.
-    func wait(seconds: TimeInterval = 2, until reached: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(seconds)
-        while !reached(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
-    }
-
     /// Records every phase the session goes through, and every state of
     /// its notes, in order.
     func watch(_ session: ListeningSession) -> SessionLog {
@@ -691,39 +672,3 @@ private final class SessionLog {
     var subscriptions: [AnyCancellable] = []
 }
 
-/// Answers a fixed text in two pieces, or throws, and keeps what each call
-/// was sent.
-///
-/// `@unchecked Sendable`: every call is awaited before a test reads it.
-private final class FakeNotesClient: TextStreamClient, @unchecked Sendable {
-    private let answer: Result<String, Error>
-    var stopReason: String? = "end_turn"
-    var blockTypes: [String] = ["text"]
-    private(set) var calls = 0
-    private(set) var texts: [String] = []
-    private(set) var systems: [String] = []
-    private(set) var budgets: [Int] = []
-
-    init(_ answer: Result<String, Error>) { self.answer = answer }
-
-    func streamCompletion(of text: String,
-                          system: String,
-                          maxTokens: Int,
-                          onDelta: @escaping @Sendable (String) async -> Void) async throws -> StreamResult {
-        calls += 1
-        texts.append(text)
-        systems.append(system)
-        budgets.append(maxTokens)
-        let notes = try answer.get()
-        let middle = notes.index(notes.startIndex, offsetBy: notes.count / 2)
-        await onDelta(String(notes[..<middle]))
-        await onDelta(String(notes[middle...]))
-        return StreamResult(text: notes, truncated: false, inputTokens: 0, outputTokens: 0,
-                            stopReason: stopReason, blockTypes: blockTypes)
-    }
-}
-
-/// What a model that isn't answering looks like from here.
-private struct NotesFailure: LocalizedError {
-    var errorDescription: String? { "The API didn't answer" }
-}

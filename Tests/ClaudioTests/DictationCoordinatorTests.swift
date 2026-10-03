@@ -1141,9 +1141,9 @@ final class DictationCoordinatorTests: XCTestCase {
 /// One coordinator and the fakes it was built with, plus what a test needs
 /// to drive it: a clock it moves by hand, and the texts the paste received.
 @MainActor
-private final class Bench {
+private final class Bench: AsyncWaiting {
     let engine: FakeSpeechEngine
-    let client: FakeStreamClient
+    let client: FakeTextStreamClient
     let history: DictationHistory
     /// Built in `init` and never cleared: the tests see it as what it is.
     var coordinator: DictationCoordinator { built }
@@ -1203,7 +1203,7 @@ private final class Bench {
         self.vocabulary = DictationVocabulary(parsing: vocabulary)
         let engine = FakeSpeechEngine(events)
         self.engine = engine
-        client = FakeStreamClient(answer, parks: cleanupParks)
+        client = FakeTextStreamClient(answer, parks: cleanupParks)
         let media = FakeMediaPlayback(playing: playing, readsWait: readsWait)
         media.microphoneCloses = { engine.stops + engine.cancels }
         self.media = media
@@ -1319,27 +1319,6 @@ private final class Bench {
         await pauser.read?.value
     }
 
-    /// Lets the coordinator's task run. Everything here is on the main actor
-    /// and nothing waits on the outside world, so a few turns are enough;
-    /// the ceiling only keeps a broken cycle from hanging the suite.
-    func settle(until reached: () -> Bool) async {
-        var turns = 0
-        while !reached(), turns < 500 {
-            await Task.yield()
-            turns += 1
-        }
-    }
-
-    /// Waits for something a timer decides rather than a turn of the loop: a
-    /// panel closing itself is the only thing here that takes real time. The
-    /// ceiling keeps a panel that never closes from hanging the suite.
-    func wait(seconds: TimeInterval = 2, until reached: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(seconds)
-        while !reached(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
-    }
-
     /// Records every phase the session goes through, in order.
     func watch(_ session: DictationSession) -> PhaseLog {
         let log = PhaseLog()
@@ -1351,110 +1330,6 @@ private final class Bench {
 private final class PhaseLog {
     var phases: [DictationSession.Phase] = []
     var subscription: AnyCancellable?
-}
-
-/// Replays a fixed list of events. The partials go out as soon as the engine
-/// starts, as a real one does while the key is held; the final waits for
-/// `stop()`, since it's the microphone closing that ends a session. A
-/// failure doesn't wait for anything.
-///
-/// `@unchecked Sendable`: everything it does happens on the main actor.
-private final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
-    private let events: [TranscriptEvent]
-    private var continuation: AsyncStream<TranscriptEvent>.Continuation?
-
-    private(set) var starts = 0
-    private(set) var stops = 0
-    private(set) var cancels = 0
-    private(set) var startedLocales: [Locale] = []
-    /// The terms each start was biased towards, one list per start.
-    private(set) var startedContextualStrings: [[String]] = []
-
-    init(_ events: [TranscriptEvent]) { self.events = events }
-
-    func start(locale: Locale, contextualStrings: [String]) -> AsyncStream<TranscriptEvent> {
-        starts += 1
-        startedLocales.append(locale)
-        startedContextualStrings.append(contextualStrings)
-        let (stream, continuation) = AsyncStream.makeStream(of: TranscriptEvent.self)
-        self.continuation = continuation
-        for event in events {
-            switch event {
-            case .partial, .level:
-                continuation.yield(event)
-            case .failed:
-                continuation.yield(event)
-                continuation.finish()
-            case .final:
-                break
-            }
-        }
-        return stream
-    }
-
-    /// What the engine says later on, while the dictation goes on: another
-    /// partial, or an end it reaches by itself — a final, a failure.
-    func say(_ event: TranscriptEvent) {
-        continuation?.yield(event)
-        switch event {
-        case .final, .failed: continuation?.finish()
-        case .partial, .level: break
-        }
-    }
-
-    func stop() {
-        stops += 1
-        for case .final(let text) in events {
-            continuation?.yield(.final(text))
-        }
-        continuation?.finish()
-    }
-
-    func cancel() {
-        cancels += 1
-        continuation?.finish()
-    }
-}
-
-/// Answers a fixed text in two pieces, or throws. Counts its calls, so a
-/// test can prove "Raw" never asks a model anything, and keeps what each
-/// call was sent: the text to clean up, the prompt it came with, and the
-/// room its answer was given.
-private final class FakeStreamClient: TextStreamClient, @unchecked Sendable {
-    private let answer: Result<String, Error>
-    private(set) var calls = 0
-    private(set) var texts: [String] = []
-    private(set) var systems: [String] = []
-    private(set) var budgets: [Int] = []
-    /// A model that doesn't answer straight away: the call parks until the
-    /// test lets it go, or until the dictation that made it is cancelled.
-    /// That is the window a dictation used to be lost in — the transcript
-    /// exists, the cleaned-up text doesn't yet.
-    private let parks: Bool
-    private var released = false
-
-    init(_ answer: Result<String, Error>, parks: Bool = false) {
-        self.answer = answer
-        self.parks = parks
-    }
-
-    func release() { released = true }
-
-    func streamCompletion(of text: String,
-                          system: String,
-                          maxTokens: Int,
-                          onDelta: @escaping @Sendable (String) async -> Void) async throws -> StreamResult {
-        calls += 1
-        texts.append(text)
-        systems.append(system)
-        budgets.append(maxTokens)
-        while parks, !released, !Task.isCancelled { await Task.yield() }
-        let cleaned = try answer.get()
-        let middle = cleaned.index(cleaned.startIndex, offsetBy: cleaned.count / 2)
-        await onDelta(String(cleaned[..<middle]))
-        await onDelta(String(cleaned[middle...]))
-        return StreamResult(text: cleaned, truncated: false, inputTokens: 0, outputTokens: 0)
-    }
 }
 
 /// What a model that isn't answering looks like from here.
