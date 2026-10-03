@@ -37,6 +37,7 @@ final class MusicSubjectTests: XCTestCase {
     /// an album means little. It carries the album and its facts as
     /// context, and needs a title and an artist.
     func testTheTrackSubjectIsTheTitlePlaying() {
+        useLanguage(.french)
         XCTAssertEqual(MusicSubject.track(of: track, facts: facts),
                        MusicSubject(kind: .track, artist: "間宮貴子", title: "LOVE TRIP",
                                     mbid: "3b03f2df-1fc0", firstReleaseDate: "1982-11-25", type: "Album",

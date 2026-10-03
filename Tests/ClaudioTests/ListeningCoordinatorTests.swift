@@ -99,6 +99,7 @@ final class ListeningCoordinatorTests: XCTestCase {
     /// it the panel says the stream ended with nothing, how, and offers
     /// "Try again" — rather than "Ready" over a blank.
     func testAnEmptyAnswerIsAnErrorThatSaysHow() async throws {
+        useLanguage(.french)
         let bench = Bench(answer: .success("  \n"), stopReason: "end_turn", blockTypes: ["text"])
         bench.coordinator.trigger()
         let session = try XCTUnwrap(bench.coordinator.session)
