@@ -1,7 +1,6 @@
 import KeyboardShortcuts
 import SwiftUI
 
-@MainActor
 struct ShortcutsPane: View {
     /// Where the dictation rows start, for the preview that scrolls to them.
     private static let dictationRows = "dictationRows"

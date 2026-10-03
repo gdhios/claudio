@@ -1,6 +1,5 @@
 import SwiftUI
 
-@MainActor
 struct GeneralPane: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?

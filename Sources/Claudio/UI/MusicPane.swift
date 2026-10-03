@@ -6,7 +6,6 @@ import SwiftUI
 /// Models tab's rows. Not here, on purpose: the notes' language (the
 /// interface's), their system prompt (it carries the "invent nothing"
 /// rule), the sources' budget.
-@MainActor
 struct MusicPane: View {
     // A preview shows fixed settings rather than this Mac's: the shot has to
     // be the same on every machine.

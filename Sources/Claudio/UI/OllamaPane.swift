@@ -1,6 +1,5 @@
 import SwiftUI
 
-@MainActor
 struct OllamaPane: View {
     @State private var addressField = AppSettings.ollamaBaseURL.absoluteString
     @State private var testing = false

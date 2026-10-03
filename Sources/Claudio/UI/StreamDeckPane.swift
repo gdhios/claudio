@@ -6,7 +6,6 @@ import SwiftUI
 /// Everything shown comes from `StreamDeckStatusModel`, which the app fills
 /// in: the pane reads no preference, looks in no folder and opens no socket,
 /// so a preview renders the same screen on every machine.
-@MainActor
 struct StreamDeckPane: View {
     @ObservedObject private var model = StreamDeckStatusModel.shared
 

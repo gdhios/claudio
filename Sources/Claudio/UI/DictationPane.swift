@@ -6,7 +6,6 @@ import SwiftUI
 /// tidies the transcript up, the prompt it is given, and the dictations
 /// already made. Split out of `SettingsView` like the other panes, because
 /// this one carries a list.
-@MainActor
 struct DictationPane: View {
     // A preview shows fixed settings rather than this Mac's: the shot has to
     // be the same on every machine, and nothing it displays is read from — or

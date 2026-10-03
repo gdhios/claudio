@@ -4,7 +4,6 @@ import SwiftUI
 /// its cost and the reminder of its default. The prompts stay in Prompts and
 /// the dictation's languages in Dictation; here only the model is set. The
 /// same settings as those tabs' own pickers: a change here shows there.
-@MainActor
 struct ModelsPane: View {
     @State private var localModels: [String] = []
 
@@ -52,7 +51,6 @@ struct ModelsPane: View {
 /// One shortcut's line: its picker, and under it the cost and the default.
 /// A preview shows the defaults rather than this Mac's settings: the shot
 /// has to be the same on every machine.
-@MainActor
 struct ModelSlotRow: View {
     let slot: ModelSlot
     let localModels: [String]
