@@ -111,28 +111,12 @@ final class ResultPanel: NSPanel {
     @MainActor
     static func make(session: ListeningSession,
                      textSize: PanelTextSize = AppSettings.panelTextSize,
-                     onCopy: @escaping () -> Void = {},
-                     onRetry: @escaping () -> Void = {},
-                     onOpenSettings: @escaping () -> Void = {},
-                     onClose: @escaping () -> Void = {},
-                     onOpenInGalette: @escaping (GaletteLink) -> Void = { _ in },
-                     onElaborate: @escaping (MusicSubject) -> Void = { _ in },
-                     onBack: @escaping () -> Void = {},
-                     onSearch: @escaping (MusicSubject) -> Void = { _ in },
-                     onOpenPlayer: @escaping () -> Void = {}) -> ResultPanel {
+                     actions: ListeningPanelActions = ListeningPanelActions()) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
         panel.host(ListeningPanelView(
             session: session,
             textSize: textSize,
-            onCopy: onCopy,
-            onRetry: onRetry,
-            onOpenSettings: onOpenSettings,
-            onClose: onClose,
-            onOpenInGalette: onOpenInGalette,
-            onElaborate: onElaborate,
-            onBack: onBack,
-            onSearch: onSearch,
-            onOpenPlayer: onOpenPlayer,
+            actions: actions,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         ))
         return panel

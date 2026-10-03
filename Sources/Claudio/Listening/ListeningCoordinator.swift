@@ -406,21 +406,20 @@ final class ListeningCoordinator {
     /// closing it drops the cycle.
     static func systemPanel(for session: ListeningSession,
                             coordinator: ListeningCoordinator) -> ResultPanel? {
-        let panel = ResultPanel.make(
-            session: session,
-            onCopy: { [weak coordinator] in coordinator?.copyTrack() },
-            onRetry: { [weak coordinator] in coordinator?.retry() },
-            onOpenSettings: { [weak coordinator] in
+        let panel = ResultPanel.make(session: session, actions: ListeningPanelActions(
+            copy: { [weak coordinator] in coordinator?.copyTrack() },
+            retry: { [weak coordinator] in coordinator?.retry() },
+            openSettings: { [weak coordinator] in
                 coordinator?.dismiss()
                 coordinator?.openSettings?()
             },
-            onClose: { [weak coordinator] in coordinator?.dismiss() },
-            onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) },
-            onElaborate: { [weak coordinator] subject in coordinator?.elaborate(on: subject) },
-            onBack: { [weak coordinator] in coordinator?.back() },
-            onSearch: { [weak coordinator] subject in coordinator?.search(subject) },
-            onOpenPlayer: { [weak coordinator] in coordinator?.openPlayer() }
-        )
+            close: { [weak coordinator] in coordinator?.dismiss() },
+            openInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) },
+            elaborate: { [weak coordinator] subject in coordinator?.elaborate(on: subject) },
+            back: { [weak coordinator] in coordinator?.back() },
+            search: { [weak coordinator] subject in coordinator?.search(subject) },
+            openPlayer: { [weak coordinator] in coordinator?.openPlayer() }
+        ))
         panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
         panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }
         panel.present()

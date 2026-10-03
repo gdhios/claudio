@@ -9,15 +9,7 @@ struct ListeningPanelView: View {
     /// Body text size, read once when the panel is built, like the other
     /// panels: the setting applies to the next one.
     var textSize: PanelTextSize = .normal
-    let onCopy: () -> Void
-    let onRetry: () -> Void
-    let onOpenSettings: () -> Void
-    let onClose: () -> Void
-    var onOpenInGalette: (GaletteLink) -> Void = { _ in }
-    var onElaborate: (MusicSubject) -> Void = { _ in }
-    var onBack: () -> Void = {}
-    var onSearch: (MusicSubject) -> Void = { _ in }
-    var onOpenPlayer: () -> Void = {}
+    let actions: ListeningPanelActions
     var onHeightChange: (@MainActor @Sendable (CGFloat) -> Void)? = nil
 
     @State private var notesHeight: CGFloat = 0
@@ -49,7 +41,7 @@ struct ListeningPanelView: View {
             }
             Spacer()
             statusLabel
-            PanelCloseButton(action: onClose)
+            PanelCloseButton(action: actions.close)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
@@ -116,7 +108,7 @@ struct ListeningPanelView: View {
             // Two rows: the ways to Galette, then the ways to Claude. Side
             // by side, the three subjects and the search overflowed the card.
             if let buttons = GaletteButtons(galette: session.galette, links: session.galetteLinks,
-                                            onOpen: onOpenInGalette) {
+                                            onOpen: actions.openInGalette) {
                 buttons
             }
             if showsSubjectPills {
@@ -157,7 +149,7 @@ struct ListeningPanelView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             ForEach(session.subjects, id: \.self) { subject in
-                Button(subject.buttonTitle) { onElaborate(subject) }
+                Button(subject.buttonTitle) { actions.elaborate(subject) }
                     .buttonStyle(SmallPillButtonStyle())
                     .help(loc("Un texte plus long de Claude, à la place des notes",
                               en: "A longer text from Claude, in place of the notes"))
@@ -173,13 +165,13 @@ struct ListeningPanelView: View {
     private var searchInClaude: some View {
         let subjects = session.subjects
         if subjects.count == 1, let only = subjects.first {
-            Button(Self.searchTitle) { onSearch(only) }
+            Button(Self.searchTitle) { actions.search(only) }
                 .buttonStyle(SmallPillButtonStyle())
                 .help(Self.searchHelp)
         } else if subjects.count > 1 {
             Menu {
                 ForEach(subjects, id: \.self) { subject in
-                    Button(subject.searchTitle) { onSearch(subject) }
+                    Button(subject.searchTitle) { actions.search(subject) }
                 }
             } label: {
                 // The ellipsis says a choice comes first, as macOS has it.
@@ -298,21 +290,21 @@ struct ListeningPanelView: View {
             // Under the long text: the same subject, in Claude's browser. The
             // footer is narrow: the site's name says where it goes.
             if let subject = session.essaySubject, session.phase != .missingKey {
-                Button("claude.ai") { onSearch(subject) }
+                Button("claude.ai") { actions.search(subject) }
                     .buttonStyle(PanelPillButtonStyle())
                     .help(Self.searchHelp)
             }
             // The way back to the notes, when there are notes to go back to.
             if session.essaySubject != nil, !session.cameFromLink {
-                Button(loc("Retour", en: "Back"), action: onBack)
+                Button(loc("Retour", en: "Back"), action: actions.back)
                     .buttonStyle(PanelPillButtonStyle())
             }
             switch session.phase {
             case .missingKey:
-                Button(loc("Réglages…", en: "Settings…"), action: onOpenSettings)
+                Button(loc("Réglages…", en: "Settings…"), action: actions.openSettings)
                     .buttonStyle(PanelPillButtonStyle())
             case .error:
-                Button(loc("Réessayer", en: "Try again"), action: onRetry)
+                Button(loc("Réessayer", en: "Try again"), action: actions.retry)
                     .buttonStyle(PanelPillButtonStyle())
             case .reading, .nothing, .streaming, .done:
                 EmptyView()
@@ -321,7 +313,7 @@ struct ListeningPanelView: View {
             // button is: as soon as the card knows the app behind it. Not
             // under the long text, whose footer is full already.
             if session.essaySubject == nil, let player = session.track?.playerName {
-                Button(loc("Ouvrir \(player)", en: "Open \(player)"), action: onOpenPlayer)
+                Button(loc("Ouvrir \(player)", en: "Open \(player)"), action: actions.openPlayer)
                     .buttonStyle(PanelPillButtonStyle())
                     .help(loc("Ramène le lecteur au premier plan et ferme ce panneau",
                               en: "Brings the player forward and closes this panel"))
@@ -329,10 +321,27 @@ struct ListeningPanelView: View {
             // Always last, whatever the phase: it copies the card, and ⌘C
             // works as soon as the card is up.
             if session.track != nil {
-                CopyButton(justCopied: session.justCopied, action: onCopy)
+                CopyButton(justCopied: session.justCopied, action: actions.copy)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
+}
+
+/// What the listening panel's buttons do: built once, by the coordinator
+/// that owns the panel, and handed down whole. The preview's does nothing.
+struct ListeningPanelActions {
+    var copy: () -> Void = {}
+    var retry: () -> Void = {}
+    var openSettings: () -> Void = {}
+    var close: () -> Void = {}
+    var openInGalette: (GaletteLink) -> Void = { _ in }
+    /// "Tell me more": the long text on a subject, in place of the notes.
+    var elaborate: (MusicSubject) -> Void = { _ in }
+    /// From the long text back to the notes.
+    var back: () -> Void = {}
+    /// The subject in Claude, which searches the web.
+    var search: (MusicSubject) -> Void = { _ in }
+    var openPlayer: () -> Void = {}
 }
