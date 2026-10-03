@@ -66,6 +66,20 @@ final class TrackFactsCacheTests: XCTestCase {
         XCTAssertEqual(cache.lookup(found, now: ninetyOneDays), .unknown)
     }
 
+    /// What has expired goes at the next write, each entry by its own
+    /// lifetime: the file only holds what may still be answered.
+    func testAWriteDropsWhatHasExpired() throws {
+        cache.store(facts, for: NowPlayingTrack(title: "Found", artist: "A"), at: now)
+        cache.store(nil, for: NowPlayingTrack(title: "Missed", artist: "A"), at: now)
+
+        // Eight days on: the miss is past its week, the result well within
+        // its three months.
+        cache.store(facts, for: NowPlayingTrack(title: "Fresh", artist: "A"), at: now.addingTimeInterval(8 * 86_400))
+        let stored = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: cache.fileURL)) as? [String: Any])
+        XCTAssertEqual(Set(stored.keys), [TrackFactsCache.key(title: "Found", artist: "A"),
+                                          TrackFactsCache.key(title: "Fresh", artist: "A")])
+    }
+
     /// An artist is kept under their MusicBrainz id when the subject has
     /// one — two artists may share a name, never an id — under their
     /// normalized name otherwise.

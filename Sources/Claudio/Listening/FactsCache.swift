@@ -5,7 +5,8 @@ import Foundation
 /// track's normalized title and artist, an artist's id or normalized name.
 /// A result holds three months; a miss a week, the record may be added
 /// meanwhile. One small JSON file per kind of thing, read and written
-/// whole: a few hundred entries at most.
+/// whole, what has expired dropped at each write: a few hundred entries
+/// at most.
 struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     enum Lookup: Equatable, Sendable {
         case facts(Value)
@@ -31,6 +32,11 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     private struct Entry: Codable {
         var facts: Value?
         var fetchedAt: Date
+
+        /// Past its lifetime: a result's three months, a miss's week.
+        func hasExpired(at now: Date) -> Bool {
+            now.timeIntervalSince(fetchedAt) >= (facts == nil ? FactsCache.missLifetime : FactsCache.resultLifetime)
+        }
     }
 
     /// Case, accents, width, spacing and the version tails players add
@@ -42,17 +48,13 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     }
 
     func lookup(key: String, now: Date) -> Lookup {
-        guard let entry = load()[key] else { return .unknown }
-        let age = now.timeIntervalSince(entry.fetchedAt)
-        if let facts = entry.facts {
-            return age < Self.resultLifetime ? .facts(facts) : .unknown
-        }
-        return age < Self.missLifetime ? .miss : .unknown
+        guard let entry = load()[key], !entry.hasExpired(at: now) else { return .unknown }
+        return entry.facts.map(Lookup.facts) ?? .miss
     }
 
-    /// `nil` facts record a miss.
+    /// `nil` facts record a miss. What has expired goes with the write.
     func store(_ facts: Value?, key: String, at now: Date) {
-        var entries = load()
+        var entries = load().filter { !$0.value.hasExpired(at: now) }
         entries[key] = Entry(facts: facts, fetchedAt: now)
         save(entries)
     }
