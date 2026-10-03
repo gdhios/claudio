@@ -108,10 +108,10 @@ enum ModelChoice: Sendable, Hashable {
             guard !identifier.isEmpty else { return nil }
             self = .ollama(model: identifier)
         default:
-            // Unknown provider (setting written by a future version):
-            // there's still a chance it's a legacy Claude ID.
-            guard let model = ClaudioModel(rawValue: storageValue) else { return nil }
-            self = .claude(model)
+            // A provider this version doesn't know (a setting written by a
+            // future one). Not a legacy Claude ID either: those never held a
+            // ":". The slot falls back to its default.
+            return nil
         }
     }
 }

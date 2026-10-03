@@ -108,9 +108,6 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertEqual(slot.current(in: defaults), .claude(ClaudioAction.correct.defaultModel))
     }
 
-    /// A value that can't be read (a setting written by a future version,
-    /// corrupted storage) yields nil: the action then falls back to its
-    /// default.
     /// A Claude identifier the app has never shipped still reads: it was
     /// picked from the API's list, or it is a model newer than this version.
     /// Whether the API still serves it is the call's business, not the
@@ -122,6 +119,9 @@ final class ModelChoiceTests: XCTestCase {
                        .claude(ClaudioModel(id: "claude-sonnet-9")), "legacy bare form")
     }
 
+    /// A value that can't be read (a setting written by a future version,
+    /// corrupted storage) yields nil: the action then falls back to its
+    /// default.
     func testAnUnreadableValueYieldsNoChoice() {
         XCTAssertNil(ModelChoice(storageValue: ""))
         XCTAssertNil(ModelChoice(storageValue: "ollama:"))
@@ -129,5 +129,6 @@ final class ModelChoiceTests: XCTestCase {
         XCTAssertNil(ModelChoice(storageValue: "gpt-4"))
         XCTAssertNil(ModelChoice(storageValue: "raw:"))
         XCTAssertNil(ModelChoice(storageValue: "claude:raw"))
+        XCTAssertNil(ModelChoice(storageValue: "claude-x:y"), "unknown provider, not a legacy ID")
     }
 }
