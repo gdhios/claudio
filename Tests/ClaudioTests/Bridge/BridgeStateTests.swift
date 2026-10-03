@@ -41,7 +41,7 @@ final class BridgeStateTests: XCTestCase {
     func testNothingUnderWayIsTheIdleState() {
         XCTAssertEqual(BridgeState(correction: nil, dictation: nil), .idle)
         XCTAssertEqual(BridgeState.idle,
-                       BridgeState(gaze: .repos, activity: .idle,
+                       BridgeState(gaze: .resting, activity: .idle,
                                    phase: nil, label: nil, locked: false))
     }
 
@@ -65,10 +65,10 @@ final class BridgeStateTests: XCTestCase {
 
     /// The gaze travels as a string: these four are wire values.
     func testGazeRawValuesAreTheWireNames() {
-        XCTAssertEqual(ClaudioMascot.Gaze.repos.rawValue, "repos")
-        XCTAssertEqual(ClaudioMascot.Gaze.veille.rawValue, "veille")
-        XCTAssertEqual(ClaudioMascot.Gaze.fait.rawValue, "fait")
-        XCTAssertEqual(ClaudioMascot.Gaze.vide.rawValue, "vide")
+        XCTAssertEqual(ClaudioMascot.Gaze.resting.rawValue, "repos")
+        XCTAssertEqual(ClaudioMascot.Gaze.focused.rawValue, "veille")
+        XCTAssertEqual(ClaudioMascot.Gaze.done.rawValue, "fait")
+        XCTAssertEqual(ClaudioMascot.Gaze.blank.rawValue, "vide")
     }
 
     // MARK: - The phase name

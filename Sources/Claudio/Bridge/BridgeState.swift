@@ -23,7 +23,7 @@ struct BridgeState: Equatable, Codable {
     var locked: Bool
 
     /// Claudio waiting: no panel, no microphone.
-    static let idle = BridgeState(gaze: .repos, activity: .idle,
+    static let idle = BridgeState(gaze: .resting, activity: .idle,
                                   phase: nil, label: nil, locked: false)
 
     @MainActor
