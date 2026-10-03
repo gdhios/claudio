@@ -103,9 +103,9 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         exit(0)
     }
 
+    /// Keeps the panel `make` has put on screen: the shot is taken of it.
     private func show(_ panel: ResultPanel) {
         self.panel = panel
-        panel.present()
     }
 
     private func showPanelPreview() {

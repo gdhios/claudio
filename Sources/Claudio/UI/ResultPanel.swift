@@ -54,9 +54,10 @@ final class ResultPanel: NSPanel {
         self.contentView = contentView
     }
 
-    /// Builds the panel wired to its SwiftUI view: forced dark appearance
-    /// (the panel keeps its theme regardless of the system mode) and window
-    /// height that follows the content.
+    /// Builds the panel wired to its SwiftUI view, and puts it on screen:
+    /// forced dark appearance (the panel keeps its theme regardless of the
+    /// system mode), window height that follows the content, and Esc and ⌘C
+    /// doing what its close and Copy buttons do.
     @MainActor
     static func make(session: CorrectionSession,
                      textSize: PanelTextSize = AppSettings.panelTextSize,
@@ -82,7 +83,7 @@ final class ResultPanel: NSPanel {
             onOpenInGalette: onOpenInGalette,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
         )
-        panel.host(view)
+        panel.show(view, close: onClose, copy: onCopy)
         return panel
     }
 
@@ -95,13 +96,14 @@ final class ResultPanel: NSPanel {
                      onCopy: @escaping () -> Void = {},
                      onClose: @escaping () -> Void = {}) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
-        panel.host(DictationPanelView(
+        let view = DictationPanelView(
             session: session,
             textSize: textSize,
             onCopy: onCopy,
             onClose: onClose,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
-        ))
+        )
+        panel.show(view, close: onClose, copy: onCopy)
         return panel
     }
 
@@ -111,31 +113,25 @@ final class ResultPanel: NSPanel {
     @MainActor
     static func make(session: ListeningSession,
                      textSize: PanelTextSize = AppSettings.panelTextSize,
-                     onCopy: @escaping () -> Void = {},
-                     onRetry: @escaping () -> Void = {},
-                     onOpenSettings: @escaping () -> Void = {},
-                     onClose: @escaping () -> Void = {},
-                     onOpenInGalette: @escaping (GaletteLink) -> Void = { _ in },
-                     onElaborate: @escaping (MusicSubject) -> Void = { _ in },
-                     onBack: @escaping () -> Void = {},
-                     onSearch: @escaping (MusicSubject) -> Void = { _ in },
-                     onOpenPlayer: @escaping () -> Void = {}) -> ResultPanel {
+                     actions: ListeningPanelActions = ListeningPanelActions()) -> ResultPanel {
         let panel = ResultPanel(contentView: NSView(), width: textSize.panelWidth)
-        panel.host(ListeningPanelView(
+        let view = ListeningPanelView(
             session: session,
             textSize: textSize,
-            onCopy: onCopy,
-            onRetry: onRetry,
-            onOpenSettings: onOpenSettings,
-            onClose: onClose,
-            onOpenInGalette: onOpenInGalette,
-            onElaborate: onElaborate,
-            onBack: onBack,
-            onSearch: onSearch,
-            onOpenPlayer: onOpenPlayer,
+            actions: actions,
             onHeightChange: { [weak panel] height in panel?.updateContentHeight(height) }
-        ))
+        )
+        panel.show(view, close: actions.close, copy: actions.copy)
         return panel
+    }
+
+    /// What every `make` ends on: the view hosted, Esc and ⌘C sent where its
+    /// close and Copy buttons go, and the panel put on screen.
+    private func show(_ view: some View, close: @escaping () -> Void, copy: @escaping () -> Void) {
+        host(view)
+        onEscape = close
+        onCopyShortcut = copy
+        present()
     }
 
     /// Puts a SwiftUI view into the panel: forced dark appearance (the panel
@@ -220,7 +216,7 @@ final class ResultPanel: NSPanel {
     ///
     /// Always centered: no more panel stuck in a corner or spilling off
     /// the screen depending on where the shortcut was triggered from.
-    func present() {
+    private func present() {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
             ?? NSScreen.main
         guard let visible = screen?.visibleFrame else {

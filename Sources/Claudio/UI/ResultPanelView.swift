@@ -1,18 +1,5 @@
 import SwiftUI
 
-/// Ideal height of the whole panel: reported to the window so it
-/// hugs the content (no more half-empty rectangle).
-private struct PanelHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Height of the text in the ScrollView: used to bound the content area.
-private struct TextHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
 struct ResultPanelView: View {
     @ObservedObject var session: CorrectionSession
     /// Body text size, read once when the panel is built: the setting
@@ -44,27 +31,7 @@ struct ResultPanelView: View {
                 footer
             }
         }
-        .frame(width: textSize.panelWidth)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: PanelHeightKey.self, value: geo.size.height)
-            }
-        }
-        .onPreferenceChange(PanelHeightKey.self) { [onHeightChange] height in
-            // Report the height to the window in the same pass as the layout,
-            // with no loop-turn delay: it follows the text frame by frame
-            // instead of lagging one frame behind. That lag is what was
-            // clipping the bottom then revealing it, hence the jerks. The report
-            // is synchronous; it's the window that decides whether to animate the jump.
-            MainActor.assumeIsolated { onHeightChange?(height) }
-        }
-        .background(ClaudioTheme.panelBackground,
-                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
-                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        .panelChrome(width: textSize.panelWidth, onHeightChange: onHeightChange)
     }
 
     private var header: some View {
@@ -97,26 +64,14 @@ struct ResultPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .capturing:
-            StatusPill {
-                ProgressView().controlSize(.mini)
-                Text(loc("Capture…", en: "Reading…"))
-            }
+            WorkingPill(loc("Capture…", en: "Reading…"))
         case .listeningInstruction:
-            // The spinner of the other phases says "wait"; while listening
-            // it is the voice that moves, so the pill carries the last
-            // readings — the dictation panel's own pill.
-            StatusPill {
-                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
-                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
-                Text(session.listeningEnded
-                     ? loc("Un instant…", en: "One moment…")
-                     : loc("À l'écoute…", en: "Listening…"))
-            }
+            ListeningPill(levels: session.levels,
+                          label: session.listeningEnded
+                              ? loc("Un instant…", en: "One moment…")
+                              : loc("À l'écoute…", en: "Listening…"))
         case .streaming:
-            StatusPill {
-                ProgressView().controlSize(.mini)
-                Text(session.progressLabel)
-            }
+            WorkingPill(session.progressLabel)
         case .done:
             if session.truncated {
                 StatusPill(background: .orange.opacity(0.18), foreground: .orange) {
@@ -124,10 +79,7 @@ struct ResultPanelView: View {
                     Text(loc("Réponse tronquée", en: "Answer cut short"))
                 }
             } else {
-                StatusPill(background: .green.opacity(0.16), foreground: .green) {
-                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                    Text(loc("Prêt", en: "Ready"))
-                }
+                ReadyPill()
             }
         case .choosingAction, .askingInstruction, .instructionNotHeard,
              .noSelection, .missingKey, .error:
@@ -146,31 +98,36 @@ struct ResultPanelView: View {
         case .instructionNotHeard(let reason):
             // A silence and a microphone that gave up are two different
             // pieces of news: only the second one has something to report.
-            messageView(icon: reason == nil ? "waveform.slash" : "exclamationmark.triangle",
-                        title: reason == nil
-                            ? loc("Rien entendu", en: "Nothing heard")
-                            : loc("Consigne non entendue", en: "Couldn't hear the instruction"),
-                        detail: reason ?? loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
-                                              en: "No speech was picked up. Hold the shortcut while you talk."))
+            PanelMessage(icon: reason == nil ? "waveform.slash" : "exclamationmark.triangle",
+                         title: reason == nil
+                             ? loc("Rien entendu", en: "Nothing heard")
+                             : loc("Consigne non entendue", en: "Couldn't hear the instruction"),
+                         detail: reason ?? loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
+                                               en: "No speech was picked up. Hold the shortcut while you talk."),
+                         textSize: textSize)
         case .noSelection:
-            messageView(icon: "cursorarrow.rays",
-                        title: loc("Aucune sélection détectée", en: "No selection found"),
-                        detail: loc("Sélectionne du texte puis relance le raccourci.",
-                                    en: "Select some text, then trigger the shortcut again."))
+            PanelMessage(icon: "cursorarrow.rays",
+                         title: loc("Aucune sélection détectée", en: "No selection found"),
+                         detail: loc("Sélectionne du texte puis relance le raccourci.",
+                                     en: "Select some text, then trigger the shortcut again."),
+                         textSize: textSize)
         case .missingKey:
-            messageView(icon: "key",
-                        title: loc("Clé API manquante", en: "No API key"),
-                        detail: loc("Ajoute ta clé Anthropic dans les Réglages pour activer la correction.",
-                                    en: "Add your Anthropic key in Settings to start using Claudio."))
+            PanelMessage(icon: "key",
+                         title: loc("Clé API manquante", en: "No API key"),
+                         detail: loc("Ajoute ta clé Anthropic dans les Réglages pour activer la correction.",
+                                     en: "Add your Anthropic key in Settings to start using Claudio."),
+                         textSize: textSize)
         case .error(let message):
-            messageView(icon: "exclamationmark.triangle",
-                        title: loc("Erreur", en: "Error"),
-                        detail: message)
+            PanelMessage(icon: "exclamationmark.triangle",
+                         title: loc("Erreur", en: "Error"),
+                         detail: message,
+                         textSize: textSize)
         default:
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        resultText
+                        StreamingText(text: session.correctedText,
+                                      isStreaming: session.phase == .capturing || session.phase == .streaming)
                             .font(.system(size: textSize.bodyPoints))
                             .foregroundStyle(.white.opacity(0.92))
                             .textSelection(.enabled)
@@ -178,14 +135,10 @@ struct ResultPanelView: View {
                             .padding(14)
                         Color.clear.frame(height: 1).id("bottom")
                     }
-                    .background {
-                        GeometryReader { geo in
-                            Color.clear.preference(key: TextHeightKey.self, value: geo.size.height)
-                        }
-                    }
+                    .reportsHeight(PanelTextHeightKey.self)
                 }
                 .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
-                .onPreferenceChange(TextHeightKey.self) { height in
+                .onPreferenceChange(PanelTextHeightKey.self) { height in
                     // The measured height jumps a whole line at a time.
                     // Interpolating it here rather than reporting it as-is
                     // makes the window follow frame by frame: it slides
@@ -308,33 +261,6 @@ struct ResultPanelView: View {
         }
     }
 
-    /// Streaming text with a blinking caret; plain text once finished.
-    @ViewBuilder private var resultText: some View {
-        if session.phase == .capturing || session.phase == .streaming {
-            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(session.correctedText)
-                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
-            }
-        } else {
-            Text(session.correctedText)
-        }
-    }
-
-    private func messageView(icon: String, title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
-            Text(detail)
-                .font(.system(size: textSize.points(12)))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 26)
-    }
-
     /// The model that processed the selection, discreet at the bottom left: it makes
     /// it verifiable at a glance what answered, Claude or a local model.
     /// Nothing to show while the request is only a palette placeholder,
@@ -349,15 +275,7 @@ struct ResultPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
-            if showsModelName {
-                // Neither the separator nor the model name are translated.
-                Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
-                Text(session.request.model.shortName)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
+            PanelFooterCaption(model: showsModelName ? session.request.model.shortName : nil)
             Spacer()
             switch session.phase {
             case .listeningInstruction:
@@ -385,14 +303,7 @@ struct ResultPanelView: View {
                         .help(loc("Relance avec un budget de tokens doublé",
                                   en: "Runs again with twice the token budget"))
                 }
-                Button(action: onCopy) {
-                    if session.justCopied {
-                        Text(loc("Copié ✓", en: "Copied ✓"))
-                    } else {
-                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(PanelPillButtonStyle())
+                CopyButton(justCopied: session.justCopied, action: onCopy)
                 Button(action: onPaste) {
                     Text(loc("Coller ", en: "Paste ")) + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
                 }
@@ -404,25 +315,5 @@ struct ResultPanelView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-    }
-}
-
-/// Panel close button: discreet in the header, becomes a circle on hover.
-/// Shared with the dictation panel, which has the same one.
-struct PanelCloseButton: View {
-    let action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 8.5, weight: .bold))
-                .foregroundStyle(hovered ? .white : .white.opacity(0.45))
-                .frame(width: 18, height: 18)
-                .background(Color.white.opacity(hovered ? 0.14 : 0), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-        .help(loc("Fermer (Échap)", en: "Close (esc)"))
     }
 }

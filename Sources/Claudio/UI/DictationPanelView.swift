@@ -24,22 +24,7 @@ struct DictationPanelView: View {
             ClaudioTheme.panelSeparator.frame(height: 1)
             footer
         }
-        .frame(width: textSize.panelWidth)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: DictationPanelHeightKey.self, value: geo.size.height)
-            }
-        }
-        .onPreferenceChange(DictationPanelHeightKey.self) { [onHeightChange] height in
-            MainActor.assumeIsolated { onHeightChange?(height) }
-        }
-        .background(ClaudioTheme.panelBackground,
-                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
-                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        .panelChrome(width: textSize.panelWidth, onHeightChange: onHeightChange)
     }
 
     private var header: some View {
@@ -67,57 +52,51 @@ struct DictationPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .listening:
-            // The spinner of the other phases says "wait"; while listening it
-            // is the voice that moves, so the pill carries the last readings.
             // Locked by a tap, the waveform says it listens and the words say
             // how it ends: with the key up, nothing else on screen does.
-            StatusPill {
-                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
-                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
-                Text(session.isLocked
-                     ? loc("Appuie encore pour finir", en: "Press again to finish")
-                     : loc("À l'écoute…", en: "Listening…"))
-            }
+            ListeningPill(levels: session.levels,
+                          label: session.isLocked
+                              ? loc("Appuie encore pour finir", en: "Press again to finish")
+                              : loc("À l'écoute…", en: "Listening…"))
         case .finishing:
-            workingPill(loc("Un instant…", en: "One moment…"))
+            WorkingPill(loc("Un instant…", en: "One moment…"))
         case .cleaning:
             // Named after the output rather than always "cleaning up": a
             // translation taking its time shouldn't look like a stuck one.
-            workingPill(session.output.progressLabel)
+            WorkingPill(session.output.progressLabel)
         case .pasting:
-            workingPill(loc("Collage…", en: "Pasting…"))
+            WorkingPill(loc("Collage…", en: "Pasting…"))
         case .done:
-            StatusPill(background: .green.opacity(0.16), foreground: .green) {
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                Text(loc("Prêt", en: "Ready"))
-            }
+            ReadyPill()
         case .empty, .error:
             EmptyView()
-        }
-    }
-
-    private func workingPill(_ label: String) -> some View {
-        StatusPill {
-            ProgressView().controlSize(.mini)
-            Text(label)
         }
     }
 
     @ViewBuilder private var content: some View {
         switch session.phase {
         case .empty:
-            messageView(icon: "waveform.slash",
-                        title: loc("Rien entendu", en: "Nothing heard"),
-                        detail: loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
-                                    en: "No speech was picked up. Hold the shortcut while you talk."))
+            PanelMessage(icon: "waveform.slash",
+                         title: loc("Rien entendu", en: "Nothing heard"),
+                         detail: loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
+                                     en: "No speech was picked up. Hold the shortcut while you talk."),
+                         textSize: textSize)
         case .error(let message):
-            messageView(icon: "exclamationmark.triangle",
-                        title: loc("Dictée impossible", en: "Dictation stopped"),
-                        detail: message,
-                        // A language that isn't installed is the one failure
-                        // the panel can act on: Claudio downloads nothing by
-                        // itself, and this opens the pane where it's added.
-                        settingsURL: session.failure?.settingsURL)
+            PanelMessage(icon: "exclamationmark.triangle",
+                         title: loc("Dictée impossible", en: "Dictation stopped"),
+                         detail: message,
+                         textSize: textSize) {
+                // A language that isn't installed is the one failure the
+                // panel can act on: Claudio downloads nothing by itself, and
+                // this opens the pane where it's added.
+                if let settingsURL = session.failure?.settingsURL {
+                    Button(loc("Ouvrir Réglages Système", en: "Open System Settings")) {
+                        NSWorkspace.shared.open(settingsURL)
+                    }
+                    .buttonStyle(PanelPillButtonStyle())
+                    .padding(.top, 2)
+                }
+            }
         default:
             Group {
                 if session.phase == .listening, session.transcript.isEmpty {
@@ -155,7 +134,8 @@ struct DictationPanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    liveText
+                    // A caret as long as words are still coming in.
+                    StreamingText(text: session.finalText, isStreaming: session.isWorking)
                         .font(.system(size: textSize.bodyPoints))
                         .foregroundStyle(.white.opacity(0.92))
                         .textSelection(.enabled)
@@ -175,14 +155,10 @@ struct DictationPanelView: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(14)
-                .background {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: DictationTextHeightKey.self, value: geo.size.height)
-                    }
-                }
+                .reportsHeight(PanelTextHeightKey.self)
             }
             .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
-            .onPreferenceChange(DictationTextHeightKey.self) { height in
+            .onPreferenceChange(PanelTextHeightKey.self) { height in
                 Task { @MainActor in
                     withAnimation(.easeOut(duration: 0.18)) { textHeight = height }
                 }
@@ -198,58 +174,12 @@ struct DictationPanelView: View {
         .transition(.opacity)
     }
 
-    /// A blinking caret as long as words are still coming in; plain text
-    /// once the dictation is out.
-    @ViewBuilder private var liveText: some View {
-        if session.isWorking {
-            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(session.finalText)
-                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
-            }
-        } else {
-            Text(session.finalText)
-        }
-    }
-
-    private func messageView(icon: String, title: String, detail: String,
-                             settingsURL: URL? = nil) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
-            Text(detail)
-                .font(.system(size: textSize.points(12)))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                // An engine's message is a sentence, not a label: without
-                // this it is cut off at one line, right where it says what
-                // to do about it.
-                .fixedSize(horizontal: false, vertical: true)
-            if let settingsURL {
-                Button(loc("Ouvrir Réglages Système", en: "Open System Settings")) {
-                    NSWorkspace.shared.open(settingsURL)
-                }
-                .buttonStyle(PanelPillButtonStyle())
-                .padding(.top, 2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 26)
-    }
-
     /// Bottom left, the model that cleaned up and, when there wasn't one,
     /// why — same spot as the correction panel's indicator. Copy only shows
     /// when the panel is staying: a pasted dictation closes by itself.
     private var footer: some View {
         HStack(spacing: 8) {
-            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
-            // Neither the separator nor the model name are translated.
-            Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
-            Text(session.model.shortName)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
+            PanelFooterCaption(model: session.model.shortName)
             if let note = session.note {
                 Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
                 Text(note)
@@ -260,30 +190,10 @@ struct DictationPanelView: View {
             }
             Spacer(minLength: 8)
             if session.canCopy {
-                Button(action: onCopy) {
-                    if session.justCopied {
-                        Text(loc("Copié ✓", en: "Copied ✓"))
-                    } else {
-                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(PanelPillButtonStyle())
+                CopyButton(justCopied: session.justCopied, action: onCopy)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
-}
-
-/// Ideal height of the whole panel, reported to the window so it hugs its
-/// content.
-private struct DictationPanelHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Height of the text inside the ScrollView, to bound the content area.
-private struct DictationTextHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
