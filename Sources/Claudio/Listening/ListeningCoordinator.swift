@@ -36,8 +36,10 @@ final class ListeningCoordinator {
     private let model: () -> ModelChoice
     /// The long text's own model, asked at each pill.
     private let essayModel: () -> ModelChoice
-    /// Hands a link to the browser: "Search in Claude".
+    /// Hands a link to the system: "Search in Claude".
     private let openLink: @MainActor (URL) -> Void
+    /// Whether Claude Desktop is on this Mac, asked at each click.
+    private let claudeDesktop: @MainActor () -> Bool
 
     private var panel: ResultPanel?
     /// The listening under way, `nil` between two.
@@ -65,7 +67,8 @@ final class ListeningCoordinator {
          preferences: @escaping () -> ListeningPreferences = { .current() },
          model: @escaping () -> ModelChoice = { AppSettings.listeningModel() },
          essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() },
-         openLink: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+         openLink: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
+         claudeDesktop: @escaping @MainActor () -> Bool = ClaudeSearch.desktopInstalled) {
         self.source = source
         self.client = client
         self.makePanel = panel
@@ -78,6 +81,7 @@ final class ListeningCoordinator {
         self.model = model
         self.essayModel = essayModel
         self.openLink = openLink
+        self.claudeDesktop = claudeDesktop
     }
 
     // MARK: - The cycle
@@ -284,13 +288,14 @@ final class ListeningCoordinator {
         }
     }
 
-    /// "Search in Claude": the subject goes to Claude in the browser, with
-    /// the artist's facts when the long text got them, and the panel
-    /// closes, its job done.
+    /// "Search in Claude": the subject goes to Claude — the desktop app
+    /// when it is on this Mac, the browser otherwise — with the artist's
+    /// facts when the long text got them, and the panel closes, its job
+    /// done.
     func search(_ subject: MusicSubject) {
         guard let session else { return }
         let artist = session.essaySubject == subject ? session.artistFacts : nil
-        openLink(ClaudeSearch.url(for: subject, artist: artist))
+        openLink(ClaudeSearch.url(for: subject, artist: artist, desktop: claudeDesktop()))
         dismiss()
     }
 

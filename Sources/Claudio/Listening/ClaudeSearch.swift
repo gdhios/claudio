@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// "Search in Claude": the card hands the subject to Claude in the browser,
 /// where he searches the web before answering — no key, no API cost, and
@@ -7,12 +7,23 @@ import Foundation
 /// interface's language since it is read there, not by the API.
 enum ClaudeSearch {
     static let baseURL = URL(string: "https://claude.ai/new")!
+    /// Claude Desktop's own scheme, as Anthropic documents it ("Open Claude
+    /// Desktop with a link", read 2026-10-03): same path, `q` prefills the
+    /// prompt without sending it. The app comes forward instead of a tab.
+    static let desktopProbe = URL(string: "claude://claude.ai/new")!
     /// The address bar has its limits: the latest releases only.
     static let maxReleases = 20
 
+    /// Whether an app on this Mac opens `claude://` links. Asked at each
+    /// click: installed or removed since, the next one knows.
+    @MainActor
+    static func desktopInstalled() -> Bool {
+        !PreviewRun.isActive && NSWorkspace.shared.urlForApplication(toOpen: desktopProbe) != nil
+    }
+
     static func url(for subject: MusicSubject, artist: ArtistFacts?,
-                    language: AppLanguage = AppSettings.language) -> URL {
-        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+                    language: AppLanguage = AppSettings.language, desktop: Bool) -> URL {
+        var components = URLComponents(url: desktop ? desktopProbe : baseURL, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "q", value: prompt(for: subject, artist: artist, language: language))]
         return components.url!
     }

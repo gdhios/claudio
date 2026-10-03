@@ -26,11 +26,11 @@ enum MusicBrainzLookup {
 
     // MARK: - The questions
 
-    /// A fielded Lucene query: the title, and the artist when the player
-    /// gave one — a browser's "artist" is a channel name, better left out
-    /// than matched.
+    /// A fielded Lucene query: the title without its version tail, and the
+    /// artist when the player gave one — a browser's "artist" is a channel
+    /// name, better left out than matched.
     static func searchURL(title: String, artist: String?) -> URL {
-        var terms = ["recording:\(luceneQuoted(title))"]
+        var terms = ["recording:\(luceneQuoted(TrackTitle.plain(title)))"]
         if let artist, !artist.trimmingCharacters(in: .whitespaces).isEmpty {
             terms.append("artist:\(luceneQuoted(artist))")
         }

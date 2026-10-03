@@ -281,7 +281,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         let subject = try XCTUnwrap(MusicSubject.artist(of: .sample))
 
         bench.coordinator.search(subject)
-        XCTAssertEqual(bench.opened, [ClaudeSearch.url(for: subject, artist: nil, language: AppSettings.language)])
+        XCTAssertEqual(bench.opened, [ClaudeSearch.url(for: subject, artist: nil, language: AppSettings.language, desktop: false)])
         XCTAssertNil(bench.coordinator.session)
 
         bench.coordinator.trigger()
@@ -291,8 +291,18 @@ final class ListeningCoordinatorTests: XCTestCase {
         await bench.runs()
         XCTAssertEqual(again.artistFacts, Bench.artist, "kept for the link, and shown nowhere")
         bench.coordinator.search(subject)
-        XCTAssertEqual(bench.opened.last, ClaudeSearch.url(for: subject, artist: Bench.artist, language: AppSettings.language))
+        XCTAssertEqual(bench.opened.last, ClaudeSearch.url(for: subject, artist: Bench.artist, language: AppSettings.language, desktop: false))
         _ = session
+    }
+
+    /// With Claude Desktop on the Mac, the link takes its scheme.
+    func testWithClaudeDesktopTheLinkTakesItsScheme() async throws {
+        let bench = Bench(claudeDesktop: true)
+        bench.coordinator.trigger()
+        await bench.runs()
+        let subject = try XCTUnwrap(MusicSubject.artist(of: .sample))
+        bench.coordinator.search(subject)
+        XCTAssertEqual(bench.opened.first?.scheme, "claude")
     }
 
     /// MusicBrainz off: no facts are asked for, the text goes at once.
@@ -498,6 +508,7 @@ private final class Bench {
          remoteCover: NSImage? = nil,
          artistFacts: ArtistFacts? = nil,
          artistWaits: Bool = false,
+         claudeDesktop: Bool = false,
          preferences: ListeningPreferences = .init(musicBrainz: true, showsArtwork: true, detail: .threeSentences),
          model: ModelChoice = ListeningNotes.model,
          essayModel: ModelChoice = ListeningEssay.model) {
@@ -554,7 +565,8 @@ private final class Bench {
             preferences: { preferences },
             model: { model },
             essayModel: { essayModel },
-            openLink: { [weak self] url in self?.opened.append(url) }
+            openLink: { [weak self] url in self?.opened.append(url) },
+            claudeDesktop: { claudeDesktop }
         )
     }
 

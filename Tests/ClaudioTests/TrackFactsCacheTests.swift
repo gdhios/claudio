@@ -24,9 +24,11 @@ final class TrackFactsCacheTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Case, accents, spacing and the "(Remastered)" tail don't make
-    /// another track.
+    /// Case, accents, spacing and the version tails — "(Remastered)",
+    /// "- Olympic Mix" — don't make another track.
     func testTheKeyForgetsCaseAccentsSpacingAndRemasterTails() {
+        XCTAssertEqual(TrackFactsCache.key(title: "Am I Wrong - Olympic Mix", artist: "Etienne de Crécy"),
+                       TrackFactsCache.key(title: "Am I Wrong", artist: "etienne de crecy"))
         XCTAssertEqual(TrackFactsCache.key(title: "  Été  Indien ", artist: "JOE DASSIN"),
                        TrackFactsCache.key(title: "ete indien", artist: "joe dassin"))
         XCTAssertEqual(TrackFactsCache.key(title: "Hey Jude - Remastered 2015", artist: "The Beatles"),

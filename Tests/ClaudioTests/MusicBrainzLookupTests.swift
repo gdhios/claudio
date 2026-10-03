@@ -21,6 +21,15 @@ final class MusicBrainzLookupTests: XCTestCase {
         XCTAssertEqual(query.first { $0.name == "fmt" }?.value, "json")
     }
 
+    /// The version tail a player adds isn't in the index: the plain title
+    /// is asked for.
+    func testTheSearchDropsTheVersionTail() {
+        let url = MusicBrainzLookup.searchURL(title: "Am I Wrong - Olympic Mix", artist: "Etienne de Crécy")
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+        XCTAssertEqual(query.first { $0.name == "query" }?.value,
+                       #"recording:"Am I Wrong" AND artist:"Etienne de Crécy""#)
+    }
+
     /// Without an artist the title alone is asked for: a browser's "artist"
     /// is a channel name, better left out than matched.
     func testWithoutAnArtistTheTitleAloneIsAskedFor() {

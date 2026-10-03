@@ -19,11 +19,26 @@ final class ClaudeSearchTests: XCTestCase {
 
     /// A new conversation on claude.ai, the prompt in `q`.
     func testTheLinkOpensANewConversationWithThePrompt() throws {
-        let url = ClaudeSearch.url(for: artist, artist: nil, language: .french)
+        let url = ClaudeSearch.url(for: artist, artist: nil, language: .french, desktop: false)
+        XCTAssertEqual(url.scheme, "https")
         XCTAssertEqual(url.host, "claude.ai")
         XCTAssertEqual(url.path, "/new")
         let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
         XCTAssertEqual(query.first { $0.name == "q" }?.value, ClaudeSearch.prompt(for: artist, artist: nil, language: .french))
+    }
+
+    /// With Claude Desktop on the Mac, its own scheme: the same path and
+    /// prompt, and the app comes forward instead of a browser tab. The
+    /// format is the one Anthropic documents (support article "Open Claude
+    /// Desktop with a link", read 2026-10-03): `q` prefills without sending.
+    func testWithTheDesktopAppItsSchemeIsUsed() throws {
+        let web = ClaudeSearch.url(for: album, artist: facts, language: .french, desktop: false)
+        let desktop = ClaudeSearch.url(for: album, artist: facts, language: .french, desktop: true)
+        XCTAssertEqual(desktop.scheme, "claude")
+        XCTAssertEqual(desktop.host, "claude.ai")
+        XCTAssertEqual(desktop.path, "/new")
+        XCTAssertEqual(desktop.query, web.query)
+        XCTAssertEqual(ClaudeSearch.desktopProbe.absoluteString, "claude://claude.ai/new")
     }
 
     /// The prompt asks for a web search first, names the subject with its

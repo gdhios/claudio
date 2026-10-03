@@ -31,19 +31,12 @@ struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
         var fetchedAt: Date
     }
 
-    private static var remasterTail: NSRegularExpression {
-        try! NSRegularExpression(pattern: #"\s*[-(\[]\s*remaster(ed)?\b[^)\]]*[)\]]?\s*$"#,
-                                 options: [.caseInsensitive])
-    }
-
-    /// Case, accents, width, spacing and the "(Remastered)" tails players
-    /// add don't make another thing.
+    /// Case, accents, width, spacing and the version tails players add
+    /// ("(Remastered)", "- Olympic Mix") don't make another thing.
     static func normalize(_ text: String) -> String {
-        var folded = text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
-                                  locale: nil)
-        folded = remasterTail.stringByReplacingMatches(in: folded, range: NSRange(folded.startIndex..., in: folded),
-                                                       withTemplate: "")
-        return folded.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        TrackTitle.plain(text)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     func lookup(key: String, now: Date) -> Lookup {
