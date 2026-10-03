@@ -16,17 +16,10 @@ final class TranscriptSink: @unchecked Sendable {
         self.continuation = continuation
     }
 
-    /// The whole text of the session so far — the best `.final` we could
-    /// send if the recognizer never sends its own.
-    var textSoFar: String { lock.withLock { latest } }
-
-    /// True once a terminal event went out: nothing more will.
-    var isFinished: Bool { lock.withLock { continuation == nil } }
-
-    /// Yielded under the lock, unlike everything else here: `yield` never
-    /// blocks, and outside the lock a partial held by another thread could
-    /// slip in between the final's yield and the end of the stream — the
-    /// panel showing again what it had just pasted.
+    /// Yielded under the lock, unlike the terminal events below: `yield`
+    /// never blocks, and outside the lock a partial held by another thread
+    /// could slip in between the final's yield and the end of the stream —
+    /// the panel showing again what it had just pasted.
     func emitPartial(_ text: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -47,21 +40,14 @@ final class TranscriptSink: @unchecked Sendable {
     /// Ends the session with its text. `nil` means "whatever we have":
     /// that is how a recognizer that goes quiet still gives back the words.
     func emitFinal(_ text: String? = nil) {
-        lock.lock()
-        guard let continuation else { lock.unlock(); return }
-        let value = text ?? latest
-        latest = value
-        self.continuation = nil
-        lock.unlock()
+        let (continuation, value) = lock.withLock { (takeContinuation(), text ?? latest) }
+        guard let continuation else { return }
         continuation.yield(.final(value))
         continuation.finish()
     }
 
     func fail(_ error: SpeechEngineError) {
-        lock.lock()
-        guard let continuation else { lock.unlock(); return }
-        self.continuation = nil
-        lock.unlock()
+        guard let continuation = lock.withLock({ takeContinuation() }) else { return }
         continuation.yield(.failed(error))
         continuation.finish()
     }
@@ -70,11 +56,15 @@ final class TranscriptSink: @unchecked Sendable {
     /// Also the last word of every run: a stream that never finishes leaves
     /// its consumer suspended forever.
     func finishSilently() {
-        lock.lock()
-        guard let continuation else { lock.unlock(); return }
-        self.continuation = nil
-        lock.unlock()
-        continuation.finish()
+        lock.withLock { takeContinuation() }?.finish()
+    }
+
+    /// The continuation, taken under the lock by whichever terminal event
+    /// gets there first: the stream is that one's to end, and every event
+    /// after it finds nothing to yield to.
+    private func takeContinuation() -> AsyncStream<TranscriptEvent>.Continuation? {
+        defer { continuation = nil }
+        return continuation
     }
 }
 

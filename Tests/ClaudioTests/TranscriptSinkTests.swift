@@ -30,7 +30,6 @@ final class TranscriptSinkTests: XCTestCase {
         sink.emitLevel(0.25)
         sink.emitPartial("bon")
         sink.emitLevel(0.75)
-        XCTAssertEqual(sink.textSoFar, "bon")
         sink.emitFinal()
         sink.emitLevel(0.5)  // the tap hadn't heard the stop yet
 
