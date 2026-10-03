@@ -108,14 +108,6 @@ final class CorrectionSession: ObservableObject {
         PaletteCatalog.rows(matching: paletteQuery, hasSelection: hasSelection)
     }
 
-    /// Highlighted row, clamped: the filter can shorten the list below
-    /// the current index between two keystrokes.
-    var selectedPaletteRow: PaletteRow? {
-        let rows = paletteRows
-        guard !rows.isEmpty else { return nil }
-        return rows[min(max(paletteSelection, 0), rows.count - 1)]
-    }
-
     /// Pointer position when the palette opens. As long as it hasn't
     /// moved, hovering over it selects nothing: the panel opens near the cursor,
     /// and a row it happens to cover would otherwise grab the selection with no
