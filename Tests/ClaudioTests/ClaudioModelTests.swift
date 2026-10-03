@@ -102,6 +102,31 @@ final class ClaudioModelTests: XCTestCase {
         XCTAssertFalse(ClaudioModel(id: "claude-haiku-9").supportsTemperature)
     }
 
+    // MARK: - Thinking
+
+    /// Claudio asks one short answer and uses no tool: thinking only eats
+    /// the answer's budget (a `thinking` block alone in 400 tokens is an
+    /// empty card). Each model has its own way to turn it off, read from
+    /// the API docs: `between_tools` on Sonnet 5.5, `disabled` on Sonnet 5
+    /// and Opus 5, nothing on Haiku 4.5 (off by default) nor on a model
+    /// this version doesn't know.
+    func testEachModelHasItsOwnWayToTurnThinkingOff() {
+        XCTAssertEqual(ClaudioModel.sonnet55.thinkingOffType, "between_tools")
+        XCTAssertEqual(ClaudioModel.sonnet5.thinkingOffType, "disabled")
+        XCTAssertEqual(ClaudioModel.opus5.thinkingOffType, "disabled")
+        XCTAssertNil(ClaudioModel.haiku45.thinkingOffType)
+        XCTAssertNil(ClaudioModel.opus55.thinkingOffType)
+        XCTAssertNil(ClaudioModel(id: "claude-sonnet-9").thinkingOffType)
+    }
+
+    /// Opus 5.5 cannot stop thinking: the effort is lowered instead, and
+    /// the budget gets headroom so the thinking leaves room for the text.
+    func testAModelThatAlwaysThinksRunsAtLowEffort() {
+        XCTAssertTrue(ClaudioModel.opus55.alwaysThinks)
+        XCTAssertFalse(ClaudioModel.sonnet55.alwaysThinks)
+        XCTAssertFalse(ClaudioModel.haiku45.alwaysThinks)
+    }
+
     // MARK: - The bundled list
 
     /// The list the app ships, grouped by family and newest first: it is the

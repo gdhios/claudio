@@ -207,4 +207,33 @@ final class AnthropicClientTests: XCTestCase {
         // The guard itself: only Haiku 4.5 supports it today.
         XCTAssertEqual(ClaudioModel.bundled.filter(\.supportsTemperature), [.haiku45])
     }
+
+    /// Thinking is on by default on the 5 models and counts against
+    /// `max_tokens`: left alone, Sonnet 5.5 spent the whole 400-token budget
+    /// of a card thinking and answered nothing. The body turns it off the
+    /// way each model accepts, and sends nothing to a model that has no
+    /// such switch — a wrong `thinking` value is a 400 for all its actions.
+    func testThinkingIsTurnedOffTheWayEachModelAccepts() {
+        func thinking(_ model: ClaudioModel) -> [String: String]? {
+            AnthropicClient.makeBody(text: "t", system: "s", model: model, maxTokens: 400)["thinking"] as? [String: String]
+        }
+        XCTAssertEqual(thinking(.sonnet55), ["type": "between_tools"])
+        XCTAssertEqual(thinking(.sonnet5), ["type": "disabled"])
+        XCTAssertEqual(thinking(.opus5), ["type": "disabled"])
+        XCTAssertNil(thinking(.haiku45))
+        XCTAssertNil(thinking(.opus55))
+        XCTAssertNil(thinking(ClaudioModel(id: "claude-sonnet-9")))
+    }
+
+    /// Opus 5.5 always thinks: it runs at low effort, with headroom on the
+    /// budget so the thinking doesn't swallow the text. The others keep the
+    /// budget they were given and no `output_config`.
+    func testAModelThatAlwaysThinksGetsLowEffortAndHeadroom() {
+        let opus = AnthropicClient.makeBody(text: "t", system: "s", model: .opus55, maxTokens: 400)
+        XCTAssertEqual(opus["output_config"] as? [String: String], ["effort": "low"])
+        XCTAssertEqual(opus["max_tokens"] as? Int, 400 + AnthropicClient.thinkingHeadroom)
+        let sonnet = AnthropicClient.makeBody(text: "t", system: "s", model: .sonnet55, maxTokens: 400)
+        XCTAssertNil(sonnet["output_config"])
+        XCTAssertEqual(sonnet["max_tokens"] as? Int, 400)
+    }
 }

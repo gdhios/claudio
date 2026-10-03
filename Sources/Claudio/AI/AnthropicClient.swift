@@ -70,9 +70,15 @@ struct AnthropicClient: TextStreamClient {
         return parser.result
     }
 
-    /// Body of the POST /v1/messages. A misnamed field or a temperature
-    /// sent to a model that rejects it is a 400 for everyone: that's what
-    /// the tests lock down.
+    /// Tokens added to the budget of a model that always thinks, so its
+    /// thinking leaves room for the text. A ceiling, not a spend.
+    static let thinkingHeadroom = 1024
+
+    /// Body of the POST /v1/messages. A misnamed field, a temperature or a
+    /// `thinking` value sent to a model that rejects it is a 400 for
+    /// everyone: that's what the tests lock down. Thinking is turned off
+    /// where the model allows it (`ClaudioModel.thinkingOffType`): it counts
+    /// against `max_tokens`, and left on it ate whole budgets of 400 tokens.
     static func makeBody(
         text: String, system: String, model: ClaudioModel, maxTokens: Int
     ) -> [String: Any] {
@@ -85,6 +91,13 @@ struct AnthropicClient: TextStreamClient {
         ]
         if model.supportsTemperature {
             body["temperature"] = Constants.temperature
+        }
+        if let type = model.thinkingOffType {
+            body["thinking"] = ["type": type]
+        }
+        if model.alwaysThinks {
+            body["output_config"] = ["effort": "low"]
+            body["max_tokens"] = maxTokens + thinkingHeadroom
         }
         return body
     }

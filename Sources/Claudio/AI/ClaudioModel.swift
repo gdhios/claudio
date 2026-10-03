@@ -162,6 +162,31 @@ struct ClaudioModel: Hashable, Sendable {
 
     var supportsTemperature: Bool { Self.temperatureModelIDs.contains(id) }
 
+    // MARK: - Thinking
+
+    /// Claudio asks one short answer and uses no tool: thinking only spends
+    /// the answer's budget, and a `thinking` block alone in 400 tokens is an
+    /// empty card. The 5 models think by default, each with its own switch
+    /// (platform.claude.com/docs, thinking-troubleshooting, read 2026-10-03):
+    /// `between_tools` on Sonnet 5.5, `disabled` on Sonnet 5 and Opus 5. A
+    /// wrong value is a 400, so the switch only goes to this closed list.
+    /// Haiku 4.5 doesn't think unless asked, and a newcomer gets nothing.
+    static let thinkingOffTypeByModelID: [String: String] = [
+        "claude-sonnet-5-5": "between_tools",
+        "claude-sonnet-5": "disabled",
+        "claude-opus-5": "disabled",
+    ]
+
+    /// The `thinking.type` that turns thinking off on this model, `nil`
+    /// when the model has no such switch.
+    var thinkingOffType: String? { Self.thinkingOffTypeByModelID[id] }
+
+    /// The models that cannot stop thinking: the request lowers their
+    /// effort instead and gives the budget headroom.
+    static let alwaysThinkingModelIDs: Set<String> = ["claude-opus-5-5"]
+
+    var alwaysThinks: Bool { Self.alwaysThinkingModelIDs.contains(id) }
+
     // MARK: - Pricing
 
     /// Dollars per million tokens, input and output.
