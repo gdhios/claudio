@@ -61,6 +61,14 @@ struct NowPlayingTrack: Sendable, Equatable {
                   duration: fields["duration"] as? Double)
     }
 
+    /// The same track, whatever the player is doing with it: paused or
+    /// playing, a read finds the card it left, cover and facts included.
+    /// The app's name goes with its bundle id.
+    static func == (lhs: NowPlayingTrack, rhs: NowPlayingTrack) -> Bool {
+        lhs.title == rhs.title && lhs.artist == rhs.artist && lhs.album == rhs.album
+            && lhs.bundleID == rhs.bundleID
+    }
+
     /// The player's name for the button that brings it forward: only when
     /// macOS gave the app behind the track. A card from a link has none.
     var playerName: String? {

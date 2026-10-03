@@ -257,6 +257,26 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertNil(session.artwork, "the old track's cover lands nowhere")
     }
 
+    /// Paused since the failure, it is still the same track: "Try again"
+    /// keeps its cover on the card rather than blink, and the card says
+    /// it's paused.
+    func testARetryOnThePausedTrackKeepsItsCover() async throws {
+        let bench = Bench(answer: .failure(ModelFailure()), artwork: Bench.cover)
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        await bench.wait { session.artwork != nil }
+
+        var paused = NowPlayingTrack.sample
+        paused.isPlaying = false
+        bench.track = paused
+        bench.artworkWaits = true  // the cover asked again is still on its way
+        bench.coordinator.retry()
+        await bench.runs()
+        XCTAssertEqual(session.track?.isPlaying, false)
+        XCTAssertTrue(session.artwork === Bench.cover, "the same track keeps its cover")
+    }
+
     // MARK: - "Tell me more"
 
     /// A pill on the card: the notes make way for a long text about the
@@ -588,7 +608,8 @@ private final class Bench: AsyncWaiting {
     private var waitingArtwork: [CheckedContinuation<NSImage?, Never>] = []
     private var waitingRemoteCovers: [CheckedContinuation<NSImage?, Never>] = []
     private let artwork: NSImage?
-    private let artworkWaits: Bool
+    /// Covers wait for `answerArtwork()`; read at each request.
+    var artworkWaits: Bool
     private let remoteCover: NSImage?
 
     init(track: NowPlayingTrack? = .sample,
@@ -643,7 +664,7 @@ private final class Bench: AsyncWaiting {
             artwork: ArtworkSource { [weak self] track in
                 guard let self else { return nil }
                 artworkRequests.append(track)
-                guard artworkWaits else { return artwork }
+                guard self.artworkWaits else { return artwork }
                 return await withCheckedContinuation { waitingArtwork.append($0) }
             },
             facts: FactsSource(

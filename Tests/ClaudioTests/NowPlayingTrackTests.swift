@@ -22,6 +22,10 @@ final class NowPlayingTrackTests: XCTestCase {
                                               bundleID: "com.spotify.client",
                                               isPlaying: true,
                                               duration: 245.3))
+        // Equality is the track's: what the player is doing is read apart.
+        XCTAssertEqual(track.appName, "Spotify")
+        XCTAssertTrue(track.isPlaying)
+        XCTAssertEqual(track.duration, 245.3)
     }
 
     /// Paused, the track is still the one the Now Playing widget shows: the
@@ -45,6 +49,9 @@ final class NowPlayingTrackTests: XCTestCase {
                                               bundleID: nil,
                                               isPlaying: true,
                                               duration: nil))
+        XCTAssertNil(track.appName)
+        XCTAssertTrue(track.isPlaying)
+        XCTAssertNil(track.duration)
     }
 
     /// No title, nothing playing — even when a player is known: an app that
@@ -71,6 +78,28 @@ final class NowPlayingTrackTests: XCTestCase {
         for printed in ["", "\n", "undefined", "null", "[]", "{", "true",
                         "execution error: Error: TypeError: undefined is not an object (-2700)"] {
             XCTAssertNil(NowPlayingTrack(printed: printed), printed)
+        }
+    }
+
+    /// Paused or playing, it is the same track: "Try again" after a pause
+    /// keeps the card's cover and facts. Another title, artist, album or
+    /// player is another track.
+    func testAPausedTrackIsTheSameTrack() {
+        let playing = NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client")
+        var paused = playing
+        paused.isPlaying = false
+        XCTAssertEqual(playing, paused)
+
+        for other in [NowPlayingTrack(title: "Ljubljana", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Bleu", album: "Rêve parti",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Live",
+                                      appName: "Spotify", bundleID: "com.spotify.client"),
+                      NowPlayingTrack(title: "Bleu", artist: "Lescop", album: "Rêve parti",
+                                      appName: "Music", bundleID: "com.apple.Music")] {
+            XCTAssertNotEqual(playing, other)
         }
     }
 
