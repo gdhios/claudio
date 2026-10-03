@@ -87,6 +87,19 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(cache.lookup(other, now: clock.now), .unknown)
     }
 
+    /// Deezer found the album but its record never came: that is a
+    /// failure, not a miss, and nothing is kept.
+    func testADeezerRecordThatFailsIsNoMiss() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        let service = makeService()  // the album's record answers 404
+
+        let facts = await service.facts(for: recent)
+        XCTAssertNil(facts)
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/recording", "/search/album", "/album/1001749391"])
+        XCTAssertEqual(cache.lookup(recent, now: clock.now), .unknown)
+    }
+
     // MARK: - The artist, before the long text
 
     private let artistID = "0df6d50f-7e43-4c6a-8220-61932b67c9c5"
@@ -200,7 +213,8 @@ final class MusicBrainzServiceTests: XCTestCase {
     }
 
     /// The budget: a service that takes its time is left to it. The facts
-    /// the search already gave are kept rather than lost to the budget.
+    /// the search already gave are shown rather than lost to the budget,
+    /// but not kept: the next listen asks for the release group again.
     func testPastTheBudgetTheReleaseGroupIsNotWaitedFor() async {
         transport.answers["/ws/2/recording"] = MusicBrainzLookupTests.search
         transport.answers["/ws/2/release-group/3b03f2df-1fc0-4572-8b90-8f952a2a9fcb"] = MusicBrainzLookupTests.releaseGroup
@@ -210,6 +224,19 @@ final class MusicBrainzServiceTests: XCTestCase {
         let facts = await service.facts(for: track)
         XCTAssertEqual(facts?.releaseGroupID, "3b03f2df-1fc0-4572-8b90-8f952a2a9fcb")
         XCTAssertEqual(transport.requests.count, 1, "no time left for the release group")
+        XCTAssertEqual(cache.lookup(track, now: clock.now), .unknown)
+    }
+
+    /// The release group failed: the search's guess is shown, never kept
+    /// for three months in place of the record's own facts.
+    func testAReleaseGroupThatFailsLeavesNothingKept() async {
+        transport.answers["/ws/2/recording"] = MusicBrainzLookupTests.search
+        let service = makeService()  // the release group answers 404
+
+        let facts = await service.facts(for: track)
+        XCTAssertEqual(facts?.releaseGroupID, "3b03f2df-1fc0-4572-8b90-8f952a2a9fcb")
+        XCTAssertEqual(transport.requests.count, 2)
+        XCTAssertEqual(cache.lookup(track, now: clock.now), .unknown)
     }
 }
 
