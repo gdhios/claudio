@@ -14,7 +14,7 @@ final class UpdateChecker {
     /// `failed` is distinct from `upToDate` so the UI never says "up to date"
     /// on a plain network error.
     enum CheckOutcome {
-        case upToDate(String)
+        case upToDate
         case updateAvailable(Feed)
         case failed
     }
@@ -42,8 +42,8 @@ final class UpdateChecker {
     func startPeriodicChecks() {
         Task { _ = await checkNow() }
         let timer = Timer.scheduledTimer(withTimeInterval: Constants.updateCheckInterval,
-                                         repeats: true) { _ in
-            Task { @MainActor in _ = await UpdateChecker.shared.checkNow() }
+                                         repeats: true) { [weak self] _ in
+            Task { @MainActor in _ = await self?.checkNow() }
         }
         timer.tolerance = 3600
         self.timer = timer
@@ -63,7 +63,7 @@ final class UpdateChecker {
                 onUpdateFound?(feed)
                 return .updateAvailable(feed)
             }
-            return .upToDate(feed.version)
+            return .upToDate
         } catch {
             return .failed
         }
