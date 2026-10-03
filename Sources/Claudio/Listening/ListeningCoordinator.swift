@@ -195,31 +195,25 @@ final class ListeningCoordinator {
             return
         }
         session.beginStreaming()
-        do {
-            let result = try await client.streamCompletion(
-                of: ListeningNotes.userMessage(for: track, facts: facts),
-                system: ListeningNotes.system(detail: detail),
-                maxTokens: detail.maxTokens
-            ) { @MainActor piece in
-                session.appendNotes(piece)
-            }
-            guard self.session === session, !Task.isCancelled else { return }
-            CostLedger.shared.record(model: session.model,
-                                     inputTokens: result.inputTokens,
-                                     outputTokens: result.outputTokens)
+        let outcome = await client.complete(
+            ListeningNotes.userMessage(for: track, facts: facts),
+            system: ListeningNotes.system(detail: detail),
+            maxTokens: detail.maxTokens,
+            model: session.model
+        ) { piece in session.appendNotes(piece) }
+        guard self.session === session else { return }
+        switch outcome {
+        case .answered(let result):
             // Nothing is an answer too, and a wrong one: said as such,
             // with what the stream held, rather than "Ready" over a blank.
             if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
-                return
+            } else {
+                session.finish(with: result.text)
             }
-            session.finish(with: result.text)
-        } catch is CancellationError {
-            // Esc during the stream: nothing to do
-        } catch let error as URLError where error.code == .cancelled {
-            // same thing, URLSession reports cancellation this way
-        } catch {
-            guard self.session === session, !Task.isCancelled else { return }
+        case .cancelled:
+            break
+        case .failed(let error):
             session.phase = .error(error.localizedDescription)
         }
     }
@@ -277,27 +271,24 @@ final class ListeningCoordinator {
         let artist = preferences().musicBrainz ? await facts.artist(subject) : nil
         guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
         session.artistFacts = artist
-        do {
-            let result = try await client.streamCompletion(
-                of: ListeningEssay.userMessage(for: subject, artist: artist),
-                system: ListeningEssay.system(),
-                maxTokens: ListeningEssay.maxTokens
-            ) { @MainActor piece in
-                session.appendEssay(piece)
-            }
-            guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
-            CostLedger.shared.record(model: session.model,
-                                     inputTokens: result.inputTokens,
-                                     outputTokens: result.outputTokens)
+        let outcome = await client.complete(
+            ListeningEssay.userMessage(for: subject, artist: artist),
+            system: ListeningEssay.system(),
+            maxTokens: ListeningEssay.maxTokens,
+            model: session.model
+        ) { piece in session.appendEssay(piece) }
+        guard self.session === session else { return }
+        switch outcome {
+        case .answered(let result):
+            guard session.essaySubject == subject else { return }
             if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
-                return
+            } else {
+                session.finishEssay(with: result.text)
             }
-            session.finishEssay(with: result.text)
-        } catch is CancellationError {
-        } catch let error as URLError where error.code == .cancelled {
-        } catch {
-            guard self.session === session, !Task.isCancelled else { return }
+        case .cancelled:
+            break
+        case .failed(let error):
             session.phase = .error(error.localizedDescription)
         }
     }

@@ -37,6 +37,43 @@ protocol TextStreamClient: Sendable {
     ) async throws -> StreamResult
 }
 
+/// How a completion ended, seen from a coordinator.
+enum StreamOutcome {
+    case answered(StreamResult)
+    /// Esc, a new press, a panel closed: nothing to show, nothing billed.
+    case cancelled
+    case failed(Error)
+}
+
+extension TextStreamClient {
+    /// One completion the way every panel runs it: streamed piece by piece,
+    /// its spend recorded, and cancellation — however the task or
+    /// URLSession reports it — folded into one case.
+    @MainActor
+    func complete(_ text: String,
+                  system: String,
+                  maxTokens: Int,
+                  model: ModelChoice,
+                  onDelta: @escaping @Sendable @MainActor (String) -> Void) async -> StreamOutcome {
+        do {
+            let result = try await streamCompletion(of: text, system: system, maxTokens: maxTokens) {
+                @MainActor piece in onDelta(piece)
+            }
+            guard !Task.isCancelled else { return .cancelled }
+            CostLedger.shared.record(model: model,
+                                     inputTokens: result.inputTokens,
+                                     outputTokens: result.outputTokens)
+            return .answered(result)
+        } catch is CancellationError {
+            return .cancelled
+        } catch let error as URLError where error.code == .cancelled {
+            return .cancelled
+        } catch {
+            return Task.isCancelled ? .cancelled : .failed(error)
+        }
+    }
+}
+
 extension URLSession.AsyncBytes {
     /// The whole body, for an HTTP error that arrives as one JSON block
     /// rather than as a stream.

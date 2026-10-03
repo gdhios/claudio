@@ -285,31 +285,24 @@ final class CorrectionCoordinator {
         let prompt = request.prompt(forText: session.originalText, track: track)
         session.beginStreaming(sending: prompt.track)
 
-        do {
-            let result = try await client.streamCompletion(
-                of: prompt.userMessage,
-                system: prompt.system,
-                maxTokens: request.maxTokens(forText: session.originalText,
-                                             multiplier: session.maxTokensMultiplier)
-            ) { @MainActor piece in
-                session.appendStreamed(piece)
-            }
-            guard !Task.isCancelled else { return }
+        let outcome = await client.complete(
+            prompt.userMessage,
+            system: prompt.system,
+            maxTokens: request.maxTokens(forText: session.originalText,
+                                         multiplier: session.maxTokensMultiplier),
+            model: request.model
+        ) { piece in session.appendStreamed(piece) }
+        switch outcome {
+        case .answered(let result):
             session.finishStreaming(with: result.text, truncated: result.truncated)
             // A custom action that succeeds enters the history: its
             // instruction can be relaunched with one gesture from the menu bar.
             if case .free(let instruction) = request.origin {
                 history.record(instruction)
             }
-            CostLedger.shared.record(model: request.model,
-                                     inputTokens: result.inputTokens,
-                                     outputTokens: result.outputTokens)
-        } catch is CancellationError {
-            // Esc during the stream: nothing to do
-        } catch let error as URLError where error.code == .cancelled {
-            // same thing, URLSession reports cancellation this way
-        } catch {
-            guard !Task.isCancelled else { return }
+        case .cancelled:
+            break
+        case .failed(let error):
             session.phase = .error(error.localizedDescription)
         }
     }

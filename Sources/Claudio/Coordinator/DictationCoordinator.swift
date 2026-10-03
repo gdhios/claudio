@@ -366,18 +366,21 @@ final class DictationCoordinator {
             session.note = pastedWithoutCleanup(loc("clé API manquante", en: "no API key"))
             return nil
         }
-        do {
-            let result = try await client.streamCompletion(
-                of: session.output.userMessage(for: raw),
-                system: session.output.systemPrompt(keeping: terms, landingIn: destination),
-                maxTokens: session.output.maxTokens(forRawLength: raw.count)
-            ) { @MainActor piece in
-                session.appendCleaned(piece)
-            }
-            guard !Task.isCancelled else { return nil }
-            CostLedger.shared.record(model: session.model,
-                                     inputTokens: result.inputTokens,
-                                     outputTokens: result.outputTokens)
+        let outcome = await client.complete(
+            session.output.userMessage(for: raw),
+            system: session.output.systemPrompt(keeping: terms, landingIn: destination),
+            maxTokens: session.output.maxTokens(forRawLength: raw.count),
+            model: session.model
+        ) { piece in session.appendCleaned(piece) }
+        switch outcome {
+        case .cancelled:
+            return nil
+        case .failed(let error):
+            // The dictation is never lost: the cleanup is what failed.
+            session.cleanedText = ""
+            session.note = pastedWithoutCleanup(error.localizedDescription)
+            return nil
+        case .answered(let result):
             let cleaned = DictationCleanup.strippingTranscriptTags(result.text)
             guard !cleaned.isEmpty else {
                 session.cleanedText = ""
@@ -396,16 +399,6 @@ final class DictationCoordinator {
             }
             session.cleanedText = cleaned
             return cleaned
-        } catch is CancellationError {
-            return nil
-        } catch let error as URLError where error.code == .cancelled {
-            return nil
-        } catch {
-            guard !Task.isCancelled else { return nil }
-            // The dictation is never lost: the cleanup is what failed.
-            session.cleanedText = ""
-            session.note = pastedWithoutCleanup(error.localizedDescription)
-            return nil
         }
     }
 
