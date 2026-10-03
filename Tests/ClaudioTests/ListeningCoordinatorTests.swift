@@ -267,9 +267,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         await bench.runs()
         await bench.wait { session.artwork != nil }
 
-        var paused = NowPlayingTrack.sample
-        paused.isPlaying = false
-        bench.track = paused
+        bench.track = .samplePaused
         bench.artworkWaits = true  // the cover asked again is still on its way
         bench.coordinator.retry()
         await bench.runs()
@@ -530,12 +528,6 @@ final class ListeningCoordinatorTests: XCTestCase {
 // MARK: - The bench
 
 private extension NowPlayingTrack {
-    static let sample = NowPlayingTrack(title: "真夜中のジョーク",
-                                        artist: "間宮貴子",
-                                        album: "LOVE TRIP",
-                                        appName: "Spotify",
-                                        bundleID: "com.spotify.client",
-                                        isPlaying: true)
     /// What the player plays by the time "Try again" reads it again.
     static let other = NowPlayingTrack(title: "Plastic Love",
                                        artist: "竹内まりや",

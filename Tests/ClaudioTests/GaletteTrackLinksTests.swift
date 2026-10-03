@@ -11,19 +11,19 @@ final class GaletteTrackLinksTests: XCTestCase {
     // MARK: - An app's track
 
     func testAnAppTrackGetsTheArtistThenTheAlbum() {
-        XCTAssertEqual(GaletteLink.links(for: .spotify, playerIsBrowser: false),
+        XCTAssertEqual(GaletteLink.links(for: .sample, playerIsBrowser: false),
                        [.artist(name: "間宮貴子"), .album(artist: "間宮貴子", title: "LOVE TRIP")])
     }
 
     func testAlbumOnlyShowsWhenTheAlbumIsKnown() {
-        var track = NowPlayingTrack.spotify
+        var track = NowPlayingTrack.sample
         track.album = nil
         XCTAssertEqual(GaletteLink.links(for: track, playerIsBrowser: false), [.artist(name: "間宮貴子")])
     }
 
     /// An album link needs its artist too: without one, nothing opens.
     func testWithoutAnArtistNoButtonShows() {
-        var track = NowPlayingTrack.spotify
+        var track = NowPlayingTrack.sample
         track.artist = nil
         XCTAssertEqual(GaletteLink.links(for: track, playerIsBrowser: false), [])
     }
@@ -121,8 +121,6 @@ final class GaletteTrackLinksTests: XCTestCase {
 }
 
 private extension NowPlayingTrack {
-    static let spotify = NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP",
-                                         appName: "Spotify", bundleID: "com.spotify.client")
     static let youTubeInZen = NowPlayingTrack(title: "The Chemical Brothers – Brothers Gonna Work It Out (Full Album)",
                                               artist: "HK Disco Club",
                                               appName: "Zen", bundleID: "app.zen-browser.zen")

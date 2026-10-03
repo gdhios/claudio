@@ -32,8 +32,3 @@ final class LocalArtworkTests: XCTestCase {
         XCTAssertNil(LocalArtwork.url(printed: "http://i.scdn.co/image/abc"), "only https is fetched")
     }
 }
-
-private extension NowPlayingTrack {
-    static let sample = NowPlayingTrack(title: "真夜中のジョーク", artist: "間宮貴子", album: "LOVE TRIP",
-                                        appName: "Spotify", bundleID: "com.spotify.client")
-}

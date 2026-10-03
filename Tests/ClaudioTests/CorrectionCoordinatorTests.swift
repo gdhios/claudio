@@ -151,7 +151,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// time: the panel is up and key by then, and a simulated ⌘C would land
     /// in it — with nothing selected, there is nothing to read again anyway.
     func testTryingAgainOnNothingSelectedSendsTheSameRequestWithoutCapturing() async throws {
-        let bench = Bench(selection: nil, track: .sample,
+        let bench = Bench(selection: nil, track: .samplePaused,
                           answers: [.failure(ModelFailure()), .success(Bench.answer)])
         bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
         let session = try XCTUnwrap(bench.coordinator.session)
@@ -169,7 +169,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
                                                      + Bench.trackBlock,
                                                  count: 2))
         XCTAssertEqual(session.phase, .done)
-        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(session.sentTrack, .samplePaused)
     }
 
     // MARK: - The track playing
@@ -177,7 +177,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// Something plays: it goes out with the request, and the panel names
     /// the track that went — the line under the answer.
     func testTheTrackPlayingGoesOutWithTheRequestAndIsNamedUnderTheAnswer() async throws {
-        let bench = Bench(selection: nil, track: .sample)
+        let bench = Bench(selection: nil, track: .samplePaused)
         bench.coordinator.triggerFreeAction()
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -188,14 +188,14 @@ final class CorrectionCoordinatorTests: XCTestCase {
         await bench.runs()
         XCTAssertEqual(bench.client.texts, ["<consigne>\nécris un message pour partager ce que j'écoute\n</consigne>\n\n"
                                                 + Bench.trackBlock])
-        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(session.sentTrack, .samplePaused)
         XCTAssertEqual(bench.reads, 1)
     }
 
     /// Over a selection too — "add the title I'm listening to at the end":
     /// the text as ever, the track after it, the transformation's prompt.
     func testOverASelectionTheTrackFollowsTheText() async throws {
-        let bench = Bench(selection: "Bonne soirée !", track: .sample)
+        let bench = Bench(selection: "Bonne soirée !", track: .samplePaused)
         bench.coordinator.triggerFreeAction()
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -205,7 +205,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
         await bench.runs()
         XCTAssertEqual(bench.client.systems, [ClaudioRequest.free(instruction: "ajoute le titre que j'écoute à la fin").system])
         XCTAssertEqual(bench.client.texts, [ClaudioRequest.wrappingSource("Bonne soirée !") + "\n\n" + Bench.trackBlock])
-        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(session.sentTrack, .samplePaused)
     }
 
     /// Nothing playing: the request goes alone, without a word about it, and
@@ -224,7 +224,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// A catalog action never hears of the track: the player isn't even
     /// asked, nor Galette looked for, and the panel names nothing.
     func testACatalogActionNeverReadsTheTrack() async throws {
-        let bench = Bench(selection: "Bonjour", track: .sample, galetteInstalled: true)
+        let bench = Bench(selection: "Bonjour", track: .samplePaused, galetteInstalled: true)
         bench.coordinator.trigger(action: .translateEN)
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -240,7 +240,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// Galette — once it went out, not before. A button leaves the panel up:
     /// an answer not pasted yet must not go with it.
     func testWithGaletteTheTrackSentOffersItsButtonsAndAClickKeepsThePanel() async throws {
-        let bench = Bench(selection: nil, track: .sample, galetteInstalled: true)
+        let bench = Bench(selection: nil, track: .samplePaused, galetteInstalled: true)
         bench.coordinator.triggerFreeAction()
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -263,12 +263,12 @@ final class CorrectionCoordinatorTests: XCTestCase {
 
     /// Without Galette the line names the track and offers nothing more.
     func testWithoutGaletteTheTrackSentOffersNothing() async throws {
-        let bench = Bench(selection: nil, track: .sample)
+        let bench = Bench(selection: nil, track: .samplePaused)
         bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
 
-        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(session.sentTrack, .samplePaused)
         XCTAssertNil(session.galette)
         XCTAssertEqual(session.galetteLinks, [])
     }
@@ -276,7 +276,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// The palette asks the player as it opens, since it may become the
     /// custom action; a catalog row picked in it sends no track all the same.
     func testACatalogRowPickedInThePaletteSendsNoTrack() async throws {
-        let bench = Bench(selection: "Bonjour", track: .sample)
+        let bench = Bench(selection: "Bonjour", track: .samplePaused)
         bench.coordinator.triggerPalette()
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -293,7 +293,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
     /// the panel up: it opens, asks for the request, and only the sending
     /// waits for the answer — long in by then, when the request is typed.
     func testThePlayerIsReadAlongsideTheCaptureAndOnlyWaitedForToSend() async throws {
-        let bench = Bench(selection: nil, track: .sample, readsWait: true)
+        let bench = Bench(selection: nil, track: .samplePaused, readsWait: true)
         bench.coordinator.triggerFreeAction()
         let session = try XCTUnwrap(bench.coordinator.session)
         await bench.runs()
@@ -309,13 +309,13 @@ final class CorrectionCoordinatorTests: XCTestCase {
         bench.answerRead()
         await bench.runs()
         XCTAssertEqual(bench.client.texts, ["<consigne>\nc'est quoi ce morceau ?\n</consigne>\n\n" + Bench.trackBlock])
-        XCTAssertEqual(session.sentTrack, .sample)
+        XCTAssertEqual(session.sentTrack, .samplePaused)
     }
 
     /// Esc while the player is still answering: the answer that comes
     /// afterwards sends nothing.
     func testEscapeWhileThePlayerAnswersSendsNothing() async throws {
-        let bench = Bench(selection: nil, track: .sample, readsWait: true)
+        let bench = Bench(selection: nil, track: .samplePaused, readsWait: true)
         bench.coordinator.triggerRecent(instruction: "c'est quoi ce morceau ?")
         let task = try XCTUnwrap(bench.coordinator.streamTask)
         // The model's client is made: all that's left before sending is the track.
@@ -332,20 +332,11 @@ final class CorrectionCoordinatorTests: XCTestCase {
 
 // MARK: - The bench
 
-private extension NowPlayingTrack {
-    static let sample = NowPlayingTrack(title: "真夜中のジョーク",
-                                        artist: "間宮貴子",
-                                        album: "LOVE TRIP",
-                                        appName: "Spotify",
-                                        bundleID: "com.spotify.client",
-                                        isPlaying: false)
-}
-
 /// One coordinator and the fakes it was built with.
 @MainActor
 private final class Bench: AsyncWaiting {
     static let answer = "Bonjour, je voulais savoir."
-    /// `NowPlayingTrack.sample`, the way the model reads it.
+    /// `NowPlayingTrack.samplePaused`, the way the model reads it.
     static let trackBlock = """
         <morceau_en_cours>
         titre : 真夜中のジョーク
