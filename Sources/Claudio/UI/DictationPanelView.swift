@@ -91,18 +91,27 @@ struct DictationPanelView: View {
     @ViewBuilder private var content: some View {
         switch session.phase {
         case .empty:
-            messageView(icon: "waveform.slash",
-                        title: loc("Rien entendu", en: "Nothing heard"),
-                        detail: loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
-                                    en: "No speech was picked up. Hold the shortcut while you talk."))
+            PanelMessage(icon: "waveform.slash",
+                         title: loc("Rien entendu", en: "Nothing heard"),
+                         detail: loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
+                                     en: "No speech was picked up. Hold the shortcut while you talk."),
+                         textSize: textSize)
         case .error(let message):
-            messageView(icon: "exclamationmark.triangle",
-                        title: loc("Dictée impossible", en: "Dictation stopped"),
-                        detail: message,
-                        // A language that isn't installed is the one failure
-                        // the panel can act on: Claudio downloads nothing by
-                        // itself, and this opens the pane where it's added.
-                        settingsURL: session.failure?.settingsURL)
+            PanelMessage(icon: "exclamationmark.triangle",
+                         title: loc("Dictée impossible", en: "Dictation stopped"),
+                         detail: message,
+                         textSize: textSize) {
+                // A language that isn't installed is the one failure the
+                // panel can act on: Claudio downloads nothing by itself, and
+                // this opens the pane where it's added.
+                if let settingsURL = session.failure?.settingsURL {
+                    Button(loc("Ouvrir Réglages Système", en: "Open System Settings")) {
+                        NSWorkspace.shared.open(settingsURL)
+                    }
+                    .buttonStyle(PanelPillButtonStyle())
+                    .padding(.top, 2)
+                }
+            }
         default:
             Group {
                 if session.phase == .listening, session.transcript.isEmpty {
@@ -140,7 +149,8 @@ struct DictationPanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    liveText
+                    // A caret as long as words are still coming in.
+                    StreamingText(text: session.finalText, isStreaming: session.isWorking)
                         .font(.system(size: textSize.bodyPoints))
                         .foregroundStyle(.white.opacity(0.92))
                         .textSelection(.enabled)
@@ -179,58 +189,12 @@ struct DictationPanelView: View {
         .transition(.opacity)
     }
 
-    /// A blinking caret as long as words are still coming in; plain text
-    /// once the dictation is out.
-    @ViewBuilder private var liveText: some View {
-        if session.isWorking {
-            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(session.finalText)
-                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
-            }
-        } else {
-            Text(session.finalText)
-        }
-    }
-
-    private func messageView(icon: String, title: String, detail: String,
-                             settingsURL: URL? = nil) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
-            Text(detail)
-                .font(.system(size: textSize.points(12)))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                // An engine's message is a sentence, not a label: without
-                // this it is cut off at one line, right where it says what
-                // to do about it.
-                .fixedSize(horizontal: false, vertical: true)
-            if let settingsURL {
-                Button(loc("Ouvrir Réglages Système", en: "Open System Settings")) {
-                    NSWorkspace.shared.open(settingsURL)
-                }
-                .buttonStyle(PanelPillButtonStyle())
-                .padding(.top, 2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 26)
-    }
-
     /// Bottom left, the model that cleaned up and, when there wasn't one,
     /// why — same spot as the correction panel's indicator. Copy only shows
     /// when the panel is staying: a pasted dictation closes by itself.
     private var footer: some View {
         HStack(spacing: 8) {
-            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
-            // Neither the separator nor the model name are translated.
-            Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
-            Text(session.model.shortName)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
+            PanelFooterCaption(model: session.model.shortName)
             if let note = session.note {
                 Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
                 Text(note)
@@ -241,14 +205,7 @@ struct DictationPanelView: View {
             }
             Spacer(minLength: 8)
             if session.canCopy {
-                Button(action: onCopy) {
-                    if session.justCopied {
-                        Text(loc("Copié ✓", en: "Copied ✓"))
-                    } else {
-                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(PanelPillButtonStyle())
+                CopyButton(justCopied: session.justCopied, action: onCopy)
             }
         }
         .padding(.horizontal, 14)

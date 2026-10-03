@@ -261,7 +261,7 @@ struct ListeningPanelView: View {
     /// ceiling rather than pushing it off the screen.
     private var notes: some View {
         ScrollView {
-            notesText
+            StreamingText(text: shownText, isStreaming: session.phase == .streaming)
                 .font(.system(size: textSize.bodyPoints))
                 .foregroundStyle(.white.opacity(0.92))
                 .textSelection(.enabled)
@@ -286,35 +286,10 @@ struct ListeningPanelView: View {
         session.essaySubject == nil ? session.notes : session.essay
     }
 
-    @ViewBuilder private var notesText: some View {
-        if session.phase == .streaming {
-            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(shownText)
-                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
-            }
-        } else {
-            Text(shownText)
-        }
-    }
-
     private func messageView(icon: String, title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
-            Text(detail)
-                .font(.system(size: textSize.points(12)))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                // An error is a sentence, not a label: without this it is
-                // cut off at one line, right where it says what went wrong.
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
         // Under a card, the card already makes room above.
-        .padding(.top, session.track == nil ? 26 : 14)
-        .padding(.bottom, 22)
+        PanelMessage(icon: icon, title: title, detail: detail, textSize: textSize,
+                     top: session.track == nil ? 26 : 14, bottom: 22)
     }
 
     /// The model is named once it has something to do with what is on
@@ -328,15 +303,7 @@ struct ListeningPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
-            if showsModelName {
-                // Neither the separator nor the model name are translated.
-                Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
-                Text(session.model.shortName)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
+            PanelFooterCaption(model: showsModelName ? session.model.shortName : nil)
             Spacer()
             // Under the long text: the same subject, in Claude's browser. The
             // footer is narrow: the site's name says where it goes.
@@ -372,14 +339,7 @@ struct ListeningPanelView: View {
             // Always last, whatever the phase: it copies the card, and ⌘C
             // works as soon as the card is up.
             if session.track != nil {
-                Button(action: onCopy) {
-                    if session.justCopied {
-                        Text(loc("Copié ✓", en: "Copied ✓"))
-                    } else {
-                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(PanelPillButtonStyle())
+                CopyButton(justCopied: session.justCopied, action: onCopy)
             }
         }
         .padding(.horizontal, 14)

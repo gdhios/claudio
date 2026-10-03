@@ -54,6 +54,101 @@ struct PanelTextHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+/// A text still coming in ends on a blinking caret; plain text once it's
+/// all there.
+struct StreamingText: View {
+    let text: String
+    let isStreaming: Bool
+
+    var body: some View {
+        if isStreaming {
+            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
+                Text(text)
+                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
+            }
+        } else {
+            Text(text)
+        }
+    }
+}
+
+/// What stands in for the text when there is none: an icon, a title, the
+/// sentence that says why and, at times, the one thing to do about it.
+struct PanelMessage<Action: View>: View {
+    let icon: String
+    let title: String
+    let detail: String
+    let textSize: PanelTextSize
+    var top: CGFloat = 26
+    var bottom: CGFloat = 26
+    @ViewBuilder let action: Action
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
+            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
+            Text(detail)
+                .font(.system(size: textSize.points(12)))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                // A message is a sentence, not a label: without this it is
+                // cut off at one line, right where it says what went wrong
+                // or what to do about it.
+                .fixedSize(horizontal: false, vertical: true)
+            action
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.top, top)
+        .padding(.bottom, bottom)
+    }
+}
+
+extension PanelMessage where Action == EmptyView {
+    init(icon: String, title: String, detail: String, textSize: PanelTextSize,
+         top: CGFloat = 26, bottom: CGFloat = 26) {
+        self.init(icon: icon, title: title, detail: detail, textSize: textSize,
+                  top: top, bottom: bottom) { EmptyView() }
+    }
+}
+
+/// The footer's left end: how to close the panel, then the model at work,
+/// whenever there is one worth naming.
+struct PanelFooterCaption: View {
+    /// The model's short name; `nil` leaves it out, its separator with it.
+    let model: String?
+
+    var body: some View {
+        Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
+        if let model {
+            // Neither the separator nor the model name are translated.
+            Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
+            Text(model)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+    }
+}
+
+/// Copy, its shortcut beside it, and "Copied ✓" for a moment after.
+struct CopyButton: View {
+    let justCopied: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if justCopied {
+                Text(loc("Copié ✓", en: "Copied ✓"))
+            } else {
+                Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(PanelPillButtonStyle())
+    }
+}
+
 /// Panel close button: discreet in the header, becomes a circle on hover.
 struct PanelCloseButton: View {
     let action: () -> Void

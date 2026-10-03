@@ -113,31 +113,36 @@ struct ResultPanelView: View {
         case .instructionNotHeard(let reason):
             // A silence and a microphone that gave up are two different
             // pieces of news: only the second one has something to report.
-            messageView(icon: reason == nil ? "waveform.slash" : "exclamationmark.triangle",
-                        title: reason == nil
-                            ? loc("Rien entendu", en: "Nothing heard")
-                            : loc("Consigne non entendue", en: "Couldn't hear the instruction"),
-                        detail: reason ?? loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
-                                              en: "No speech was picked up. Hold the shortcut while you talk."))
+            PanelMessage(icon: reason == nil ? "waveform.slash" : "exclamationmark.triangle",
+                         title: reason == nil
+                             ? loc("Rien entendu", en: "Nothing heard")
+                             : loc("Consigne non entendue", en: "Couldn't hear the instruction"),
+                         detail: reason ?? loc("Aucune parole n'a été captée. Maintiens le raccourci en parlant.",
+                                               en: "No speech was picked up. Hold the shortcut while you talk."),
+                         textSize: textSize)
         case .noSelection:
-            messageView(icon: "cursorarrow.rays",
-                        title: loc("Aucune sélection détectée", en: "No selection found"),
-                        detail: loc("Sélectionne du texte puis relance le raccourci.",
-                                    en: "Select some text, then trigger the shortcut again."))
+            PanelMessage(icon: "cursorarrow.rays",
+                         title: loc("Aucune sélection détectée", en: "No selection found"),
+                         detail: loc("Sélectionne du texte puis relance le raccourci.",
+                                     en: "Select some text, then trigger the shortcut again."),
+                         textSize: textSize)
         case .missingKey:
-            messageView(icon: "key",
-                        title: loc("Clé API manquante", en: "No API key"),
-                        detail: loc("Ajoute ta clé Anthropic dans les Réglages pour activer la correction.",
-                                    en: "Add your Anthropic key in Settings to start using Claudio."))
+            PanelMessage(icon: "key",
+                         title: loc("Clé API manquante", en: "No API key"),
+                         detail: loc("Ajoute ta clé Anthropic dans les Réglages pour activer la correction.",
+                                     en: "Add your Anthropic key in Settings to start using Claudio."),
+                         textSize: textSize)
         case .error(let message):
-            messageView(icon: "exclamationmark.triangle",
-                        title: loc("Erreur", en: "Error"),
-                        detail: message)
+            PanelMessage(icon: "exclamationmark.triangle",
+                         title: loc("Erreur", en: "Error"),
+                         detail: message,
+                         textSize: textSize)
         default:
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        resultText
+                        StreamingText(text: session.correctedText,
+                                      isStreaming: session.phase == .capturing || session.phase == .streaming)
                             .font(.system(size: textSize.bodyPoints))
                             .foregroundStyle(.white.opacity(0.92))
                             .textSelection(.enabled)
@@ -271,33 +276,6 @@ struct ResultPanelView: View {
         }
     }
 
-    /// Streaming text with a blinking caret; plain text once finished.
-    @ViewBuilder private var resultText: some View {
-        if session.phase == .capturing || session.phase == .streaming {
-            TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-                let caretOn = Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % 2 == 0
-                Text(session.correctedText)
-                    + Text("▍").foregroundStyle(caretOn ? ClaudioTheme.accent : .clear)
-            }
-        } else {
-            Text(session.correctedText)
-        }
-    }
-
-    private func messageView(icon: String, title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.system(size: textSize.points(13), weight: .semibold))
-            Text(detail)
-                .font(.system(size: textSize.points(12)))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 26)
-    }
-
     /// The model that processed the selection, discreet at the bottom left: it makes
     /// it verifiable at a glance what answered, Claude or a local model.
     /// Nothing to show while the request is only a palette placeholder,
@@ -312,15 +290,7 @@ struct ResultPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Text(loc("Échap pour fermer", en: "esc to close")).font(.caption2).foregroundStyle(.tertiary)
-            if showsModelName {
-                // Neither the separator nor the model name are translated.
-                Text(verbatim: "·").font(.caption2).foregroundStyle(.quaternary)
-                Text(session.request.model.shortName)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
+            PanelFooterCaption(model: showsModelName ? session.request.model.shortName : nil)
             Spacer()
             switch session.phase {
             case .listeningInstruction:
@@ -348,14 +318,7 @@ struct ResultPanelView: View {
                         .help(loc("Relance avec un budget de tokens doublé",
                                   en: "Runs again with twice the token budget"))
                 }
-                Button(action: onCopy) {
-                    if session.justCopied {
-                        Text(loc("Copié ✓", en: "Copied ✓"))
-                    } else {
-                        Text(loc("Copier ", en: "Copy ")) + Text("⌘C").foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(PanelPillButtonStyle())
+                CopyButton(justCopied: session.justCopied, action: onCopy)
                 Button(action: onPaste) {
                     Text(loc("Coller ", en: "Paste ")) + Text("⏎").fontWeight(.regular).foregroundStyle(.white.opacity(0.7))
                 }
