@@ -58,24 +58,14 @@ struct ListeningPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .reading:
-            workingPill(loc("Écoute…", en: "Checking…"))
+            WorkingPill(loc("Écoute…", en: "Checking…"))
         case .streaming:
-            workingPill(loc("Rédaction…", en: "Writing…"))
+            WorkingPill(loc("Rédaction…", en: "Writing…"))
                 .id(session.essaySubject)
         case .done:
-            StatusPill(background: .green.opacity(0.16), foreground: .green) {
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                Text(loc("Prêt", en: "Ready"))
-            }
+            ReadyPill()
         case .nothing, .missingKey, .error:
             EmptyView()
-        }
-    }
-
-    private func workingPill(_ label: String) -> some View {
-        StatusPill {
-            ProgressView().controlSize(.mini)
-            Text(label)
         }
     }
 

@@ -54,6 +54,46 @@ struct PanelTextHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+/// The header's pill while a panel works: a spinner, and what it's doing.
+struct WorkingPill: View {
+    let label: String
+
+    init(_ label: String) { self.label = label }
+
+    var body: some View {
+        StatusPill {
+            ProgressView().controlSize(.mini)
+            Text(label)
+        }
+    }
+}
+
+/// The header's pill while a panel listens: the spinner of the other phases
+/// says "wait", but here it is the voice that moves, so the pill carries
+/// the microphone's last six readings.
+struct ListeningPill: View {
+    let levels: LevelHistory
+    let label: String
+
+    var body: some View {
+        StatusPill {
+            DictationWaveform(levels: Array(levels.values.suffix(6)),
+                              barWidth: 2, spacing: 1.5, maxHeight: 11)
+            Text(label)
+        }
+    }
+}
+
+/// The header's pill once the text is all there.
+struct ReadyPill: View {
+    var body: some View {
+        StatusPill(background: .green.opacity(0.16), foreground: .green) {
+            Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
+            Text(loc("Prêt", en: "Ready"))
+        }
+    }
+}
+
 /// A text still coming in ends on a blinking caret; plain text once it's
 /// all there.
 struct StreamingText: View {

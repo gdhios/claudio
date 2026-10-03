@@ -52,39 +52,24 @@ struct DictationPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .listening:
-            // The spinner of the other phases says "wait"; while listening it
-            // is the voice that moves, so the pill carries the last readings.
             // Locked by a tap, the waveform says it listens and the words say
             // how it ends: with the key up, nothing else on screen does.
-            StatusPill {
-                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
-                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
-                Text(session.isLocked
-                     ? loc("Appuie encore pour finir", en: "Press again to finish")
-                     : loc("À l'écoute…", en: "Listening…"))
-            }
+            ListeningPill(levels: session.levels,
+                          label: session.isLocked
+                              ? loc("Appuie encore pour finir", en: "Press again to finish")
+                              : loc("À l'écoute…", en: "Listening…"))
         case .finishing:
-            workingPill(loc("Un instant…", en: "One moment…"))
+            WorkingPill(loc("Un instant…", en: "One moment…"))
         case .cleaning:
             // Named after the output rather than always "cleaning up": a
             // translation taking its time shouldn't look like a stuck one.
-            workingPill(session.output.progressLabel)
+            WorkingPill(session.output.progressLabel)
         case .pasting:
-            workingPill(loc("Collage…", en: "Pasting…"))
+            WorkingPill(loc("Collage…", en: "Pasting…"))
         case .done:
-            StatusPill(background: .green.opacity(0.16), foreground: .green) {
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                Text(loc("Prêt", en: "Ready"))
-            }
+            ReadyPill()
         case .empty, .error:
             EmptyView()
-        }
-    }
-
-    private func workingPill(_ label: String) -> some View {
-        StatusPill {
-            ProgressView().controlSize(.mini)
-            Text(label)
         }
     }
 

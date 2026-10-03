@@ -64,26 +64,15 @@ struct ResultPanelView: View {
     @ViewBuilder private var statusLabel: some View {
         switch session.phase {
         case .capturing:
-            StatusPill {
-                ProgressView().controlSize(.mini)
-                Text(loc("Capture…", en: "Reading…"))
-            }
+            WorkingPill(loc("Capture…", en: "Reading…"))
         case .listeningInstruction:
-            // The spinner of the other phases says "wait"; while listening
-            // it is the voice that moves, so the pill carries the last
-            // readings — the dictation panel's own pill.
-            StatusPill {
-                DictationWaveform(levels: Array(session.levels.values.suffix(6)),
-                                  barWidth: 2, spacing: 1.5, maxHeight: 11)
-                Text(session.listeningEnded
-                     ? loc("Un instant…", en: "One moment…")
-                     : loc("À l'écoute…", en: "Listening…"))
-            }
+            // The dictation panel's own pill: the voice moving.
+            ListeningPill(levels: session.levels,
+                          label: session.listeningEnded
+                              ? loc("Un instant…", en: "One moment…")
+                              : loc("À l'écoute…", en: "Listening…"))
         case .streaming:
-            StatusPill {
-                ProgressView().controlSize(.mini)
-                Text(session.progressLabel)
-            }
+            WorkingPill(session.progressLabel)
         case .done:
             if session.truncated {
                 StatusPill(background: .orange.opacity(0.18), foreground: .orange) {
@@ -91,10 +80,7 @@ struct ResultPanelView: View {
                     Text(loc("Réponse tronquée", en: "Answer cut short"))
                 }
             } else {
-                StatusPill(background: .green.opacity(0.16), foreground: .green) {
-                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                    Text(loc("Prêt", en: "Ready"))
-                }
+                ReadyPill()
             }
         case .choosingAction, .askingInstruction, .instructionNotHeard,
              .noSelection, .missingKey, .error:
