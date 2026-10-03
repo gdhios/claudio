@@ -95,18 +95,23 @@ final class ListeningCoordinator {
     /// Menu or shortcut: the panel opens at once, on its header alone, and
     /// the player is read behind it.
     func trigger() {
-        dismiss()  // idempotent: a shortcut while the panel is up starts fresh
-        // Before this session exists: closing another panel may call back
-        // into `dismiss()`, which must then find nothing of this one to close.
-        onOpen?()
         let session = ListeningSession(model: model())
+        present(session)
+        cycle = Task { [weak self] in
+            await self?.read(session)
+        }
+    }
+
+    /// Puts a new session on screen in place of whatever was up.
+    private func present(_ session: ListeningSession) {
+        dismiss()  // idempotent: a shortcut while the panel is up starts fresh
+        // Before this session is the one up: closing another panel may call
+        // back into `dismiss()`, which must then find nothing of it to close.
+        onOpen?()
         // Looked for with each panel: the card only offers what this Mac has.
         session.galette = galette.find()
         self.session = session
         panel = makePanel(session, self)
-        cycle = Task { [weak self] in
-            await self?.read(session)
-        }
     }
 
     /// Asks the player what it plays, then Claude about it.
@@ -213,6 +218,12 @@ final class ListeningCoordinator {
             model: session.model
         ) { piece in session.appendNotes(piece) }
         guard self.session === session else { return }
+        show(outcome, in: session) { session.finish(with: $0) }
+    }
+
+    /// How a stream ends on screen: `finish` with the text, or the reason
+    /// there is none. A stream cut short leaves the panel as it is.
+    private func show(_ outcome: StreamOutcome, in session: ListeningSession, finish: (String) -> Void) {
         switch outcome {
         case .answered(let result):
             // Nothing is an answer too, and a wrong one: said as such,
@@ -220,7 +231,7 @@ final class ListeningCoordinator {
             if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
             } else {
-                session.finish(with: result.text)
+                finish(result.text)
             }
         case .cancelled:
             break
@@ -232,8 +243,8 @@ final class ListeningCoordinator {
     // MARK: - "Tell me more"
 
     /// A pill on the card: the notes make way for a long text about the
-    /// album or the artist. Whatever the notes were doing stops; they stay
-    /// as they are for the way back.
+    /// track, its album or its artist. Whatever the notes were doing stops;
+    /// they stay as they are for the way back.
     func elaborate(on subject: MusicSubject) {
         guard let session else { return }
         cycle?.cancel()
@@ -256,19 +267,14 @@ final class ListeningCoordinator {
     /// streams at once. The album's facts come with the link: the archive
     /// is asked for its cover like a listening would.
     func open(_ subject: MusicSubject) {
-        dismiss()
-        onOpen?()
         let session = ListeningSession(model: model())
-        session.galette = galette.find()
         session.cameFromLink = true
         session.track = subject.card
         session.facts = subject.facts
-        self.session = session
-        panel = makePanel(session, self)
-        let preferences = preferences()
+        present(session)
         playerCoverSettled = true
         archiveAsked = false
-        considerArchiveCover(for: session, preferences: preferences)
+        considerArchiveCover(for: session, preferences: preferences())
         elaborate(on: subject)
     }
 
@@ -289,19 +295,9 @@ final class ListeningCoordinator {
             model: session.model
         ) { piece in session.appendEssay(piece) }
         guard self.session === session else { return }
-        switch outcome {
-        case .answered(let result):
-            guard session.essaySubject == subject else { return }
-            if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
-            } else {
-                session.finishEssay(with: result.text)
-            }
-        case .cancelled:
-            break
-        case .failed(let error):
-            session.phase = .error(error.localizedDescription)
-        }
+        // An answer about a subject the panel has moved on from lands nowhere.
+        if case .answered = outcome, session.essaySubject != subject { return }
+        show(outcome, in: session) { session.finishEssay(with: $0) }
     }
 
     /// "Search in Claude": the subject goes to Claude — the desktop app
@@ -348,15 +344,9 @@ final class ListeningCoordinator {
     /// stays up while the player answers.
     func retry() {
         guard let session, case .error = session.phase else { return }
-        cycle?.cancel()
         // The long text failed: it is asked again, the card as it is.
-        if let subject = session.essaySubject {
-            session.beginEssay(on: subject, model: essayModel())
-            cycle = Task { [weak self] in
-                await self?.write(about: subject, session: session)
-            }
-            return
-        }
+        if let subject = session.essaySubject { return elaborate(on: subject) }
+        cycle?.cancel()
         session.phase = .reading
         cycle = Task { [weak self] in
             await self?.read(session)
