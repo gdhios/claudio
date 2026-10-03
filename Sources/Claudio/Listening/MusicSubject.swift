@@ -102,7 +102,12 @@ struct MusicSubject: Hashable, Sendable {
     /// only them. The track playing opens it: the text's subject for a
     /// track, its anchor for an album or an artist.
     var promptBlock: String {
-        let fields: [(label: String, value: String?)] = [
+        let genre = switch kind {
+        case .album: "album"
+        case .artist: "artiste"
+        case .track: "morceau"
+        }
+        return PromptBlock.make("sujet", attributes: "genre=\"\(genre)\"", fields: [
             ("morceau", track),
             ("artiste", artist),
             ("album", title),
@@ -111,13 +116,6 @@ struct MusicSubject: Hashable, Sendable {
             ("label", label),
             ("pays", country),
             ("mbid", mbid),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        let genre = switch kind {
-        case .album: "album"
-        case .artist: "artiste"
-        case .track: "morceau"
-        }
-        return (["<sujet genre=\"\(genre)\">"] + lines + ["</sujet>"]).joined(separator: "\n")
+        ])
     }
 }

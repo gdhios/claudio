@@ -32,23 +32,23 @@ struct ArtistFacts: Equatable, Sendable, Codable {
     /// prompt: who, from where, since when, and the dated list — the
     /// source named so the system prompt's rule applies to it.
     var promptBlock: String {
-        let fields: [(label: String, value: String?)] = [
+        PromptBlock.make("artiste", attributes: "source=\"MusicBrainz\"", fields: [
             ("nom", name),
             ("précision", disambiguation.flatMap { $0.isEmpty ? nil : $0 }),
             ("type", type.map(Self.typeName)),
             ("pays", country),
             (beginLabel, beginDate),
             ("fin", endDate),
-        ]
-        var lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        if !releases.isEmpty {
-            lines.append("discographie (albums et EP, par première sortie) :")
-            lines += releases.map { release in
-                let type = release.primaryType.map { TrackFacts.typeName($0, english: false) } ?? "sortie"
-                return "- \(release.year ?? "sans date") · \(type) · \(release.title)"
-            }
+        ], more: discography)
+    }
+
+    /// The dated list, under its own heading; nothing without a release.
+    private var discography: [String] {
+        guard !releases.isEmpty else { return [] }
+        return ["discographie (albums et EP, par première sortie) :"] + releases.map { release in
+            let type = release.primaryType.map { TrackFacts.typeName($0, english: false) } ?? "sortie"
+            return "- \(release.year ?? "sans date") · \(type) · \(release.title)"
         }
-        return (["<artiste source=\"MusicBrainz\">"] + lines + ["</artiste>"]).joined(separator: "\n")
     }
 
     private var beginLabel: String {

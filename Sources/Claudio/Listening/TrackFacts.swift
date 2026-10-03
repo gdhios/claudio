@@ -94,12 +94,10 @@ struct TrackFacts: Equatable, Sendable, Codable {
     /// French like every prompt, the source named so the system prompt's
     /// rule applies to it.
     var promptBlock: String {
-        let fields: [(label: String, value: String?)] = [
+        PromptBlock.make("faits", attributes: "source=\"\(originName)\"", fields: [
             ("album d'origine", albumTitle),
             ("type", typeLabel(english: false)),
             ("première sortie", firstReleaseDate),
-        ]
-        let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        return (["<faits source=\"\(originName)\">"] + lines + ["</faits>"]).joined(separator: "\n")
+        ])
     }
 }
