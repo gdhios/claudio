@@ -95,6 +95,20 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertNotNil(bench.coordinator.session)
     }
 
+    /// Nothing is an answer too, and a wrong one: the card stays, and under
+    /// it the panel says the stream ended with nothing, how, and offers
+    /// "Try again" — rather than "Ready" over a blank.
+    func testAnEmptyAnswerIsAnErrorThatSaysHow() async throws {
+        let bench = Bench(answer: .success("  \n"), stopReason: "end_turn", blockTypes: ["text"])
+        bench.coordinator.trigger()
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.runs()
+        guard case .error(let message) = session.phase else { return XCTFail("\(session.phase)") }
+        XCTAssertTrue(message.contains("end_turn · text · 0 jetons"), message)
+        XCTAssertTrue(message.contains(ListeningNotes.model.shortName), message)
+        XCTAssertEqual(session.track, .sample)
+    }
+
     /// Esc while the player is still being read: the panel goes, and the
     /// answer that comes afterwards neither brings it back nor asks Claude
     /// anything.
@@ -511,12 +525,16 @@ private final class Bench {
          claudeDesktop: Bool = false,
          preferences: ListeningPreferences = .init(musicBrainz: true, showsArtwork: true, detail: .threeSentences),
          model: ModelChoice = ListeningNotes.model,
-         essayModel: ModelChoice = ListeningEssay.model) {
+         essayModel: ModelChoice = ListeningEssay.model,
+         stopReason: String? = "end_turn",
+         blockTypes: [String] = ["text"]) {
         self.track = track
         self.readsWait = readsWait
         self.artwork = artwork
         self.artworkWaits = artworkWaits
         let client = FakeNotesClient(answer)
+        client.stopReason = stopReason
+        client.blockTypes = blockTypes
         self.client = client
         galette = FakeGalette(installed: galetteInstalled)
         built = ListeningCoordinator(
@@ -657,6 +675,8 @@ private final class SessionLog {
 /// `@unchecked Sendable`: every call is awaited before a test reads it.
 private final class FakeNotesClient: TextStreamClient, @unchecked Sendable {
     private let answer: Result<String, Error>
+    var stopReason: String? = "end_turn"
+    var blockTypes: [String] = ["text"]
     private(set) var calls = 0
     private(set) var texts: [String] = []
     private(set) var systems: [String] = []
@@ -676,7 +696,8 @@ private final class FakeNotesClient: TextStreamClient, @unchecked Sendable {
         let middle = notes.index(notes.startIndex, offsetBy: notes.count / 2)
         await onDelta(String(notes[..<middle]))
         await onDelta(String(notes[middle...]))
-        return StreamResult(text: notes, truncated: false, inputTokens: 0, outputTokens: 0)
+        return StreamResult(text: notes, truncated: false, inputTokens: 0, outputTokens: 0,
+                            stopReason: stopReason, blockTypes: blockTypes)
     }
 }
 

@@ -37,6 +37,27 @@ final class AnthropicClientTests: XCTestCase {
         return parser
     }
 
+    /// An answer with no text at all — a stream Sonnet 5.5 sent Guillaume
+    /// several times on 2026-10-03 — is told apart by what came instead:
+    /// the stop reason and the content blocks' types, for the panel to say
+    /// why it has nothing to show.
+    func testAnEmptyAnswerKeepsItsStopReasonAndBlockTypes() throws {
+        let parser = try parse([
+            #"data: {"type":"message_start","message":{"id":"m","usage":{"input_tokens":58,"output_tokens":2}}}"#,
+            #"data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}"#,
+            #"data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hmm"}}"#,
+            #"data: {"type":"content_block_stop","index":0}"#,
+            #"data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":9}}"#,
+            #"data: {"type":"message_stop"}"#,
+        ])
+        XCTAssertEqual(parser.text, "")
+        XCTAssertEqual(parser.result.stopReason, "end_turn")
+        XCTAssertEqual(parser.result.blockTypes, ["thinking"])
+        XCTAssertEqual(parser.result.outputTokens, 9)
+        XCTAssertEqual(parser.result.emptyAnswerDescription, "end_turn · thinking · 9 jetons")
+        XCTAssertNil(try parse(["data: {\"type\":\"message_stop\"}"]).result.stopReason)
+    }
+
     /// An ordinary response, as the API sends it: named events, blank lines
     /// between them, a ping in the middle.
     private let ordinaryResponse = [

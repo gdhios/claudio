@@ -200,10 +200,16 @@ final class ListeningCoordinator {
                 session.appendNotes(piece)
             }
             guard self.session === session, !Task.isCancelled else { return }
-            session.finish(with: result.text)
             CostLedger.shared.record(model: session.model,
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)
+            // Nothing is an answer too, and a wrong one: said as such,
+            // with what the stream held, rather than "Ready" over a blank.
+            if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
+                return
+            }
+            session.finish(with: result.text)
         } catch is CancellationError {
             // Esc during the stream: nothing to do
         } catch let error as URLError where error.code == .cancelled {
@@ -276,10 +282,14 @@ final class ListeningCoordinator {
                 session.appendEssay(piece)
             }
             guard self.session === session, !Task.isCancelled, session.essaySubject == subject else { return }
-            session.finishEssay(with: result.text)
             CostLedger.shared.record(model: session.model,
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)
+            if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                session.phase = .error(Self.emptyAnswerMessage(model: session.model, result: result))
+                return
+            }
+            session.finishEssay(with: result.text)
         } catch is CancellationError {
         } catch let error as URLError where error.code == .cancelled {
         } catch {
@@ -297,6 +307,14 @@ final class ListeningCoordinator {
         let artist = session.essaySubject == subject ? session.artistFacts : nil
         openLink(ClaudeSearch.url(for: subject, artist: artist, desktop: claudeDesktop()))
         dismiss()
+    }
+
+    /// The line under the card when the model sent nothing: which model,
+    /// how the stream ended, what it carried. Enough to tell a refusal
+    /// from a thinking-only answer from a cut connection.
+    static func emptyAnswerMessage(model: ModelChoice, result: StreamResult) -> String {
+        loc("Réponse vide de \(model.shortName) (\(result.emptyAnswerDescription)).",
+            en: "Empty answer from \(model.shortName) (\(result.emptyAnswerDescription)).")
     }
 
     // MARK: - Panel actions

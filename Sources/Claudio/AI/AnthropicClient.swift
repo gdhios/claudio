@@ -98,10 +98,13 @@ struct AnthropicClient: TextStreamClient {
         private(set) var truncated = false
         private(set) var inputTokens = 0
         private(set) var outputTokens = 0
+        private(set) var stopReason: String?
+        private(set) var blockTypes: [String] = []
 
         var result: StreamResult {
             StreamResult(text: text, truncated: truncated,
-                         inputTokens: inputTokens, outputTokens: outputTokens)
+                         inputTokens: inputTokens, outputTokens: outputTokens,
+                         stopReason: stopReason, blockTypes: blockTypes)
         }
 
         /// Consumes one line of the stream and returns the text fragment it
@@ -127,10 +130,15 @@ struct AnthropicClient: TextStreamClient {
                     inputTokens = usage["input_tokens"] as? Int ?? inputTokens
                     outputTokens = usage["output_tokens"] as? Int ?? outputTokens
                 }
+            case "content_block_start":
+                if let block = event["content_block"] as? [String: Any], let kind = block["type"] as? String {
+                    blockTypes.append(kind)
+                }
             case "message_delta":
                 if let delta = event["delta"] as? [String: Any],
                    let stop = delta["stop_reason"] as? String {
                     truncated = (stop == "max_tokens")
+                    stopReason = stop
                 }
                 // The output count is cumulative: the last one wins.
                 if let usage = event["usage"] as? [String: Any] {
@@ -141,7 +149,7 @@ struct AnthropicClient: TextStreamClient {
                 let message = ((event["error"] as? [String: Any])?["message"] as? String) ?? "erreur inconnue"
                 throw AnthropicError.stream(message)
             default:
-                break  // content_block_start/stop, message_stop, ping
+                break  // content_block_stop, message_stop, ping
             }
             return nil
         }

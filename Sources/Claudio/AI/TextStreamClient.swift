@@ -9,6 +9,19 @@ struct StreamResult: Sendable {
     /// stream stops before they've been given.
     let inputTokens: Int
     let outputTokens: Int
+    /// Why the provider stopped ("end_turn", "max_tokens", "refusal"…),
+    /// `nil` when it never said. Kept for the day the text is empty.
+    var stopReason: String? = nil
+    /// The types of the content blocks that came, in order ("text",
+    /// "thinking"…): what the stream held when it held no text.
+    var blockTypes: [String] = []
+
+    /// What the panel says over an empty answer: how the stream ended,
+    /// what it carried, what it cost. "?" where the provider said nothing.
+    var emptyAnswerDescription: String {
+        let blocks = blockTypes.isEmpty ? loc("aucun bloc", en: "no block") : blockTypes.joined(separator: ", ")
+        return "\(stopReason ?? "?") · \(blocks) · \(outputTokens) \(loc("jetons", en: "tokens"))"
+    }
 }
 
 /// Common contract for all streaming completion providers.
