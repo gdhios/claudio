@@ -441,15 +441,11 @@ final class DictationCoordinator {
     /// closing it cancels the dictation.
     static func systemPanel(for session: DictationSession,
                             coordinator: DictationCoordinator) -> ResultPanel? {
-        let panel = ResultPanel.make(
+        ResultPanel.make(
             session: session,
             onCopy: { [weak coordinator] in coordinator?.copyText() },
             onClose: { [weak coordinator] in coordinator?.escape() }
         )
-        panel.onEscape = { [weak coordinator] in coordinator?.escape() }
-        panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyText() }
-        panel.present()
-        return panel
     }
 
     /// Copies what the panel shows: the way out when the paste had nowhere

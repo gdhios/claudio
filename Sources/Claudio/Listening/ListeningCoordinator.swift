@@ -406,7 +406,7 @@ final class ListeningCoordinator {
     /// closing it drops the cycle.
     static func systemPanel(for session: ListeningSession,
                             coordinator: ListeningCoordinator) -> ResultPanel? {
-        let panel = ResultPanel.make(session: session, actions: ListeningPanelActions(
+        ResultPanel.make(session: session, actions: ListeningPanelActions(
             copy: { [weak coordinator] in coordinator?.copyTrack() },
             retry: { [weak coordinator] in coordinator?.retry() },
             openSettings: { [weak coordinator] in
@@ -420,9 +420,5 @@ final class ListeningCoordinator {
             search: { [weak coordinator] subject in coordinator?.search(subject) },
             openPlayer: { [weak coordinator] in coordinator?.openPlayer() }
         ))
-        panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
-        panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyTrack() }
-        panel.present()
-        return panel
     }
 }

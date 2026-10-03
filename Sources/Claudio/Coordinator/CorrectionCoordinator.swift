@@ -401,13 +401,10 @@ final class CorrectionCoordinator {
             onOpenInGalette: { [weak coordinator] link in coordinator?.openInGalette(link) }
         )
         panel.onEnter = { [weak coordinator] in coordinator?.confirm() }
-        panel.onEscape = { [weak coordinator] in coordinator?.dismiss() }
-        panel.onCopyShortcut = { [weak coordinator] in coordinator?.copyResult() }
         panel.onArrow = { [weak coordinator] delta in coordinator?.movePaletteSelection(by: delta) ?? false }
         panel.onDigit = { [weak coordinator] rank, withCommand in
             coordinator?.launchPaletteRank(rank, withCommand: withCommand) ?? false
         }
-        panel.present()
         return panel
     }
 
