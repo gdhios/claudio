@@ -19,7 +19,7 @@ struct ClaudioMascot: View {
     /// The rawValue travels: the Stream Deck plugin draws the same four
     /// faces and names them with these strings. Cases can be added, never
     /// renamed.
-    enum Gaze: String, Equatable, Codable {
+    enum Gaze: String, Equatable, Codable, CaseIterable {
         /// Open eye, centered pupil. He's waiting, available.
         case repos
         /// Closed eyes. He's focusing while the answer comes in.

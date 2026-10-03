@@ -55,7 +55,7 @@ struct OllamaPane: View {
 
     /// Preview: the screen populated with data, without calling the server.
     private func showFixedState() {
-        models = ["qwen2.5:14b", "llama3.2:3b"]
+        models = LocalModels.frozen
         failed = false
         report = loc("Connexion OK — \(models.count) modèles détectés.",
                      en: "Connected — \(models.count) models found.")

@@ -4,10 +4,6 @@ import AppKit
 /// then enlarged without smoothing. That's where readability gets judged: a
 /// gaze that can't be told apart here is useless in the app.
 final class MenuBarPreviewView: NSView {
-    private let gazes: [(String, ClaudioMascot.Gaze)] = [
-        ("repos", .repos), ("veille", .veille), ("fait", .fait), ("vide", .vide),
-    ]
-
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -22,12 +18,13 @@ final class MenuBarPreviewView: NSView {
             background.setFill()
             NSRect(x: 0, y: top, width: bounds.width, height: band).fill()
 
-            for (index, (name, gaze)) in gazes.enumerated() {
+            // Each under the name the Stream Deck plugin knows it by.
+            for (index, gaze) in ClaudioMascot.Gaze.allCases.enumerated() {
                 let x = 20 + CGFloat(index) * column
                 let image = ClaudioMascot.menuBarImage(gaze: gaze).tinted(ink)
                 let size = image.size
 
-                NSAttributedString(string: name, attributes: [
+                NSAttributedString(string: gaze.rawValue, attributes: [
                     .font: NSFont.systemFont(ofSize: 9),
                     .foregroundColor: ink.withAlphaComponent(0.55),
                 ]).draw(at: NSPoint(x: x, y: top + 10))
