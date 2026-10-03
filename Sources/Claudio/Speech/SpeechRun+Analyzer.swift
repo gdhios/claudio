@@ -51,14 +51,8 @@ extension SpeechRun {
         }
         if isCancelled { return }
 
-        let audio = AVAudioEngine()
-        let input = audio.inputNode
-        let microphoneFormat = input.outputFormat(forBus: 0)
-        guard microphoneFormat.sampleRate > 0 else {
-            sink.fail(.audioEngine(loc("aucune entrée audio", en: "no audio input")))
-            return
-        }
-        guard let converter = AVAudioConverter(from: microphoneFormat, to: analysisFormat) else {
+        guard let microphone = makeMicrophone() else { return }
+        guard let converter = AVAudioConverter(from: microphone.format, to: analysisFormat) else {
             sink.fail(.audioEngine(loc("le micro ne peut pas être converti pour la transcription",
                                        en: "the microphone can't be converted for transcription")))
             return
@@ -102,28 +96,18 @@ extension SpeechRun {
                 }
                 sink.emitFinal()
             } catch {
-                // A cancelled run says nothing more: the error is the one
-                // the teardown caused.
-                if self?.isCancelled != false {
-                    // nothing to report
-                } else if self?.isStopping == true {
-                    sink.emitFinal()
-                } else {
-                    sink.fail(.recognizer(error.localizedDescription))
-                }
+                self?.recognizerEnded(with: error)
             }
             gate.open()
         }
 
-        input.installTap(onBus: 0, bufferSize: 4096, format: microphoneFormat) { buffer, _ in
-            sink.emitLevel(AudioLevel.level(of: buffer))
+        microphone.tap(bufferSize: 4096, levelsTo: sink) { buffer in
             guard let converted = Self.convert(buffer, with: converter, to: analysisFormat) else { return }
             inputSink.yield(AnalyzerInput(buffer: converted))
         }
 
         let closeMicrophone = {
-            input.removeTap(onBus: 0)
-            audio.stop()
+            microphone.close()
             inputSink.finish()
         }
         let teardown = {
@@ -132,17 +116,13 @@ extension SpeechRun {
             Task { await analyzer.cancelAndFinishNow() }
             gate.open()
         }
-        let onStop = {
+        let onStop = { [weak self] in
             closeMicrophone()
             // The analyzer finishes what it has, the results stream ends,
             // and the collector emits the final. The watchdog is there for
             // the case where it never does.
             Task { try? await analyzer.finalizeAndFinishThroughEndOfInput() }
-            Task {
-                try? await Task.sleep(for: AppleSpeechEngine.finalTimeout)
-                sink.emitFinal()
-                gate.open()
-            }
+            self?.armFinalWatchdog(gate)
         }
         guard adopt(teardown: teardown, onStop: onStop) else {
             closeMicrophone()
@@ -152,14 +132,11 @@ extension SpeechRun {
 
         do {
             try await analyzer.start(inputSequence: inputStream)
-            audio.prepare()
-            try audio.start()
         } catch {
             sink.fail(.audioEngine(error.localizedDescription))
             return
         }
-        if isCancelled { return }
-        await gate.wait()
+        await startAudio(microphone, until: gate)
     }
 
     /// The microphone rarely speaks the format the transcriber wants; this

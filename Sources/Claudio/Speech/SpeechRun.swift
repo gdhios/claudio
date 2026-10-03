@@ -172,4 +172,31 @@ final class SpeechRun: @unchecked Sendable {
         lock.unlock()
         hook?()
     }
+
+    // MARK: - The recognizer's last word
+
+    /// The recognizer gave up with an error. A cancelled run says nothing
+    /// more: the error is the one its own teardown caused. A run asked to
+    /// stop still owes the words it already has — a dictation is never
+    /// lost. Anything else is the dictation failing.
+    func recognizerEnded(with error: Error) {
+        if isCancelled { return }
+        if isStopping {
+            sink.emitFinal()
+        } else {
+            sink.fail(.recognizer(error.localizedDescription))
+        }
+    }
+
+    /// Armed by a stop, for a recognizer that never sends its own final:
+    /// past `AppleSpeechEngine.finalTimeout`, the last partial stands in for
+    /// it and the run stops waiting.
+    func armFinalWatchdog(_ gate: SpeechGate) {
+        let sink = self.sink
+        Task {
+            try? await Task.sleep(for: AppleSpeechEngine.finalTimeout)
+            sink.emitFinal()
+            gate.open()
+        }
+    }
 }
