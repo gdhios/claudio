@@ -395,11 +395,20 @@ final class DictationCoordinator {
             CostLedger.shared.record(model: session.model,
                                      inputTokens: result.inputTokens,
                                      outputTokens: result.outputTokens)
-            let cleaned = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = DictationCleanup.strippingTranscriptTags(result.text)
             guard !cleaned.isEmpty else {
                 session.cleanedText = ""
                 session.note = pastedWithoutCleanup(loc("réponse vide du modèle",
                                                         en: "the model answered nothing"))
+                return nil
+            }
+            // A model that answered the dictation instead of cleaning it up:
+            // what was said is pasted, not its reply.
+            guard session.output != .cleanup
+                    || CleanupPlausibility.isCleanup(cleaned, of: raw) else {
+                session.cleanedText = ""
+                session.note = pastedWithoutCleanup(loc("le modèle a répondu au lieu de nettoyer",
+                                                        en: "the model answered instead of cleaning up"))
                 return nil
             }
             session.cleanedText = cleaned

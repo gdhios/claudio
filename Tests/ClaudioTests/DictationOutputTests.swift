@@ -110,9 +110,11 @@ final class DictationOutputTests: XCTestCase {
     /// The action prompts speak of a text inside <texte_source> tags, because
     /// that is how the correction cycle sends a selection. A dictation sends
     /// its transcript the same way, so the prompt is used in the conditions
-    /// it was written for. The cleanup keeps sending it raw, as it always has.
-    func testOnlyATransformingOutputWrapsTheTranscript() {
-        XCTAssertEqual(DictationOutput.cleanup.userMessage(for: "bonjour"), "bonjour")
+    /// it was written for. The cleanup has its own envelope: sent bare, a
+    /// transcript that says "you" was answered rather than cleaned up.
+    func testEveryOutputWrapsTheTranscript() {
+        XCTAssertEqual(DictationOutput.cleanup.userMessage(for: "bonjour"),
+                       DictationCleanup.wrappingTranscript("bonjour"))
         for output in DictationOutput.allCases where output != .cleanup {
             let message = output.userMessage(for: "bonjour")
             XCTAssertTrue(message.contains("<texte_source>"), output.rawValue)

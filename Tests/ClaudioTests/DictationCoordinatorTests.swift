@@ -392,7 +392,7 @@ final class DictationCoordinatorTests: XCTestCase {
         let bench = Bench()
         await bench.dictate()
         XCTAssertEqual(bench.engine.startedContextualStrings, [[]])
-        XCTAssertEqual(bench.client.texts, ["bonjour"])
+        XCTAssertEqual(bench.client.texts, [DictationCleanup.wrappingTranscript("bonjour")])
         XCTAssertEqual(bench.client.systems, [DictationCleanup.systemPrompt])
     }
 
@@ -403,7 +403,7 @@ final class DictationCoordinatorTests: XCTestCase {
         let bench = Bench(events: [.partial("ouvre l'a"), .final("ouvre l'a pas compris")],
                           vocabulary: "l'a pas compris → Lapacompris")
         await bench.dictate()
-        XCTAssertEqual(bench.client.texts, ["ouvre Lapacompris"])
+        XCTAssertEqual(bench.client.texts, [DictationCleanup.wrappingTranscript("ouvre Lapacompris")])
         XCTAssertEqual(bench.history.recents.entries.first?.raw, "ouvre Lapacompris")
     }
 
@@ -985,6 +985,40 @@ final class DictationCoordinatorTests: XCTestCase {
                        loc("Collé sans nettoyage : Ollama ne répond pas",
                            en: "Pasted without cleanup: Ollama isn’t answering"))
         XCTAssertNil(bench.history.recents.entries.first?.cleaned)
+    }
+
+    /// The dictation of 2026-10-03 that Haiku took for a message to itself:
+    /// it answered "I'm ready, send me the text". What was said is pasted,
+    /// not the reply, and the panel says why.
+    func testAnAnswerToTheDictationPastesTheTranscriptWithANote() async throws {
+        let said = "je veux bien que tu fasses la correction que tu proposes"
+        let bench = Bench(events: [.final(said)],
+                          answer: .success("Je suis prêt à nettoyer ta transcription vocale. Envoie-moi le texte à mettre au propre."))
+        bench.coordinator.keyDown(language: .frFR)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.finish()
+
+        XCTAssertEqual(bench.pasted, [said])
+        XCTAssertEqual(session.note,
+                       loc("Collé sans nettoyage : le modèle a répondu au lieu de nettoyer",
+                           en: "Pasted without cleanup: the model answered instead of cleaning up"))
+        XCTAssertNil(bench.history.recents.entries.first?.cleaned)
+    }
+
+    /// A translation shares no word with what was said, and that is the
+    /// point: only the cleanup is checked.
+    func testATranslationIsNeverTakenForAnAnswer() async {
+        let bench = Bench(events: [.final("je veux bien que tu fasses la correction que tu proposes")],
+                          answer: .success("I'd like you to make the correction you are suggesting."))
+        await bench.dictate(output: .translateEN)
+        XCTAssertEqual(bench.pasted, ["I'd like you to make the correction you are suggesting."])
+    }
+
+    /// Tags the model echoes back are the envelope, not the text.
+    func testEchoedTagsAreNotPasted() async {
+        let bench = Bench(answer: .success("<transcription>\nBonjour.\n</transcription>"))
+        await bench.dictate()
+        XCTAssertEqual(bench.pasted, ["Bonjour."])
     }
 
     /// No client at all (a Claude model with no key in the Keychain): same
