@@ -13,17 +13,8 @@ struct GeneralPane: View {
     var body: some View {
         Form {
             Section(loc("Système", en: "System")) {
-                Toggle(loc("Ouvrir à l'ouverture de session", en: "Open at login"), isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) {
-                        do {
-                            try LoginItem.setEnabled(launchAtLogin)
-                            loginItemError = nil
-                        } catch {
-                            loginItemError = loc("Nécessite l'app installée dans /Applications (\(error.localizedDescription))",
-                                                 en: "Requires the app to live in /Applications (\(error.localizedDescription))")
-                            launchAtLogin = LoginItem.isEnabled
-                        }
-                    }
+                Toggle(loc("Ouvrir à l'ouverture de session", en: "Open at login"),
+                       isOn: Binding(get: { launchAtLogin }, set: { setLaunchAtLogin($0) }))
                 if let loginItemError {
                     Text(loginItemError).font(.caption).foregroundStyle(.orange)
                 }
@@ -91,5 +82,20 @@ struct GeneralPane: View {
         }
         .formStyle(.grouped)
         .onAppear { ledger.refresh() }
+    }
+
+    /// The switch, flipped by hand, and only that: putting it back after a
+    /// failure goes through no setter, so the reason stays on screen rather
+    /// than being cleared by a second, needless try.
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLogin = enabled
+        do {
+            try LoginItem.setEnabled(enabled)
+            loginItemError = nil
+        } catch {
+            loginItemError = loc("Nécessite l'app installée dans /Applications (\(error.localizedDescription))",
+                                 en: "Requires the app to live in /Applications (\(error.localizedDescription))")
+            launchAtLogin = LoginItem.isEnabled
+        }
     }
 }
