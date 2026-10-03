@@ -26,8 +26,7 @@ struct RecentDictationsMenu: Equatable {
 
     init(_ recents: RecentDictations) {
         items = recents.entries.prefix(Self.limit).map { entry in
-            let text = entry.cleaned ?? entry.raw
-            return Item(title: Self.title(for: text), text: text)
+            Item(title: Self.title(for: entry.pastedText), text: entry.pastedText)
         }
     }
 
@@ -35,7 +34,7 @@ struct RecentDictationsMenu: Equatable {
     /// space, cut with "…" past `titleLength`. Counted in Swift characters —
     /// an accent with its letter, a whole emoji — so a cut never splits one.
     static func title(for text: String) -> String {
-        let flat = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let flat = text.collapsingWhitespace()
         guard flat.count > titleLength else { return flat }
         return flat.prefix(titleLength - 1).trimmingCharacters(in: .whitespaces) + "…"
     }

@@ -252,7 +252,7 @@ struct DictationPane: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            Text(entry.cleaned ?? entry.raw)
+            Text(entry.pastedText)
                 .font(.callout)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
