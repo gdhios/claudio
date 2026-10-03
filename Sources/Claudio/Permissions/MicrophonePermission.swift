@@ -62,7 +62,12 @@ enum MicrophonePermission {
         }
         if SFSpeechRecognizer.authorizationStatus() != .authorized {
             let status = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+                // Sendable, so it doesn't inherit the main actor: the system
+                // answers on a queue of its choosing, and a main-actor
+                // closure called there stops the app on Swift 6's check.
+                SFSpeechRecognizer.requestAuthorization { @Sendable status in
+                    continuation.resume(returning: status)
+                }
             }
             guard status == .authorized else { return false }
         }
