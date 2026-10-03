@@ -46,7 +46,7 @@ final class BridgeServer {
 
     /// How many plugins are actually connected: a connection counts once it
     /// has said `hello`, not before.
-    var clientCount: Int { clients.count(where: \.hasSaidHello) }
+    private var clientCount: Int { clients.count(where: \.hasSaidHello) }
 
     init(token: String,
          onCommand: @escaping (BridgeInbound) -> Void,

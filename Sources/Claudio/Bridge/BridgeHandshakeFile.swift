@@ -31,12 +31,11 @@ struct BridgeHandshakeFile {
     /// permissions rather than by luck.
     static func makeToken() -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
-        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+        if SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) != errSecSuccess {
             // Not seen in practice. The system generator is a CSPRNG on
             // Apple platforms too, and taking the whole app down over this
             // would be worse than the bridge it protects.
             bytes = (0..<bytes.count).map { _ in UInt8.random(in: .min ... .max) }
-            return hex(bytes)
         }
         return hex(bytes)
     }
