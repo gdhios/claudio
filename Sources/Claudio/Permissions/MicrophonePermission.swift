@@ -2,10 +2,6 @@ import AVFoundation
 import AppKit
 import Speech
 
-/// The two permissions dictation needs: the microphone, and speech
-/// recognition. Modelled on `AccessibilityPermission` — read the state, ask
-/// for it, explain it — so the coordinator treats all three permissions the
-/// same way.
 /// The two permissions as the dictation cycle needs them: read, ask,
 /// explain. Injected as one value, like `PasteService`, so a test can run a
 /// whole cycle without TCC — and so a preview never asks anything.
@@ -20,6 +16,10 @@ struct MicrophoneGate {
                                        showExplanation: MicrophonePermission.showExplanation)
 }
 
+/// The two permissions dictation needs: the microphone, and speech
+/// recognition. Modelled on `AccessibilityPermission` — read the state, ask
+/// for it, explain it — so the coordinator treats all three permissions the
+/// same way.
 @MainActor
 enum MicrophonePermission {
     static var isGranted: Bool { missingAccess() == nil }
