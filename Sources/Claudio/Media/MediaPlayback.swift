@@ -39,8 +39,7 @@ enum MediaRemoteCommand: UInt32 {
 
     @MainActor
     private static let sendCommand: SendCommand? = {
-        guard let framework = dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote",
-                                     RTLD_LAZY),
+        guard let framework = dlopen(MediaRemote.frameworkPath + "/MediaRemote", RTLD_LAZY),
               let symbol = dlsym(framework, "MRMediaRemoteSendCommand") else { return nil }
         return unsafeBitCast(symbol, to: SendCommand.self)
     }()
