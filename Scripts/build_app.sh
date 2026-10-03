@@ -11,13 +11,18 @@
 #                    name of the self-signed certificate in the Keychain;
 #                    independent of the app's name, keeping it avoids recreating
 #                    a certificate)
-#   DEV_ID_IDENTITY  Developer ID identity (default: auto-detected in the Keychain)
+#   DEV_ID_IDENTITY  Developer ID identity, a SHA-1 hash or a name (default: the
+#                    "Developer ID Application" certificate in the Keychain that
+#                    expires last)
 #   NOTARY_PROFILE   notarytool profile (default: "claudio-notary")
 #   DEST             install folder (default: /Applications)
 #
 # Notarization prerequisites, one time only (Apple Developer account required):
-#   1. Certificate: Xcode → Settings… → Accounts → Manage Certificates… →
-#      + → "Developer ID Application".
+#   1. Certificate: on https://developer.apple.com/account/resources/certificates/list
+#      (not from Xcode's Manage Certificates), + → "Developer ID Application",
+#      intermediary "G2 Sub-CA". Xcode still issues from Apple's original
+#      Developer ID authority, which expires on 2027-02-01 along with every
+#      certificate it signed; G2 runs until 2031.
 #   2. Credentials: an app password at https://account.apple.com, then
 #      xcrun notarytool store-credentials claudio-notary \
 #        --apple-id <apple-id> --team-id <TEAMID> --password <app-password>
@@ -35,6 +40,42 @@ SIGN_IDENTITY="${SIGN_IDENTITY:-Plume Local Dev}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-claudio-notary}"
 DEST="${DEST:-/Applications}"
 APP="$DEST/$APP_NAME.app"
+
+# The "Developer ID Application" identity to sign with: the one in the Keychain
+# that expires last, as a SHA-1 hash. Apple's original Developer ID authority
+# and its G2 successor issue certificates under the very same name, so while
+# both are in the Keychain `codesign` rejects the name as ambiguous; the hash
+# picks one. Prints nothing when there is none.
+developer_id_identity() {
+    local hash end epoch best="" best_epoch=0
+    for hash in $(security find-identity -v -p codesigning \
+            | sed -n 's/^ *[0-9]*) \([0-9A-F]*\) "Developer ID Application: .*/\1/p'); do
+        end=$(developer_id_certificate "$hash" | openssl x509 -noout -enddate | sed 's/^notAfter=//')
+        epoch=$(date -j -f "%b %e %T %Y %Z" "$end" +%s 2>/dev/null || echo 0)
+        if [ "$epoch" -gt "$best_epoch" ]; then
+            best="$hash"
+            best_epoch="$epoch"
+        fi
+    done
+    printf '%s' "$best"
+}
+
+# PEM of the "Developer ID Application" certificate with this SHA-1 hash.
+developer_id_certificate() {
+    security find-certificate -a -Z -p -c "Developer ID Application" \
+        | awk -v h="$1" '/^SHA-1 hash:/ { keep = ($3 == h); next } keep'
+}
+
+# What to log for an identity: its name and expiry when given a hash, the
+# value itself otherwise.
+identity_label() {
+    case "$1" in
+        ""|*[!0-9A-F]*) printf '%s' "$1" ;;
+        *) developer_id_certificate "$1" | openssl x509 -noout -subject -enddate \
+            | sed -n 's/.*CN=\([^,]*\).*/\1/p; s/^notAfter=\(.*\)/expires \1/p' \
+            | paste -sd '|' - | sed 's/|/, /' ;;
+    esac
+}
 
 echo "→ Resolving dependencies…"
 swift package resolve
@@ -114,8 +155,7 @@ xattr -cr "$APP" 2>/dev/null || true
 if [ "${NOTARIZE:-0}" = "1" ]; then
     echo "→ Developer ID signature (hardened runtime)…"
     if [ -z "${DEV_ID_IDENTITY:-}" ]; then
-        DEV_ID_IDENTITY=$(security find-identity -v -p codesigning \
-            | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+        DEV_ID_IDENTITY=$(developer_id_identity)
     fi
     if [ -z "$DEV_ID_IDENTITY" ]; then
         echo "❌ No \"Developer ID Application\" certificate in the Keychain."
@@ -123,7 +163,7 @@ if [ "${NOTARIZE:-0}" = "1" ]; then
         echo "   Manage Certificates… → + → \"Developer ID Application\"."
         exit 1
     fi
-    echo "   Identity: $DEV_ID_IDENTITY"
+    echo "   Identity: $(identity_label "$DEV_ID_IDENTITY")"
     # The hardened runtime refuses the microphone to a signature that doesn't
     # ask for it, whatever System Settings says: dictation then fails on every
     # press with the permission switched on. Local builds aren't hardened, so
@@ -178,8 +218,7 @@ else
     # every rebuild. Notarization is what is skipped here, and it has no say
     # in the requirement.
     if [ -z "${DEV_ID_IDENTITY:-}" ]; then
-        DEV_ID_IDENTITY=$(security find-identity -v -p codesigning \
-            | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+        DEV_ID_IDENTITY=$(developer_id_identity)
     fi
     if [ -n "$DEV_ID_IDENTITY" ]; then
         echo "→ Developer ID signature (same one the published build carries)…"
@@ -193,7 +232,7 @@ else
         # first press.
         codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "com.apple.security.device.audio-input" \
             || { echo "❌ The signature lacks the audio-input entitlement: dictation would be refused."; exit 1; }
-        echo "   Identity: $DEV_ID_IDENTITY"
+        echo "   Identity: $(identity_label "$DEV_ID_IDENTITY")"
         touch "$APP"
         /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" >/dev/null 2>&1 || true
         echo "✅ $APP ready. Launch with: open \"$APP\""
