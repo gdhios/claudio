@@ -14,6 +14,20 @@ struct MicrophoneGate {
     static let system = MicrophoneGate(isGranted: { MicrophonePermission.isGranted },
                                        request: MicrophonePermission.request,
                                        showExplanation: MicrophonePermission.showExplanation)
+
+    /// The prompts, then the explanation if either is refused. Cancelled
+    /// between the press and its first turn, it asks nothing: a newer press
+    /// owns the prompts. The prompts are modal, so a second press lands long
+    /// before the answer does; only the last chain explains itself, and two
+    /// alerts stacked on the same refusal is what cancelling the old one is for.
+    func ask() -> Task<Void, Never> {
+        Task { @MainActor in
+            guard !Task.isCancelled else { return }
+            let granted = await request()
+            guard !Task.isCancelled, !granted else { return }
+            showExplanation()
+        }
+    }
 }
 
 /// The two permissions dictation needs: the microphone, and speech

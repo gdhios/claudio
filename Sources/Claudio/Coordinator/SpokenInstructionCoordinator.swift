@@ -167,7 +167,7 @@ final class SpokenInstructionCoordinator {
             // are modal and the key is long released by the time they are
             // answered, so this press asks and the next one speaks. Same
             // bargain as dictation's.
-            askForTheMicrophone()
+            permission = microphone.ask()
         case .none:
             break
         }
@@ -195,14 +195,6 @@ final class SpokenInstructionCoordinator {
         session = nil
     }
 
-    private func askForTheMicrophone() {
-        permission = Task { [weak self] in
-            guard let self, !Task.isCancelled else { return }
-            let granted = await microphone.request()
-            guard !Task.isCancelled, !granted else { return }
-            microphone.showExplanation()
-        }
-    }
 
     /// The key came up on a hold: the microphone closes and the engine gets
     /// to say its last word.

@@ -141,31 +141,15 @@ final class DictationCoordinator {
 
         // Then the microphone and speech recognition. Granted, this costs
         // nothing and the dictation starts on the press itself.
+        // The first press on a machine that hasn't been asked yet only asks:
+        // the prompts are modal and the key is long released by the time
+        // they are answered, so the next press dictates. Same bargain as the
+        // Accessibility gate.
         guard microphone.isGranted() else {
-            askForTheMicrophone()
+            permission = microphone.ask()
             return
         }
         beginListening(language: language, output: output, heldFor: heldFor)
-    }
-
-    /// The first press, on a machine that hasn't been asked yet: the two
-    /// system prompts, then the explanation if either is refused. Nothing is
-    /// listened to here — the prompts are modal and the key is long released
-    /// by the time they are answered, so this press asks and the next one
-    /// dictates. Same bargain as the Accessibility gate.
-    private func askForTheMicrophone() {
-        permission = Task { [weak self] in
-            // Cancelled between the press and the first turn of the loop:
-            // a newer press owns the prompts, and this one asks nothing.
-            guard let self, !Task.isCancelled else { return }
-            let granted = await microphone.request()
-            // The prompts are modal, so a second press lands here long
-            // before the answer does. Only the last chain explains itself:
-            // two alerts stacked on the same refusal is what `dismiss()`
-            // cancelling this task is for.
-            guard !Task.isCancelled, !granted else { return }
-            microphone.showExplanation()
-        }
     }
 
     /// Opens the microphone and puts the panel on screen.
