@@ -46,8 +46,8 @@ struct MusicPane: View {
             Section {
                 Toggle(loc("Compléter avec MusicBrainz et Deezer", en: "Complete with MusicBrainz and Deezer"), isOn: $musicBrainz)
                     .onChange(of: musicBrainz) { AppSettings.setMusicBrainzEnabled(musicBrainz) }
-                Text(loc("Album d'origine, type et année de première sortie, affichés sous le morceau et transmis à Claude pour qu'il ne les devine pas. Seuls le titre, l'artiste et l'album sont envoyés à musicbrainz.org, base communautaire gratuite, avec l'identifiant Claudio/\(MusicBrainzLookup.appVersion), puis à api.deezer.com quand MusicBrainz ne connaît pas encore le disque. Rien n'attend leur réponse.",
-                         en: "Album of origin, type and year of first release, shown under the track and given to Claude so he doesn't guess them. Only the title, artist and album are sent to musicbrainz.org, a free community database, as Claudio/\(MusicBrainzLookup.appVersion), then to api.deezer.com when MusicBrainz doesn't know the record yet. Nothing waits for their answer."))
+                Text(loc("Album d'origine, type et année de première sortie, affichés sous le morceau et transmis à Claude pour qu'il ne les devine pas. Seuls le titre, l'artiste et l'album sont envoyés à musicbrainz.org, base communautaire gratuite, avec l'identifiant Claudio/\(Bundle.main.shortVersion), puis à api.deezer.com quand MusicBrainz ne connaît pas encore le disque. Rien n'attend leur réponse.",
+                         en: "Album of origin, type and year of first release, shown under the track and given to Claude so he doesn't guess them. Only the title, artist and album are sent to musicbrainz.org, a free community database, as Claudio/\(Bundle.main.shortVersion), then to api.deezer.com when MusicBrainz doesn't know the record yet. Nothing waits for their answer."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle(loc("Afficher la pochette", en: "Show the cover"), isOn: $showsArtwork)

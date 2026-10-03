@@ -19,11 +19,6 @@ enum MusicBrainzLookup {
         "Claudio/\(version) ( https://github.com/gdhios/claudio )"
     }
 
-    /// The version the bundle carries, "dev" from `swift run`.
-    static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
     // MARK: - The questions
 
     /// A fielded Lucene query: the title without its version tail, and the

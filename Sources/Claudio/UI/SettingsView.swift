@@ -587,9 +587,7 @@ private struct AboutPane: View {
     @State private var updateMessage: String?
     @State private var pendingUpdate: UpdateChecker.Feed?
 
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
+    private var version: String { Bundle.main.shortVersion }
 
     var body: some View {
         Form {

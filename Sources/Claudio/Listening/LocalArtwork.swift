@@ -62,8 +62,7 @@ enum LocalArtwork {
         request.setValue("image/*", forHTTPHeaderField: "Accept")
         if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true
-        else { return nil }
+              response.isSuccessful else { return nil }
         return NSImage(data: data)
     }
 }

@@ -50,7 +50,7 @@ actor MusicBrainzService {
 
     static let shared = MusicBrainzService(
         transport: { try await URLSession.shared.data(for: $0) },
-        version: MusicBrainzLookup.appVersion,
+        version: Bundle.main.shortVersion,
         cache: .standard,
         artists: .standard)
 
@@ -153,9 +153,7 @@ actor MusicBrainzService {
         let sentAt = now()
         if throttled { lastRequest = sentAt }
         if search { lastSearch = sentAt }
-        guard let (data, response) = try? await transport(request),
-              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true
-        else { return nil }
+        guard let (data, response) = try? await transport(request), response.isSuccessful else { return nil }
         return data
     }
 }
@@ -203,7 +201,7 @@ struct RemoteArtworkSource {
     static let system = RemoteArtworkSource { facts in
         guard !PreviewRun.isActive, let id = facts.releaseGroupID else { return nil }
         return await LocalArtwork.fetch(frontURL(releaseGroup: id),
-                                        userAgent: MusicBrainzLookup.userAgent(version: MusicBrainzLookup.appVersion))
+                                        userAgent: MusicBrainzLookup.userAgent(version: Bundle.main.shortVersion))
     }
 
     static let none = RemoteArtworkSource { _ in nil }

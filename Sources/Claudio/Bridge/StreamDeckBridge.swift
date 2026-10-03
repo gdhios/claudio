@@ -18,14 +18,9 @@ final class StreamDeckBridge {
         case connected(clients: Int)
     }
 
-    /// The app's own version, sent in the welcome. `swift run` has no
-    /// bundle, hence the fallback.
-    static var bundleVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
     private let dispatcher: BridgeDispatcher
     private let handshake: BridgeHandshakeFile
+    /// The app's own version, sent in the welcome.
     private let appVersion: String
 
     private var server: BridgeServer?
@@ -63,7 +58,7 @@ final class StreamDeckBridge {
 
     init(dispatcher: BridgeDispatcher,
          handshake: BridgeHandshakeFile = .init(),
-         appVersion: String = StreamDeckBridge.bundleVersion) {
+         appVersion: String = Bundle.main.shortVersion) {
         self.dispatcher = dispatcher
         self.handshake = handshake
         self.appVersion = appVersion
