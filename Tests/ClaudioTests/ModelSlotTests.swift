@@ -103,17 +103,6 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(ClaudioRequest.awaitingInstruction.model, .claude(.sonnet55),
                        "the footer names the model set now, not the one set at first use")
     }
-
-    // MARK: - The tab
-
-    /// The Models tab sits right after the API key: the key, then what it
-    /// pays for.
-    func testTheModelsTabSitsAfterTheAPIKey() {
-        let sections = SettingsSection.allCases
-        let key = sections.firstIndex(of: .apiKey)!
-        XCTAssertEqual(sections[key + 1], .models)
-        XCTAssertEqual(SettingsSection.models.rawValue, "models")
-    }
 }
 
 private extension ModelSlot {

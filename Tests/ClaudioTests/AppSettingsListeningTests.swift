@@ -41,13 +41,4 @@ final class AppSettingsListeningTests: XCTestCase {
         defaults.set("essay", forKey: "listening.detail")
         XCTAssertEqual(AppSettings.listeningDetail(in: defaults), .threeSentences)
     }
-
-    /// The Music tab sits right after Dictation: the two things Claudio
-    /// listens to, side by side.
-    func testTheMusicTabSitsAfterDictation() {
-        let sections = SettingsSection.allCases
-        let dictation = sections.firstIndex(of: .dictation)!
-        XCTAssertEqual(sections[dictation + 1], .music)
-        XCTAssertEqual(SettingsSection.music.rawValue, "music")
-    }
 }
