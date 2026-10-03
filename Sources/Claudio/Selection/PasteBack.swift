@@ -46,12 +46,12 @@ enum PasteBack {
         target.app?.activate()
         try? await Task.sleep(for: Constants.activationDelay)
 
-        NSPasteboard.general.setText(text)
+        let pasted = NSPasteboard.general.setText(text)
         Keystroke.simulate(virtualKey: Keystroke.keyV, flags: .maskCommand)
 
         if let snapshot = target.clipboard {
             try? await Task.sleep(for: Constants.clipboardRestoreDelay)
-            snapshot.restore()
+            snapshot.restore(ifUnchangedSince: pasted)
         }
     }
 }
