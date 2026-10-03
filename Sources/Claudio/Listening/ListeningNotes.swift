@@ -42,7 +42,7 @@ enum ListeningNotes {
             le morceau.
             - Si ce n'est pas de la musique (podcast, vidéo, livre audio), dis ce que c'est en une \
             phrase.
-            - Les faits entre balises <faits> viennent d'une base publique (MusicBrainz) et priment \
+            - Les faits entre balises <faits> viennent d'une base publique (MusicBrainz ou Deezer) et priment \
             sur ta mémoire : album d'origine, type, première sortie. Sans ce bloc, ne cite ni date ni \
             album dont tu n'es pas sûr.
             - Tu n'inventes rien : aucune date, aucun classement, aucune collaboration, aucune \

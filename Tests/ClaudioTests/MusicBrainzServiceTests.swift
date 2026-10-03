@@ -35,6 +35,58 @@ final class MusicBrainzServiceTests: XCTestCase {
                            sleep: { [clock] duration in clock!.advance(by: duration) })
     }
 
+    // MARK: - Deezer, behind MusicBrainz
+
+    private let recent = NowPlayingTrack(title: "Breath Meditation", artist: "Benjamin Adamson", album: "Holding Space")
+
+    /// MusicBrainz has nothing, the player named the album: Deezer is
+    /// asked, in two requests, and its facts are cached like the others.
+    func testWhenMusicBrainzHasNothingDeezerIsAsked() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        transport.answers["/album/1001749391"] = DeezerLookupTests.album
+        let service = makeService()
+
+        let facts = await service.facts(for: recent)
+        XCTAssertEqual(facts?.firstReleaseDate, "2026-09-30")
+        XCTAssertEqual(facts?.origin, .deezer)
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/recording", "/search/album", "/album/1001749391"])
+        XCTAssertEqual(cache.lookup(recent, now: clock.now), .facts(facts!))
+    }
+
+    /// Without an album from the player there is nothing to ask Deezer
+    /// for; and a track MusicBrainz knows never reaches Deezer.
+    func testDeezerIsNotAskedWithoutAnAlbumNorBehindAMatch() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = DeezerLookupTests.search
+        let service = makeService()
+        _ = await service.facts(for: NowPlayingTrack(title: "Breath Meditation", artist: "Benjamin Adamson"))
+        XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/recording"])
+
+        transport.answers["/ws/2/recording"] = MusicBrainzLookupTests.search
+        transport.answers["/ws/2/release-group/3b03f2df-1fc0-4572-8b90-8f952a2a9fcb"] = MusicBrainzLookupTests.releaseGroup
+        _ = await service.facts(for: track)
+        XCTAssertFalse(transport.requests.map(\.url?.path).contains("/search/album"))
+    }
+
+    /// Both bases answered and neither knew: a miss, kept. Deezer failed:
+    /// nothing is kept, the next listen asks again.
+    func testAMissNeedsBothBasesToHaveAnswered() async {
+        transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = #"{"data":[],"total":0}"#
+        let service = makeService()
+        let missed = await service.facts(for: recent)
+        XCTAssertNil(missed)
+        XCTAssertEqual(cache.lookup(recent, now: clock.now), .miss)
+
+        let other = NowPlayingTrack(title: "Hope Radio", artist: "Benjamin Adamson", album: "Elsewhere")
+        transport.answers["/search/album"] = nil
+        transport.status = 503
+        let failed = await service.facts(for: other)
+        XCTAssertNil(failed)
+        XCTAssertEqual(cache.lookup(other, now: clock.now), .unknown)
+    }
+
     // MARK: - The artist, before the long text
 
     private let artistID = "0df6d50f-7e43-4c6a-8220-61932b67c9c5"
@@ -133,6 +185,7 @@ final class MusicBrainzServiceTests: XCTestCase {
     /// the next listen may find the service back.
     func testAMissIsCachedButAFailureIsNot() async {
         transport.answers["/ws/2/recording"] = #"{"count":0,"offset":0,"recordings":[]}"#
+        transport.answers["/search/album"] = #"{"data":[],"total":0}"#  // Deezer, asked behind, knows nothing either
         let service = makeService()
         let missed = await service.facts(for: track)
         XCTAssertNil(missed)

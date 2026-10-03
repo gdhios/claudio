@@ -1,6 +1,17 @@
 import XCTest
 @testable import Claudio
 
+/// Facts cached before Deezer existed carry no origin: they are
+/// MusicBrainz's, and read back as such.
+final class TrackFactsOriginTests: XCTestCase {
+    func testAnOriginlessEntryIsMusicBrainzs() throws {
+        let json = #"{"recordingID":"r","secondaryTypes":[],"albumTitle":"LOVE TRIP"}"#
+        let facts = try JSONDecoder().decode(TrackFacts.self, from: Data(json.utf8))
+        XCTAssertNil(facts.origin)
+        XCTAssertTrue(facts.promptBlock.hasPrefix("<faits source=\"MusicBrainz\">"), facts.promptBlock)
+    }
+}
+
 /// What MusicBrainz said about the track, as the card shows it and as
 /// Claude reads it.
 final class TrackFactsTests: XCTestCase {

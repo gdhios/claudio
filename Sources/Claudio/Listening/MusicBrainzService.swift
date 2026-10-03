@@ -53,9 +53,11 @@ actor MusicBrainzService {
         cache: .standard,
         artists: .standard)
 
-    /// The facts, `nil` when MusicBrainz has none, failed, or took too
-    /// long. A miss is cached, a failure is not: the next listen may find
-    /// the service back.
+    /// The facts, `nil` when neither base has them, or they failed or took
+    /// too long. MusicBrainz first; Deezer when it had nothing and the
+    /// player named the album — a record three days old isn't in a
+    /// community base yet. A miss is cached once both have answered, a
+    /// failure never: the next listen may find the service back.
     func facts(for track: NowPlayingTrack) async -> TrackFacts? {
         switch cache.lookup(track, now: now()) {
         case .facts(let facts): return facts
@@ -65,13 +67,25 @@ actor MusicBrainzService {
         let deadline = now().addingTimeInterval(Self.budget)
         guard let searched = await send(MusicBrainzLookup.searchURL(title: track.title, artist: track.artist),
                                         search: true, deadline: deadline) else { return nil }
-        guard var facts = MusicBrainzLookup.parseSearch(searched, playerAlbum: track.album) else {
+        if var facts = MusicBrainzLookup.parseSearch(searched, playerAlbum: track.album) {
+            if let groupID = facts.releaseGroupID,
+               let group = await send(MusicBrainzLookup.releaseGroupURL(id: groupID), search: false, deadline: deadline) {
+                facts = MusicBrainzLookup.parseReleaseGroup(group, into: facts)
+            }
+            cache.store(facts, for: track, at: now())
+            return facts
+        }
+        guard let album = track.album, let artist = track.artist else {
             cache.store(nil, for: track, at: now())
             return nil
         }
-        if let groupID = facts.releaseGroupID,
-           let group = await send(MusicBrainzLookup.releaseGroupURL(id: groupID), search: false, deadline: deadline) {
-            facts = MusicBrainzLookup.parseReleaseGroup(group, into: facts)
+        guard let found = await send(DeezerLookup.albumSearchURL(artist: artist, album: album),
+                                     search: false, deadline: deadline) else { return nil }
+        guard let id = DeezerLookup.parseAlbumSearch(found, artist: artist),
+              let record = await send(DeezerLookup.albumURL(id: id), search: false, deadline: deadline),
+              let facts = DeezerLookup.parseAlbum(record) else {
+            cache.store(nil, for: track, at: now())
+            return nil
         }
         cache.store(facts, for: track, at: now())
         return facts

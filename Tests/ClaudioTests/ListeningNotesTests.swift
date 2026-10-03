@@ -74,6 +74,7 @@ final class ListeningNotesTests: XCTestCase {
         let prompt = ListeningNotes.system(language: .french)
         XCTAssertTrue(prompt.contains("<faits>"), prompt)
         XCTAssertTrue(prompt.contains("priment"), prompt)
+        XCTAssertTrue(prompt.contains("MusicBrainz ou Deezer"), prompt)
     }
 
     /// The prompt is written once, in French; only its last line changes,

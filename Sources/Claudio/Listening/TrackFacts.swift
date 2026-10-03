@@ -2,9 +2,18 @@ import Foundation
 
 /// What MusicBrainz knows of the track playing: the recording, the release
 /// group it comes from — the album of origin rather than the compilation the
-/// player happens to play — its type and its first release. Facts, never
-/// guesses: the card shows them, and Claude reads them as the truth.
+/// player happens to play — its type and its first release. Or, when
+/// MusicBrainz doesn't know the record yet, what Deezer says of the album
+/// the player named. Facts, never guesses: the card shows them, and Claude
+/// reads them as the truth.
 struct TrackFacts: Equatable, Sendable, Codable {
+    /// Where the facts come from, by the name Claude is told.
+    enum Origin: String, Codable, Sendable {
+        case musicBrainz = "MusicBrainz"
+        case deezer = "Deezer"
+    }
+
+    /// MusicBrainz's recording id; empty when the facts are Deezer's.
     var recordingID: String
     var releaseGroupID: String?
     var albumTitle: String?
@@ -20,6 +29,10 @@ struct TrackFacts: Equatable, Sendable, Codable {
     /// look them up without a search. Absent from entries cached before
     /// it was kept.
     var artistID: String? = nil
+    /// `nil` in entries cached before Deezer: those are MusicBrainz's.
+    var origin: Origin? = nil
+
+    var originName: String { (origin ?? .musicBrainz).rawValue }
 
     var year: String? {
         firstReleaseDate.map { String($0.prefix(4)) }
@@ -87,6 +100,6 @@ struct TrackFacts: Equatable, Sendable, Codable {
             ("première sortie", firstReleaseDate),
         ]
         let lines = fields.compactMap { field in field.value.map { "\(field.label) : \($0)" } }
-        return (["<faits source=\"MusicBrainz\">"] + lines + ["</faits>"]).joined(separator: "\n")
+        return (["<faits source=\"\(originName)\">"] + lines + ["</faits>"]).joined(separator: "\n")
     }
 }
