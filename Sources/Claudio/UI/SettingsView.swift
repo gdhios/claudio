@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Settings styled after System Settings: sidebar with colored dots,
-/// sections as cards (`.formStyle(.grouped)`).
+/// A tab of Settings. The raw value is also the tab's name in a
+/// `claudio://settings/<name>` link, which the Stream Deck plugin and the
+/// website hand out: a case can be added, never renamed.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
@@ -15,6 +16,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case about
 
     var id: String { rawValue }
+
+    /// The tab a `claudio://settings/<name>` link names, whatever the case
+    /// it was typed in or passed on with.
+    init?(linkName: String) {
+        let wanted = linkName.lowercased()
+        guard let section = Self.allCases.first(where: { $0.rawValue.lowercased() == wanted }) else {
+            return nil
+        }
+        self = section
+    }
 
     var title: String {
         switch self {
@@ -62,6 +73,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// Settings styled after System Settings: sidebar with colored dots,
+/// sections as cards (`.formStyle(.grouped)`).
 struct SettingsView: View {
     /// The tab, owned outside the view: whoever opens Settings a second time
     /// on another tab has to be obeyed by the window already on screen.
