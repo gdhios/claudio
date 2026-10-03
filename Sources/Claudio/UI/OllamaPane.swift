@@ -41,8 +41,8 @@ struct OllamaPane: View {
                     ForEach(models, id: \.self) { model in
                         Text(model).monospaced()
                     }
-                    Text(loc("Ces modèles se choisissent action par action dans l'onglet Prompts.",
-                             en: "Pick one of these per action in the Prompts tab."))
+                    Text(loc("Ces modèles se choisissent pour chaque raccourci dans l'onglet Modèles.",
+                             en: "Pick one of these per shortcut in the Models tab."))
                         .settingsNote()
                 }
             }
