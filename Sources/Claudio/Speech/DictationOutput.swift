@@ -70,12 +70,12 @@ enum DictationOutput: String, CaseIterable, Sendable {
                                              base: Self.transcriptPreamble + "\n\n" + action.system)
     }
 
-    /// What the model is sent. `.cleanup` sends the transcript raw, as it
-    /// always has. The others send it tagged, the way the correction cycle
-    /// sends a selection: their prompt is the catalog action's, and it speaks
-    /// of a text inside `<texte_source>`.
+    /// What the model is sent: always the transcript tagged, never bare.
+    /// `.cleanup` uses its own `<transcription>` envelope. The others send it
+    /// the way the correction cycle sends a selection: their prompt is the
+    /// catalog action's, and it speaks of a text inside `<texte_source>`.
     func userMessage(for raw: String) -> String {
-        action == nil ? raw : ClaudioRequest.wrappingSource(raw)
+        action == nil ? DictationCleanup.wrappingTranscript(raw) : ClaudioRequest.wrappingSource(raw)
     }
 
     /// Everything a transforming output needs to know about a dictation, and

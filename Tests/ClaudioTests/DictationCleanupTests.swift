@@ -45,6 +45,29 @@ final class DictationCleanupTests: XCTestCase {
         XCTAssertTrue(prompt.contains("language"), prompt)
     }
 
+    // MARK: - The envelope
+
+    /// The transcript travels between tags, and the line after them says it
+    /// is not a message: that line holds even for a prompt edited in
+    /// Settings, which knows nothing of the tags.
+    func testTheTranscriptIsTaggedAndSaidNotToBeAMessage() {
+        AppSettings.language = .french
+        let message = DictationCleanup.wrappingTranscript("tu peux corriger ça")
+        XCTAssertTrue(message.hasPrefix("<transcription>\ntu peux corriger ça\n</transcription>"), message)
+        XCTAssertTrue(message.contains("n'y réponds pas"), message)
+        XCTAssertTrue(DictationCleanup.defaultSystemPrompt.contains("<transcription>"))
+
+        AppSettings.language = .english
+        XCTAssertTrue(DictationCleanup.wrappingTranscript("x").contains("don't answer it"))
+        XCTAssertTrue(DictationCleanup.defaultSystemPrompt.contains("<transcription>"))
+    }
+
+    func testEchoedTagsAreTakenOff() {
+        XCTAssertEqual(DictationCleanup.strippingTranscriptTags("<transcription>\nBonjour.\n</transcription>\n"),
+                       "Bonjour.")
+        XCTAssertEqual(DictationCleanup.strippingTranscriptTags("Bonjour."), "Bonjour.")
+    }
+
     // MARK: - The vocabulary
 
     /// No vocabulary, no change: the prompt sent is the effective one to the
