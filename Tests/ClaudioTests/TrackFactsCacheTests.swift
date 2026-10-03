@@ -66,8 +66,20 @@ final class TrackFactsCacheTests: XCTestCase {
         XCTAssertEqual(cache.lookup(found, now: ninetyOneDays), .unknown)
     }
 
-    /// Artists have their own file, keyed by their normalized name: the
-    /// same kind of cache, the same lifetimes.
+    /// An artist is kept under their MusicBrainz id when the subject has
+    /// one — two artists may share a name, never an id — under their
+    /// normalized name otherwise.
+    func testAnArtistIsKeyedByTheirIDWhenKnown() {
+        XCTAssertEqual(ArtistFactsCache.key(for: MusicSubject(kind: .artist, artist: "Nirvana", mbid: "5b11f4ce")),
+                       "5b11f4ce")
+        XCTAssertEqual(ArtistFactsCache.key(for: MusicSubject(kind: .album, artist: "Nirvana", title: "Nevermind",
+                                                              artistID: "5b11f4ce")),
+                       "5b11f4ce")
+        XCTAssertEqual(ArtistFactsCache.key(for: MusicSubject(kind: .artist, artist: "  NIRVANA ")), "nirvana")
+    }
+
+    /// Artists have their own file, keyed by their normalized name when no
+    /// id is known: the same kind of cache, the same lifetimes.
     func testArtistsHaveTheirOwnCache() {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("ClaudioTests.artists.\(UUID().uuidString).json")
@@ -75,11 +87,12 @@ final class TrackFactsCacheTests: XCTestCase {
         let artists = ArtistFactsCache(fileURL: file)
         let facts = ArtistFacts(artistID: "0df6d50f", name: "The Supermen Lovers", type: "Person",
                                 country: "FR", beginDate: "1975-02-09", releases: [])
-        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: now), .unknown)
-        artists.store(facts, forArtist: "The Supermen Lovers", at: now)
-        XCTAssertEqual(artists.lookup(artistNamed: "the supermen  lovers", now: now), .facts(facts))
-        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: now.addingTimeInterval(91 * 86_400)),
-                       .unknown)
+        let subject = MusicSubject(kind: .artist, artist: "The Supermen Lovers")
+        XCTAssertEqual(artists.lookup(subject, now: now), .unknown)
+        artists.store(facts, for: subject, at: now)
+        XCTAssertEqual(artists.lookup(MusicSubject(kind: .album, artist: "the supermen  lovers", title: "The Player"),
+                                      now: now), .facts(facts))
+        XCTAssertEqual(artists.lookup(subject, now: now.addingTimeInterval(91 * 86_400)), .unknown)
         XCTAssertEqual(ArtistFactsCache.standard.fileURL.lastPathComponent, "musicbrainz-artists.json")
         XCTAssertEqual(TrackFactsCache.standard.fileURL.lastPathComponent, "musicbrainz-facts.json")
         XCTAssertEqual(ArtistFactsCache.standard.fileURL.deletingLastPathComponent(),

@@ -101,7 +101,7 @@ actor MusicBrainzService {
     /// has one — the record, no search — by name otherwise. Past the
     /// budget, the artist without their releases is still handed over.
     func artist(for subject: MusicSubject) async -> ArtistFacts? {
-        switch artists.lookup(artistNamed: subject.artist, now: now()) {
+        switch artists.lookup(subject, now: now()) {
         case .facts(let facts): return facts
         case .miss: return nil
         case .unknown: break
@@ -118,13 +118,13 @@ actor MusicBrainzService {
             found = MusicBrainzLookup.parseArtistSearch(data)
         }
         guard var facts = found else {
-            artists.store(nil, forArtist: subject.artist, at: now())
+            artists.store(nil, for: subject, at: now())
             return nil
         }
         if let groups = await send(MusicBrainzLookup.releaseGroupsURL(artist: facts.artistID),
                                    search: false, deadline: deadline) {
             facts = MusicBrainzLookup.parseReleaseGroups(groups, into: facts)
-            artists.store(facts, forArtist: subject.artist, at: now())
+            artists.store(facts, for: subject, at: now())
         }
         return facts
     }

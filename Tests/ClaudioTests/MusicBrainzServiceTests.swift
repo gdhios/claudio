@@ -105,7 +105,7 @@ final class MusicBrainzServiceTests: XCTestCase {
     private let artistID = "0df6d50f-7e43-4c6a-8220-61932b67c9c5"
 
     /// With the artist's id in hand: their record, then their release
-    /// groups; no search. The result is kept under the artist's name.
+    /// groups; no search. The result is kept under the artist's id.
     func testAKnownArtistIsLookedUpThenBrowsed() async {
         transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
         transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
@@ -116,10 +116,24 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(facts?.name, "The Supermen Lovers")
         XCTAssertEqual(facts?.releases.map(\.title), ["Starlight", "The Player", "Body Double", "Staralight 20th anniversary edition"])
         XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist/\(artistID)", "/ws/2/release-group"])
-        XCTAssertEqual(artists.lookup(artistNamed: "The Supermen Lovers", now: clock.now), .facts(facts!))
+        XCTAssertEqual(artists.lookup(subject, now: clock.now), .facts(facts!))
 
         _ = await service.artist(for: subject)
         XCTAssertEqual(transport.requests.count, 2, "the cache answered")
+    }
+
+    /// Two artists may share a name, never an id: a namesake known by
+    /// their own id is looked up, not answered with the other's facts.
+    func testANamesakeIsNotAnsweredWithTheOthersFacts() async {
+        transport.answers["/ws/2/artist/\(artistID)"] = ArtistFactsTests.artistLookup
+        transport.answers["/ws/2/release-group"] = ArtistFactsTests.releaseGroups
+        let service = makeService()
+        _ = await service.artist(for: MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: artistID))
+
+        let namesake = "5e1f7a2b-9c3d-4e8f-a1b2-c3d4e5f60718"
+        let other = await service.artist(for: MusicSubject(kind: .artist, artist: "The Supermen Lovers", mbid: namesake))
+        XCTAssertNil(other, "MusicBrainz doesn't know the namesake here")
+        XCTAssertEqual(transport.requests.last?.url?.path, "/ws/2/artist/\(namesake)")
     }
 
     /// Without an id, the artist is searched by name — on the search
@@ -135,9 +149,10 @@ final class MusicBrainzServiceTests: XCTestCase {
         XCTAssertEqual(transport.requests.map(\.url?.path), ["/ws/2/artist", "/ws/2/release-group"])
 
         transport.answers["/ws/2/artist"] = #"{"count":0,"offset":0,"artists":[]}"#
-        let missed = await service.artist(for: MusicSubject(kind: .artist, artist: "Nobody"))
+        let nobody = MusicSubject(kind: .artist, artist: "Nobody")
+        let missed = await service.artist(for: nobody)
         XCTAssertNil(missed)
-        XCTAssertEqual(artists.lookup(artistNamed: "Nobody", now: clock.now), .miss)
+        XCTAssertEqual(artists.lookup(nobody, now: clock.now), .miss)
         XCTAssertGreaterThanOrEqual(transport.sentAt[2].timeIntervalSince(transport.sentAt[0]), 4,
                                     "two searches keep the index's cadence")
     }

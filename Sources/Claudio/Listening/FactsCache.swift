@@ -1,9 +1,11 @@
 import Foundation
 
-/// MusicBrainz is asked once per thing: what it said is kept on disk under
-/// the thing's normalized name. A result holds three months; a miss a
-/// week, the record may be added meanwhile. One small JSON file per kind
-/// of thing, read and written whole: a few hundred entries at most.
+/// MusicBrainz, and Deezer behind it, are asked once per thing: what they
+/// said is kept on disk under the key each kind of thing defines — a
+/// track's normalized title and artist, an artist's id or normalized name.
+/// A result holds three months; a miss a week, the record may be added
+/// meanwhile. One small JSON file per kind of thing, read and written
+/// whole: a few hundred entries at most.
 struct FactsCache<Value: Codable & Equatable & Sendable>: Sendable {
     enum Lookup: Equatable, Sendable {
         case facts(Value)
@@ -98,11 +100,17 @@ typealias ArtistFactsCache = FactsCache<ArtistFacts>
 extension FactsCache where Value == ArtistFacts {
     static var standard: ArtistFactsCache { standard(file: "musicbrainz-artists.json") }
 
-    func lookup(artistNamed name: String, now: Date) -> Lookup {
-        lookup(key: Self.normalize(name), now: now)
+    /// The subject's artist by their MusicBrainz id when it has one — two
+    /// artists may share a name, never an id — by name otherwise.
+    static func key(for subject: MusicSubject) -> String {
+        subject.artistMBID ?? normalize(subject.artist)
     }
 
-    func store(_ facts: ArtistFacts?, forArtist name: String, at now: Date) {
-        store(facts, key: Self.normalize(name), at: now)
+    func lookup(_ subject: MusicSubject, now: Date) -> Lookup {
+        lookup(key: Self.key(for: subject), now: now)
+    }
+
+    func store(_ facts: ArtistFacts?, for subject: MusicSubject, at now: Date) {
+        store(facts, key: Self.key(for: subject), at: now)
     }
 }
