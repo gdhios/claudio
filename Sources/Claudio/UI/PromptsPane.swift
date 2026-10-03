@@ -3,7 +3,6 @@ import SwiftUI
 struct PromptsPane: View {
     @State private var selectedAction: ClaudioAction = .correct
     @State private var promptText: String = ClaudioAction.correct.system
-    @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
     /// Models pulled on the Ollama server, read when the pane opens.
     @State private var localModels: [String] = []
 
@@ -19,17 +18,15 @@ struct PromptsPane: View {
                 }
                 .onChange(of: selectedAction) {
                     promptText = selectedAction.system
-                    selectedModel = selectedAction.model
                 }
             }
 
             Section(loc("Modèle", en: "Model")) {
-                ModelPicker(loc("Modèle de cette action", en: "Model for this action"),
-                            selection: $selectedModel, localModels: localModels)
-                    .onChange(of: selectedModel) {
-                        ModelSlot.action(selectedAction).set(selectedModel)
-                    }
-                ModelChoiceCaption(choice: selectedModel, defaultChoice: .claude(selectedAction.defaultModel))
+                // The Models tab's row, built again for each action: it
+                // reads its slot once, when built.
+                ModelSlotRow(slot: .action(selectedAction), localModels: localModels,
+                             title: loc("Modèle de cette action", en: "Model for this action"))
+                    .id(selectedAction)
                 if localModels.isEmpty {
                     NoLocalModelHint()
                 }

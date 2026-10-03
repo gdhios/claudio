@@ -56,17 +56,22 @@ struct ModelsPane: View {
 struct ModelSlotRow: View {
     let slot: ModelSlot
     let localModels: [String]
+    /// What the picker is called where the slot's own title would say too
+    /// much: in Prompts, the action is already picked above it.
+    let title: String?
     @State private var choice: ModelChoice
 
-    init(slot: ModelSlot, localModels: [String]) {
+    init(slot: ModelSlot, localModels: [String], title: String? = nil) {
         self.slot = slot
         self.localModels = localModels
+        self.title = title
         _choice = State(initialValue: PreviewRun.isActive ? slot.defaultChoice : slot.current())
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ModelPicker(slot.title, selection: $choice, localModels: localModels, allowsRaw: slot.allowsRaw)
+            ModelPicker(title ?? slot.title, selection: $choice, localModels: localModels,
+                        allowsRaw: slot.allowsRaw)
                 .onChange(of: choice) { slot.set(choice) }
             ModelChoiceCaption(choice: choice, defaultChoice: slot.defaultChoice)
         }
