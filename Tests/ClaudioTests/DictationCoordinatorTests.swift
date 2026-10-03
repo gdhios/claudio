@@ -1303,20 +1303,9 @@ private final class Bench: AsyncWaiting {
         return session
     }
 
-    /// Waits for the cycle under way to end. One that never does — a
-    /// dictation nothing finishes, the stream still open — fails its test
-    /// instead of hanging the suite: past the ceiling it is cancelled.
-    func cycleEnds(seconds: TimeInterval = 2,
-                   file: StaticString = #filePath, line: UInt = #line) async {
-        guard let cycle = coordinator.cycle else { return }
-        let ceiling = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            XCTFail("the dictation never finished", file: file, line: line)
-            cycle.cancel()
-        }
-        await cycle.value
-        ceiling.cancel()
+    /// Waits for the cycle under way to end, or fails its test.
+    func cycleEnds(file: StaticString = #filePath, line: UInt = #line) async {
+        await ends(coordinator.cycle, "the dictation never finished", file: file, line: line)
     }
 
     /// Releases a press already under way and waits for the cycle to end.

@@ -731,18 +731,9 @@ private final class Bench: AsyncWaiting {
         for read in waiting { read.resume(returning: track) }
     }
 
-    /// Waits for the cycle under way to end. One that never does fails its
-    /// test instead of hanging the suite: past the ceiling it is cancelled.
-    func runs(seconds: TimeInterval = 2, file: StaticString = #filePath, line: UInt = #line) async {
-        guard let cycle = coordinator.cycle else { return }
-        let ceiling = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            XCTFail("the cycle never finished", file: file, line: line)
-            cycle.cancel()
-        }
-        await cycle.value
-        ceiling.cancel()
+    /// Waits for the cycle under way to end, or fails its test.
+    func runs(file: StaticString = #filePath, line: UInt = #line) async {
+        await ends(coordinator.cycle, "the cycle never finished", file: file, line: line)
     }
 
     /// Records every phase the session goes through, and every state of

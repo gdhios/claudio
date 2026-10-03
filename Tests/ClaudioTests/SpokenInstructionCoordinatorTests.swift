@@ -437,19 +437,9 @@ private final class Bench: AsyncWaiting {
         await cycleEnds()
     }
 
-    /// Waits for the cycle under way to end. One that never does fails its
-    /// test instead of hanging the suite.
-    func cycleEnds(seconds: TimeInterval = 2,
-                   file: StaticString = #filePath, line: UInt = #line) async {
-        guard let cycle = coordinator.cycle else { return }
-        let ceiling = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            XCTFail("the instruction never ended", file: file, line: line)
-            cycle.cancel()
-        }
-        await cycle.value
-        ceiling.cancel()
+    /// Waits for the cycle under way to end, or fails its test.
+    func cycleEnds(file: StaticString = #filePath, line: UInt = #line) async {
+        await ends(coordinator.cycle, "the instruction never ended", file: file, line: line)
     }
 
 }

@@ -435,18 +435,10 @@ private final class Bench: AsyncWaiting {
         for read in waiting { read.resume(returning: track) }
     }
 
-    /// Waits for the capture and the stream under way to end. One that never
-    /// does fails its test instead of hanging the suite.
-    func runs(seconds: TimeInterval = 2, file: StaticString = #filePath, line: UInt = #line) async {
-        guard let task = coordinator.streamTask else { return }
-        let ceiling = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled else { return }
-            XCTFail("the correction never finished", file: file, line: line)
-            task.cancel()
-        }
-        await task.value
-        ceiling.cancel()
+    /// Waits for the capture and the stream under way to end, or fails its
+    /// test.
+    func runs(file: StaticString = #filePath, line: UInt = #line) async {
+        await ends(coordinator.streamTask, "the correction never finished", file: file, line: line)
     }
 
 }

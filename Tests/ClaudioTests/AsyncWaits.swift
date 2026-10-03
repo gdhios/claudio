@@ -1,4 +1,4 @@
-import Foundation
+import XCTest
 
 /// How a coordinator test waits on the coordinator's tasks.
 @MainActor
@@ -24,5 +24,21 @@ extension AsyncWaiting {
         while !reached(), Date() < deadline {
             try? await Task.sleep(for: .milliseconds(2))
         }
+    }
+
+    /// Waits for a coordinator's task to end. One that never does (a cycle
+    /// nothing finishes, a stream still open) fails its test with `failure`
+    /// instead of hanging the suite: past the ceiling it is cancelled.
+    func ends(_ task: Task<Void, Never>?, within seconds: TimeInterval = 2, _ failure: String,
+              file: StaticString = #filePath, line: UInt = #line) async {
+        guard let task else { return }
+        let ceiling = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            XCTFail(failure, file: file, line: line)
+            task.cancel()
+        }
+        await task.value
+        ceiling.cancel()
     }
 }
