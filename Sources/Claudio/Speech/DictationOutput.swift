@@ -4,10 +4,10 @@ import Foundation
 /// English, or turned into a prompt. Each shortcut carries its own, which is
 /// what makes "speak French, paste corrected English" one keystroke.
 ///
-/// Never a second model call: the output composes its instruction with the
-/// dictation preamble `DictationCleanup` already sends, so the transcript is
-/// tidied and transformed in the same breath. The instruction itself is the
-/// catalog action's, not a new prompt — a translation is a translation
+/// Never a second model call: a transforming output sends a short
+/// transcript preamble of its own, then its instruction, so the transcript
+/// is tidied and transformed in the same breath. The instruction itself is
+/// the catalog action's, not a new prompt — a translation is a translation
 /// wherever it is asked for, custom prompt from Settings included.
 ///
 /// The rawValue is the storage key: add cases, never rename them.
@@ -19,7 +19,7 @@ enum DictationOutput: String, CaseIterable, Sendable {
     case makePrompt
 
     /// The catalog action whose prompt this output reuses. None for the
-    /// cleanup: it is the preamble itself.
+    /// cleanup, whose prompt is `DictationCleanup`'s.
     var action: ClaudioAction? {
         switch self {
         case .cleanup: nil
@@ -31,22 +31,14 @@ enum DictationOutput: String, CaseIterable, Sendable {
     /// Label in the Dictation settings. The two model-backed ones borrow the
     /// action's own name, so the picker and the palette say the same thing.
     var title: String {
-        switch self {
-        case .cleanup: loc("Nettoyer", en: "Clean up")
-        case .translateEN: ClaudioAction.translateEN.menuTitle
-        case .makePrompt: ClaudioAction.makePrompt.menuTitle
-        }
+        action?.menuTitle ?? loc("Nettoyer", en: "Clean up")
     }
 
     /// What the panel says while the model works: naming the output costs
     /// nothing and a translation taking its time doesn't look like a stuck
     /// cleanup.
     var progressLabel: String {
-        switch self {
-        case .cleanup: loc("Nettoyage…", en: "Cleaning up…")
-        case .translateEN: ClaudioAction.translateEN.progressLabel
-        case .makePrompt: ClaudioAction.makePrompt.progressLabel
-        }
+        action?.progressLabel ?? loc("Nettoyage…", en: "Cleaning up…")
     }
 
     /// The system prompt of the one call. `.cleanup` sends the cleanup
@@ -62,12 +54,9 @@ enum DictationOutput: String, CaseIterable, Sendable {
     /// instructions cannot be ranked by asking nicely — so there is only one.
     func systemPrompt(keeping terms: [String],
                       landingIn destination: DictationDestination? = nil) -> String {
-        guard let action else {
-            return DictationCleanup.systemPrompt(keeping: terms, landingIn: destination)
-        }
-        return DictationCleanup.systemPrompt(keeping: terms,
-                                             landingIn: destination,
-                                             base: Self.transcriptPreamble + "\n\n" + action.system)
+        DictationCleanup.systemPrompt(keeping: terms,
+                                      landingIn: destination,
+                                      base: action.map { Self.transcriptPreamble + "\n\n" + $0.system })
     }
 
     /// What the model is sent: always the transcript tagged, never bare.
