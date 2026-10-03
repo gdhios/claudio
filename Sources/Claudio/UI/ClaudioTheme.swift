@@ -4,11 +4,11 @@ import SwiftUI
 /// gradient as the icon), permanently dark panel, "pill" badges and
 /// colored icon dots.
 enum ClaudioTheme {
-    static let violetHaut = Color(red: 0.369, green: 0.208, blue: 0.651)  // #5e35a6
-    static let violetBas = Color(red: 0.243, green: 0.063, blue: 0.435)   // #3e106f
-    static let accent = Color(red: 0.486, green: 0.310, blue: 0.816)      // #7c4fd0
+    static let purpleTop = Color(red: 0.369, green: 0.208, blue: 0.651)     // #5e35a6
+    static let purpleBottom = Color(red: 0.243, green: 0.063, blue: 0.435)  // #3e106f
+    static let accent = Color(red: 0.486, green: 0.310, blue: 0.816)        // #7c4fd0
 
-    static let gradient = LinearGradient(colors: [violetHaut, violetBas],
+    static let gradient = LinearGradient(colors: [purpleTop, purpleBottom],
                                          startPoint: .top,
                                          endPoint: .bottom)
 

@@ -13,10 +13,9 @@ enum ClaudioURL: Equatable {
     case settings(SettingsSection)
     case music(MusicSubject)
 
-    /// `claudio://settings/<section>`, the section matched whatever its case
-    /// against the names Settings stores. `claudio://settings` alone opens
-    /// the tab Settings always opens on. `claudio://music?kind=…&artist=…`
-    /// is a subject. Anything else: nil.
+    /// `claudio://settings/<section>`, the section matched by its link name
+    /// whatever its case. `claudio://settings` alone opens General.
+    /// `claudio://music?kind=…&artist=…` is a subject. Anything else: nil.
     static func parse(_ url: URL) -> ClaudioURL? {
         guard url.scheme?.lowercased() == "claudio" else { return nil }
         if url.host()?.lowercased() == "music" { return music(url).map(ClaudioURL.music) }
@@ -29,11 +28,7 @@ enum ClaudioURL: Equatable {
         case 0:
             return .settings(.general)
         case 1:
-            let wanted = parts[0].lowercased()
-            guard let section = SettingsSection.allCases.first(where: {
-                $0.rawValue.lowercased() == wanted
-            }) else { return nil }
-            return .settings(section)
+            return SettingsSection(linkName: parts[0]).map(ClaudioURL.settings)
         default:
             // A link half understood is a link not understood.
             return nil

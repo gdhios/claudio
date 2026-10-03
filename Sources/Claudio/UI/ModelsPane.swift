@@ -4,7 +4,6 @@ import SwiftUI
 /// its cost and the reminder of its default. The prompts stay in Prompts and
 /// the dictation's languages in Dictation; here only the model is set. The
 /// same settings as those tabs' own pickers: a change here shows there.
-@MainActor
 struct ModelsPane: View {
     @State private var localModels: [String] = []
 
@@ -19,8 +18,7 @@ struct ModelsPane: View {
             } footer: {
                 Text(loc("Les prompts de ces actions se règlent dans l'onglet Prompts.",
                          en: "These actions' prompts are set in the Prompts tab."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             }
 
             Section(loc("Action libre", en: "Custom action")) {
@@ -39,8 +37,7 @@ struct ModelsPane: View {
             Section {
                 Text(loc("Les modèles Claude viennent de la liste de l'API, relue une fois par jour à l'ouverture des Réglages ; « nouveau » marque ceux que cette version de Claudio n'embarquait pas. Le local est gratuit et ne sort pas de ta machine.",
                          en: "The Claude models come from the API's list, read once a day when Settings open; “new” marks those this version of Claudio didn't ship with. Local models are free and never leave your Mac."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
                 if localModels.isEmpty {
                     NoLocalModelHint()
                 }
@@ -54,21 +51,25 @@ struct ModelsPane: View {
 /// One shortcut's line: its picker, and under it the cost and the default.
 /// A preview shows the defaults rather than this Mac's settings: the shot
 /// has to be the same on every machine.
-@MainActor
 struct ModelSlotRow: View {
     let slot: ModelSlot
     let localModels: [String]
+    /// What the picker is called where the slot's own title would say too
+    /// much: in Prompts, the action is already picked above it.
+    let title: String?
     @State private var choice: ModelChoice
 
-    init(slot: ModelSlot, localModels: [String]) {
+    init(slot: ModelSlot, localModels: [String], title: String? = nil) {
         self.slot = slot
         self.localModels = localModels
+        self.title = title
         _choice = State(initialValue: PreviewRun.isActive ? slot.defaultChoice : slot.current())
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ModelPicker(slot.title, selection: $choice, localModels: localModels, allowsRaw: slot.allowsRaw)
+            ModelPicker(title ?? slot.title, selection: $choice, localModels: localModels,
+                        allowsRaw: slot.allowsRaw)
                 .onChange(of: choice) { slot.set(choice) }
             ModelChoiceCaption(choice: choice, defaultChoice: slot.defaultChoice)
         }

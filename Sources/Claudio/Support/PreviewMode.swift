@@ -77,7 +77,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             StreamDeckStatusModel.shared.status = .waiting
             StreamDeckStatusModel.shared.pluginInstalled = false
         }
-        let section = SettingsSection.allCases.first { $0.rawValue.lowercased() == tab } ?? .general
+        let section = SettingsSection(linkName: tab) ?? .general
         settingsController.show(initialSection: section)
     }
 

@@ -1,8 +1,8 @@
 import SwiftUI
-import KeyboardShortcuts
 
-/// Settings styled after System Settings: sidebar with colored dots,
-/// sections as cards (`.formStyle(.grouped)`).
+/// A tab of Settings. The raw value is also the tab's name in a
+/// `claudio://settings/<name>` link, which the Stream Deck plugin and the
+/// website hand out: a case can be added, never renamed.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case apiKey
@@ -16,6 +16,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case about
 
     var id: String { rawValue }
+
+    /// The tab a `claudio://settings/<name>` link names, whatever the case
+    /// it was typed in or passed on with.
+    init?(linkName: String) {
+        let wanted = linkName.lowercased()
+        guard let section = Self.allCases.first(where: { $0.rawValue.lowercased() == wanted }) else {
+            return nil
+        }
+        self = section
+    }
 
     var title: String {
         switch self {
@@ -40,7 +50,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: "desktopcomputer"
         case .shortcuts: "command"
         case .dictation: "mic.fill"
-        case .music: "music.note"
+        case .music: ListeningSession.symbolName
         case .streamDeck: "rectangle.grid.3x2.fill"
         case .prompts: "text.quote"
         case .about: "info"
@@ -55,7 +65,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ollama: .green
         case .shortcuts: .indigo
         case .dictation: .pink
-        case .music: .mint
+        case .music: ListeningSession.tint
         case .streamDeck: .teal
         case .prompts: .orange
         case .about: .blue
@@ -63,10 +73,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// Settings styled after System Settings: sidebar with colored dots,
+/// sections as cards (`.formStyle(.grouped)`).
 struct SettingsView: View {
     /// The tab, owned outside the view: whoever opens Settings a second time
     /// on another tab has to be obeyed by the window already on screen.
     @ObservedObject private var selection: SettingsSelection
+    /// The interface language, watched under the key `AppSettings.language`
+    /// keeps it in: General changes it with this window open, and the
+    /// sidebar and the pane have to say everything again in the new one.
+    @AppStorage("language") private var language: AppLanguage = .system
 
     init(selection: SettingsSelection) {
         _selection = ObservedObject(wrappedValue: selection)
@@ -85,608 +101,37 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            switch selection.section {
-            case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
-            case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
-            case .models: ModelsPane().navigationTitle(SettingsSection.models.title)
-            case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
-            case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
-            case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
-            case .music: MusicPane().navigationTitle(SettingsSection.music.title)
-            case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
-            case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
-            case .about: AboutPane().navigationTitle(SettingsSection.about.title)
-            }
+            // Built again on every opening and in every language: the window
+            // is reused, and a pane that never left it would replay neither
+            // its `.onAppear` nor its `.task`, which is where it reads this
+            // Mac, and would keep the labels it was built with.
+            pane.id(PaneKey(opening: selection.openings, language: language))
         }
         .frame(minWidth: 700, minHeight: 500)
         // The Claude list is a day old at most: asked here, where it is
-        // read, and nowhere on the way to an action.
-        .task { await ModelCatalog.shared.refreshIfStale() }
-    }
-}
-
-// MARK: - General
-
-@MainActor
-private struct GeneralPane: View {
-    @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var loginItemError: String?
-    @State private var costCounterEnabled = AppSettings.costCounterEnabled()
-    @State private var panelTextSize = AppSettings.panelTextSize
-    @State private var language = AppSettings.language
-    @ObservedObject private var ledger = CostLedger.shared
-    @ObservedObject private var catalog = ModelCatalog.shared
-
-    var body: some View {
-        Form {
-            Section(loc("Système", en: "System")) {
-                Toggle(loc("Ouvrir à l'ouverture de session", en: "Open at login"), isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) {
-                        do {
-                            try LoginItem.setEnabled(launchAtLogin)
-                            loginItemError = nil
-                        } catch {
-                            loginItemError = loc("Nécessite l'app installée dans /Applications (\(error.localizedDescription))",
-                                                 en: "Requires the app to live in /Applications (\(error.localizedDescription))")
-                            launchAtLogin = LoginItem.isEnabled
-                        }
-                    }
-                if let loginItemError {
-                    Text(loginItemError).font(.caption).foregroundStyle(.orange)
-                }
-            }
-
-            Section(loc("Langue", en: "Language")) {
-                Picker(loc("Langue de l'interface", en: "Interface language"), selection: $language) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }
-                .onChange(of: language) { AppSettings.language = language }
-                Text(loc("S'applique aux libellés de Claudio. Le texte que Claude renvoie, lui, reste toujours dans la langue du texte sélectionné, ou dans celle de ta demande quand rien n'est sélectionné.",
-                         en: "Applies to Claudio's own labels. What Claude sends back always follows the language of the selected text, or of your request when nothing is selected."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(loc("Panneau", en: "Panel")) {
-                Picker(loc("Taille du texte", en: "Text size"), selection: $panelTextSize) {
-                    ForEach(PanelTextSize.allCases) { size in
-                        Text(size.title).tag(size)
-                    }
-                }
-                .onChange(of: panelTextSize) { AppSettings.panelTextSize = panelTextSize }
-                Text(loc("Le résultat s'affiche à cette taille.", en: "The result appears at this size."))
-                    .font(.system(size: panelTextSize.bodyPoints))
-                    .foregroundStyle(.secondary)
-                Text(loc("S'applique au texte du panneau flottant : le résultat, la consigne et les actions de la palette. Le panneau s'élargit avec le texte, et le changement vaut pour le panneau suivant.",
-                         en: "Applies to the floating panel: the result, the instruction field and the palette actions. The panel widens with the text, and the change takes effect on the next panel."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(loc("Modèle", en: "Model")) {
-                LabeledContent(loc("Modèle", en: "Model"),
-                               value: loc("réglable par raccourci", en: "set per shortcut"))
-                Text(loc("Le modèle se choisit pour chaque raccourci dans l'onglet Modèles : un modèle Claude, ou un modèle local servi par Ollama. Tarifs Anthropic par million de jetons, entrée / sortie : \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Le local est gratuit et ne sort pas de ta machine.",
-                         en: "The model is chosen per shortcut in the Models tab: a Claude model, or a local model served by Ollama. Anthropic prices per million tokens, input / output: \(catalog.models.compactMap(\.priceLine).joined(separator: ", ")). Local models are free and never leave your Mac."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(loc("Dépense", en: "Spending")) {
-                Toggle(loc("Compter ce que je dépense", en: "Count what I spend"), isOn: $costCounterEnabled)
-                    .onChange(of: costCounterEnabled) {
-                        AppSettings.setCostCounterEnabled(costCounterEnabled)
-                    }
-                if costCounterEnabled {
-                    LabeledContent(loc("Aujourd'hui", en: "Today")) {
-                        Text(ledger.day.actions == 0
-                             ? loc("aucune action", en: "no action yet")
-                             : "\(ledger.day.formattedTotal) · \(ledger.day.actions) action\(ledger.day.actions > 1 ? "s" : "")")
-                            .monospacedDigit()
-                    }
-                    Button(loc("Remettre à zéro", en: "Reset")) { ledger.reset() }
-                        .disabled(ledger.day.actions == 0)
-                }
-                Text(loc("Le total est calculé sur ta machine à partir des jetons facturés par appel, et repart à zéro chaque jour. Le décompte qui fait foi reste celui de console.anthropic.com.",
-                         en: "The total is computed on your Mac from the tokens billed per call, and starts over every day. The count that matters is still the one on console.anthropic.com."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if costCounterEnabled, ledger.day.unpricedActions > 0 {
-                    Text(loc("* \(ledger.day.unpricedActions) appel\(ledger.day.unpricedActions > 1 ? "s" : "") à un modèle dont cette version de Claudio ne connaît pas le tarif : compté\(ledger.day.unpricedActions > 1 ? "s" : "") pour zéro, le total est un plancher.",
-                             en: "* \(ledger.day.unpricedActions) call\(ledger.day.unpricedActions > 1 ? "s" : "") to a model whose price this version of Claudio doesn't know, counted as zero: the total is a floor."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .onAppear { ledger.refresh() }
-    }
-}
-
-// MARK: - API key
-
-private struct APIKeyPane: View {
-    @State private var apiKeyField = ""
-    @State private var hasStoredKey = KeychainStore.loadAPIKey() != nil
-    @State private var workspaceIDField = AppSettings.workspaceID ?? ""
-
-    var body: some View {
-        Form {
-            Section(loc("Clé API Anthropic", en: "Anthropic API key")) {
-                SecureField("sk-ant-…", text: $apiKeyField)
-                HStack {
-                    if hasStoredKey {
-                        Label(loc("Clé enregistrée dans le Trousseau", en: "Key saved in the Keychain"), systemImage: "checkmark.circle")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                    } else {
-                        Label(loc("Aucune clé enregistrée", en: "No key saved"), systemImage: "exclamationmark.circle")
-                            .foregroundStyle(.orange)
-                            .font(.caption)
-                    }
-                    Spacer()
-                    if hasStoredKey {
-                        Button(loc("Supprimer", en: "Delete")) {
-                            KeychainStore.deleteAPIKey()
-                            hasStoredKey = false
-                        }
-                    }
-                    Button(loc("Enregistrer", en: "Save")) {
-                        let trimmed = apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return }
-                        guard KeychainStore.saveAPIKey(trimmed) else { return }
-                        apiKeyField = ""
-                        hasStoredKey = true
-                    }
-                    .disabled(apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                Link(loc("Créer une clé sur console.anthropic.com", en: "Create a key on console.anthropic.com"),
-                     destination: URL(string: "https://console.anthropic.com/settings/keys")!)
-                    .font(.caption)
-            }
-
-            Section(loc("Espace de travail", en: "Workspace")) {
-                TextField(loc("Espace de travail", en: "Workspace"), text: $workspaceIDField, prompt: Text("wrkspc_…"))
-                    .onChange(of: workspaceIDField) {
-                        AppSettings.workspaceID = workspaceIDField
-                    }
-                Text(loc("Requis uniquement si ta clé est « liée à l'identité » (erreur 400 sinon). Console → Réglages → Workspaces → copier l'ID de l'espace.",
-                         en: "Only needed if your key is “identity-bound” (otherwise you get a 400). Console → Settings → Workspaces → copy the workspace ID."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
-
-// MARK: - Local (Ollama)
-
-@MainActor
-private struct OllamaPane: View {
-    @State private var addressField = AppSettings.ollamaBaseURL.absoluteString
-    @State private var testing = false
-    @State private var models: [String] = []
-    /// Result of the last test: the message, and whether it reports a failure.
-    @State private var report: String?
-    @State private var failed = false
-
-    var body: some View {
-        Form {
-            Section(loc("Serveur", en: "Server")) {
-                TextField(loc("Adresse", en: "Address"), text: $addressField,
-                          prompt: Text(Constants.ollamaDefaultURL.absoluteString))
-                    .onSubmit { save() }
-                HStack {
-                    Button(loc("Tester la connexion", en: "Test connection")) {
-                        Task { await test() }
-                    }
-                    .disabled(testing)
-                    if testing { ProgressView().controlSize(.small) }
-                }
-                if let report {
-                    Label(report, systemImage: failed ? "exclamationmark.triangle" : "checkmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(failed ? .orange : .secondary)
-                }
-                Text(loc("Ollama tourne sur ta machine, ou sur un autre Mac du réseau local. Rien n'est envoyé ailleurs qu'à cette adresse, et un appel local ne coûte rien. Sans authentification : Ollama n'en propose pas.",
-                         en: "Ollama runs on this Mac, or on another Mac on your local network. Nothing is sent anywhere but this address, and a local call costs nothing. No authentication: Ollama doesn't offer any."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(loc("Modèles détectés", en: "Models found")) {
-                if models.isEmpty {
-                    Text(loc("Aucun modèle détecté. Teste la connexion, et tire un modèle avec « ollama pull qwen2.5:14b ».",
-                             en: "No model found. Test the connection, then pull one with “ollama pull qwen2.5:14b”."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(models, id: \.self) { model in
-                        Text(model).monospaced()
-                    }
-                    Text(loc("Ces modèles se choisissent action par action dans l'onglet Prompts.",
-                             en: "Pick one of these per action in the Prompts tab."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .onAppear {
-            if PreviewRun.isActive { showFixedState() } else { Task { await test() } }
-        }
+        // read, and nowhere on the way to an action. Asked again on every
+        // opening, since the window outlives this view's first appearance.
+        .task(id: selection.openings) { await ModelCatalog.shared.refreshIfStale() }
     }
 
-    /// Preview: the screen populated with data, without calling the server.
-    private func showFixedState() {
-        models = ["qwen2.5:14b", "llama3.2:3b"]
-        failed = false
-        report = loc("Connexion OK — \(models.count) modèles détectés.",
-                     en: "Connected — \(models.count) models found.")
+    /// What a pane is built for: one opening of the window, in one language.
+    private struct PaneKey: Hashable {
+        let opening: Int
+        let language: AppLanguage
     }
 
-    /// An unreadable address doesn't overwrite the one that worked: the field
-    /// falls back to the value kept.
-    @discardableResult
-    private func save() -> URL? {
-        guard let url = AppSettings.normalizedOllamaURL(addressField) else {
-            addressField = AppSettings.ollamaBaseURL.absoluteString
-            return nil
-        }
-        AppSettings.ollamaBaseURL = url
-        addressField = url.absoluteString
-        return url
-    }
-
-    private func test() async {
-        guard let url = save() else {
-            models = []
-            failed = true
-            report = loc("Adresse illisible : attendu « http://machine:11434 ».",
-                         en: "Unreadable address: expected “http://host:11434”.")
-            return
-        }
-        testing = true
-        defer { testing = false }
-
-        do {
-            let found = try await OllamaClient.reachableModels(at: url)
-            models = found
-            failed = false
-            report = found.isEmpty
-                ? loc("Connexion OK, mais aucun modèle tiré sur ce serveur.",
-                      en: "Connected, but no model has been pulled on that server.")
-                : loc("Connexion OK — \(found.count) modèle\(found.count > 1 ? "s" : "") détecté\(found.count > 1 ? "s" : "").",
-                      en: "Connected — \(found.count) model\(found.count > 1 ? "s" : "") found.")
-        } catch {
-            models = []
-            failed = true
-            report = error.localizedDescription
-        }
-    }
-}
-
-// MARK: - Shortcuts
-
-@MainActor
-private struct ShortcutsPane: View {
-    /// Where the dictation rows start, for the preview that scrolls to them.
-    private static let dictationRows = "dictationRows"
-
-    @State private var windowShortcutsEnabled = AppSettings.windowShortcutsEnabled
-    @State private var dictationEnabled = AppSettings.dictationEnabled()
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            form
-                .onAppear {
-                    // The dictation rows sit below the fold of a preview's
-                    // window, and nothing scrolls a preview but itself.
-                    guard !PreviewRun.dictationLoneKeys.isEmpty else { return }
-                    DispatchQueue.main.async { proxy.scrollTo(Self.dictationRows, anchor: .center) }
-                }
-        }
-    }
-
-    private var form: some View {
-        Form {
-            Section {
-                // At the top: the palette, which gives access to everything else.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: PaletteCatalog.symbolName,
-                              color: PaletteCatalog.tint, size: 22)
-                    Text(PaletteCatalog.menuTitle)
-                    Spacer()
-                    KeyboardShortcuts.Recorder("", name: .actionPalette)
-                }
-                ForEach(ClaudioAction.allCases, id: \.self) { action in
-                    HStack(spacing: 10) {
-                        IconBadge(systemName: action.symbolName, color: action.tint, size: 22)
-                        Text(action.menuTitle)
-                        Spacer()
-                        KeyboardShortcuts.Recorder("", name: action.shortcutName)
-                    }
-                }
-                // Outside the catalog: its instruction is entered in the panel.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: ClaudioRequest.awaitingInstruction.origin.symbolName,
-                              color: ClaudioRequest.awaitingInstruction.origin.tint, size: 22)
-                    Text(ClaudioRequest.freeMenuTitle)
-                    Spacer()
-                    KeyboardShortcuts.Recorder("", name: .freeAction)
-                }
-                // Outside the catalog too, and needs no selection at all.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: ListeningSession.symbolName,
-                              color: ListeningSession.tint, size: 22)
-                    Text(ListeningSession.menuTitle)
-                    Spacer()
-                    KeyboardShortcuts.Recorder("", name: .whatsPlaying)
-                }
-            } header: {
-                Text(loc("Raccourcis globaux", en: "Global shortcuts"))
-            } footer: {
-                Text(loc("Chaque action s'applique au texte sélectionné, dans n'importe quelle app. La palette les propose toutes dans le panneau, sans raccourci à retenir. L'action libre demande la consigne au moment du déclenchement : tapé, son raccourci ouvre le champ où l'écrire ; maintenu, il ouvre le micro pour la dire. Sans sélection, elle devient une demande à Claudio, et Entrée colle sa réponse au curseur. Avec ou sans sélection, elle emporte le morceau en cours s'il y en a un, même en pause ; les autres actions, jamais. « Qu'est-ce que j'écoute ? » se passe aussi de sélection : Claudio lit le morceau en cours et Claude te le présente.",
-                         en: "Every action applies to the selected text, in any app. The palette offers all of them in the panel, with no shortcut to remember. The custom action asks for its instruction when you trigger it: tap its shortcut to type it, hold it to say it. With nothing selected, it becomes a request to Claudio, and Enter pastes the answer at the cursor. Selection or not, it takes the current track along if there is one, even paused; the other actions never do. “What's playing?” needs no selection either: Claudio reads the track playing and Claude tells you about it."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Toggle(loc("Activer la dictée", en: "Enable dictation"),
-                       isOn: $dictationEnabled)
-                    .onChange(of: dictationEnabled) {
-                        HotkeySetup.setDictationEnabled(dictationEnabled)
-                    }
-                HStack(spacing: 10) {
-                    IconBadge(systemName: SettingsSection.dictation.symbolName,
-                              color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter", en: "Dictate"))
-                    Spacer()
-                    // A key combination, or a right-hand modifier held alone.
-                    DictationShortcutField(shortcut: .dictate)
-                }
-                .id(Self.dictationRows)
-                .disabled(!dictationEnabled)
-                HStack(spacing: 10) {
-                    IconBadge(systemName: "globe", color: SettingsSection.dictation.color, size: 22)
-                    Text(loc("Dicter dans l'autre langue",
-                             en: "Dictate in the other language"))
-                    Spacer()
-                    DictationShortcutField(shortcut: .dictateOtherLanguage)
-                }
-                .disabled(!dictationEnabled)
-            } header: {
-                Text(SettingsSection.dictation.title)
-            } footer: {
-                Text(loc("Maintenus, ces deux-là écoutent tant que la touche est enfoncée et collent au relâchement ; tapés une fois, ils écoutent jusqu'au prochain appui. Une touche de modification seule, côté droit (⌥, ⌘, ⇧ ou ⌃), marche aussi : clique le champ, appuie sur la touche et relâche-la. Les langues et le modèle de nettoyage se règlent dans l'onglet Dictée. Décochée, la dictée rend les deux touches à tes autres outils.",
-                         en: "Held, these two listen while the key is down and paste on release; tapped once, they listen until the next press. A modifier key on its own, right-hand side (⌥, ⌘, ⇧ or ⌃), works too: click the field, press the key and let go. The languages and the cleanup model are set in the Dictation tab. Switched off, dictation releases both keys and leaves them to your other tools."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Toggle(loc("Placer les fenêtres au clavier", en: "Move windows from the keyboard"),
-                       isOn: $windowShortcutsEnabled)
-                    .onChange(of: windowShortcutsEnabled) {
-                        HotkeySetup.setWindowShortcutsEnabled(windowShortcutsEnabled)
-                    }
-                ForEach(WindowLayout.allCases, id: \.self) { layout in
-                    HStack(spacing: 10) {
-                        IconBadge(systemName: layout.symbolName, color: .indigo, size: 22)
-                        Text(layout.title)
-                        Spacer()
-                        KeyboardShortcuts.Recorder("", name: layout.shortcutName)
-                    }
-                    .disabled(!windowShortcutsEnabled)
-                }
-                // Not a layout: this one keeps the placement and changes display.
-                HStack(spacing: 10) {
-                    IconBadge(systemName: "display.2", color: .indigo, size: 22)
-                    Text(loc("Écran suivant", en: "Next display"))
-                    Spacer()
-                    KeyboardShortcuts.Recorder("", name: .windowNextScreen)
-                }
-                .disabled(!windowShortcutsEnabled)
-            } header: {
-                Text(loc("Fenêtres", en: "Windows"))
-            } footer: {
-                Text(loc("Cale la fenêtre du premier plan sur ⌃⌥⌘ : flèches pour les moitiés, ↩ pour maximiser, 7/9/1/3 pour les coins, 5 pour centrer et ⇟ pour l'envoyer sur l'écran suivant en gardant sa place. Si un autre outil (Raycast, Rectangle…) tient déjà ces touches, coupe-le sur celles-ci ou change les raccourcis ici.",
-                         en: "Snaps the frontmost window on ⌃⌥⌘: arrows for halves, ↩ to maximize, 7/9/1/3 for the corners, 5 to center and ⇟ to send it to the next display, keeping its placement. If another tool (Raycast, Rectangle…) already owns these keys, disable it on them or change the shortcuts here."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
-
-// MARK: - Prompts
-
-private struct PromptsPane: View {
-    @State private var selectedAction: ClaudioAction = .correct
-    @State private var promptText: String = ClaudioAction.correct.system
-    @State private var selectedModel: ModelChoice = ClaudioAction.correct.model
-    /// Models pulled on the Ollama server, read when the pane opens.
-    @State private var localModels: [String] = []
-
-    private var isCustomized: Bool { promptText != selectedAction.defaultSystem }
-
-    var body: some View {
-        Form {
-            Section {
-                Picker(loc("Action", en: "Action"), selection: $selectedAction) {
-                    ForEach(ClaudioAction.allCases, id: \.self) { action in
-                        Text(action.menuTitle).tag(action)
-                    }
-                }
-                .onChange(of: selectedAction) {
-                    promptText = selectedAction.system
-                    selectedModel = selectedAction.model
-                }
-            }
-
-            Section(loc("Modèle", en: "Model")) {
-                ModelPicker(loc("Modèle de cette action", en: "Model for this action"),
-                            selection: $selectedModel, localModels: localModels)
-                    .onChange(of: selectedModel) {
-                        ModelSlot.action(selectedAction).set(selectedModel)
-                    }
-                ModelChoiceCaption(choice: selectedModel, defaultChoice: .claude(selectedAction.defaultModel))
-                if localModels.isEmpty {
-                    NoLocalModelHint()
-                }
-            }
-
-            Section(loc("Prompt système", en: "System prompt")) {
-                TextEditor(text: $promptText)
-                    .font(.callout)
-                    .frame(minHeight: 260)
-                    .onChange(of: promptText) {
-                        // Same as the default: remove the override (follows app updates).
-                        AppSettings.setCustomSystemPrompt(isCustomized ? promptText : nil,
-                                                          for: selectedAction)
-                    }
-                HStack {
-                    if isCustomized {
-                        Label(loc("Personnalisé", en: "Customised"), systemImage: "pencil")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    } else {
-                        Label(loc("Prompt par défaut", en: "Default prompt"), systemImage: "checkmark.circle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(loc("Réinitialiser", en: "Reset")) {
-                        AppSettings.setCustomSystemPrompt(nil, for: selectedAction)
-                        promptText = selectedAction.defaultSystem
-                    }
-                    .disabled(!isCustomized)
-                }
-                Text(loc("Modifications appliquées immédiatement. Le texte sélectionné est envoyé à part, balisé <texte_source> pour les actions de prompt : ce prompt ne définit que la tâche. Les prompts par défaut sont écrits en français, et demandent à Claude de répondre dans la langue du texte sélectionné.",
-                         en: "Changes take effect immediately. The selected text is sent separately, wrapped in <texte_source> for the prompt actions: this prompt only defines the task. The default prompts are written in French, and ask Claude to answer in the language of the selected text."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .task { localModels = await LocalModels.discover() }
-    }
-}
-
-// MARK: - About
-
-private struct AboutPane: View {
-    @State private var checking = false
-    @State private var installing = false
-    @State private var updateMessage: String?
-    @State private var pendingUpdate: UpdateChecker.Feed?
-
-    private var version: String { Bundle.main.shortVersion }
-
-    var body: some View {
-        Form {
-            Section {
-                HStack(spacing: 14) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 56, height: 56)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Claudio").font(.title3.bold())
-                        Text(loc("Version \(version)", en: "Version \(version)"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(loc("Des actions IA sur votre texte sélectionné, partout sur macOS.",
-                                 en: "AI actions on your selected text, anywhere on macOS."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-
-            Section(loc("Mises à jour", en: "Updates")) {
-                HStack {
-                    Button(loc("Vérifier maintenant", en: "Check now")) {
-                        checking = true
-                        Task { @MainActor in
-                            switch await UpdateChecker.shared.checkNow() {
-                            case .upToDate:
-                                updateMessage = loc("Claudio est à jour (version \(version)).",
-                                                    en: "Claudio is up to date (version \(version)).")
-                                pendingUpdate = nil
-                            case .updateAvailable(let feed):
-                                updateMessage = loc("Mise à jour \(feed.version) disponible.",
-                                                    en: "Update \(feed.version) available.")
-                                pendingUpdate = feed
-                            case .failed:
-                                updateMessage = loc("Vérification impossible, réessayez plus tard.",
-                                                    en: "Could not check, try again later.")
-                                pendingUpdate = nil
-                            }
-                            checking = false
-                        }
-                    }
-                    .disabled(checking || installing)
-                    if checking || installing {
-                        ProgressView().controlSize(.small)
-                    }
-                    Spacer()
-                    if let pendingUpdate {
-                        Button(loc("Installer et redémarrer", en: "Install and restart")) { install(pendingUpdate) }
-                            .disabled(installing)
-                    }
-                }
-                if let updateMessage {
-                    Text(updateMessage).font(.caption).foregroundStyle(.secondary)
-                }
-                Text(loc("Vérification automatique une fois par jour : une simple lecture de version.json sur claudio.okonoma.com, aucune donnée envoyée. L'installation remplace l'app en place et relance Claudio, sans rien laisser dans les Téléchargements.",
-                         en: "Checked automatically once a day: a plain read of version.json on claudio.okonoma.com, nothing sent. Installing replaces the app in place and relaunches Claudio, leaving nothing in Downloads."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Link(destination: URL(string: "https://claudio.okonoma.com")!) {
-                    Label(loc("Site web", en: "Website"), systemImage: "globe")
-                }
-                Link(destination: URL(string: "https://github.com/gdhios/claudio")!) {
-                    Label(loc("Code source (MIT)", en: "Source code (MIT)"), systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-                Link(destination: URL(string: "https://buymeacoffee.com/gdhios")!) {
-                    Label(loc("Offrir un café ☕", en: "Buy me a coffee ☕"), systemImage: "heart")
-                }
-            }
-
-            Section {
-                Text(loc("Fait main en Swift. Projet indépendant, non affilié à Anthropic. Claude est une marque d'Anthropic, PBC.",
-                         en: "Hand-made in Swift. Independent project, not affiliated with Anthropic. Claude is a trademark of Anthropic, PBC."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    /// Downloads, verifies and installs: on success, the app quits and
-    /// the new version relaunches itself.
-    private func install(_ feed: UpdateChecker.Feed) {
-        installing = true
-        updateMessage = loc("Téléchargement de la version \(feed.version)…",
-                            en: "Downloading version \(feed.version)…")
-        Task { @MainActor in
-            do {
-                let newApp = try await UpdateInstaller.prepare(from: feed.url)
-                try UpdateInstaller.installAndRelaunch(newApp)
-            } catch {
-                updateMessage = error.localizedDescription
-                installing = false
-            }
+    @ViewBuilder private var pane: some View {
+        switch selection.section {
+        case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
+        case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
+        case .models: ModelsPane().navigationTitle(SettingsSection.models.title)
+        case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
+        case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
+        case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
+        case .music: MusicPane().navigationTitle(SettingsSection.music.title)
+        case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
+        case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
+        case .about: AboutPane().navigationTitle(SettingsSection.about.title)
         }
     }
 }

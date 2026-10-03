@@ -57,7 +57,7 @@ enum UpdateInstaller {
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         guard let (downloaded, response) = try? await URLSession.shared.download(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200 else {
+              response.isSuccessful else {
             throw Failure.download
         }
 

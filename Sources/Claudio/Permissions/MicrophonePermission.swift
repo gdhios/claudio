@@ -1,5 +1,4 @@
 import AVFoundation
-import AppKit
 import Speech
 
 /// The two permissions as the dictation cycle needs them: read, ask,
@@ -62,7 +61,12 @@ enum MicrophonePermission {
         }
         if SFSpeechRecognizer.authorizationStatus() != .authorized {
             let status = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+                // Sendable, so it doesn't inherit the main actor: the system
+                // answers on a queue of its choosing, and a main-actor
+                // closure called there stops the app on Swift 6's check.
+                SFSpeechRecognizer.requestAuthorization { @Sendable status in
+                    continuation.resume(returning: status)
+                }
             }
             guard status == .authorized else { return false }
         }
@@ -74,14 +78,13 @@ enum MicrophonePermission {
     /// someone to the wrong one is sending them nowhere.
     static func showExplanation() {
         guard let missing = missingAccess() else { return }
-        let pane: String
-        let alert = NSAlert()
+        let pane: String, title: String, message: String
         switch missing {
         case .recognitionDenied:
             pane = "Privacy_SpeechRecognition"
-            alert.messageText = loc("Autorisation Reconnaissance vocale requise",
-                                    en: "Speech Recognition permission needed")
-            alert.informativeText = loc("""
+            title = loc("Autorisation Reconnaissance vocale requise",
+                        en: "Speech Recognition permission needed")
+            message = loc("""
             Claudio a besoin de l'autorisation « Reconnaissance vocale » pour transformer \
             ta voix en texte, sur cet ordinateur.
 
@@ -96,9 +99,9 @@ enum MicrophonePermission {
             """)
         default:
             pane = "Privacy_Microphone"
-            alert.messageText = loc("Autorisation Microphone requise",
-                                    en: "Microphone permission needed")
-            alert.informativeText = loc("""
+            title = loc("Autorisation Microphone requise",
+                        en: "Microphone permission needed")
+            message = loc("""
             Claudio a besoin de l'autorisation « Microphone » pour t'entendre dicter.
 
             Réglages Système → Confidentialité et sécurité → Microphone → activer Claudio, \
@@ -110,12 +113,6 @@ enum MicrophonePermission {
             then trigger the shortcut again.
             """)
         }
-        alert.addButton(withTitle: loc("Ouvrir les Réglages Système", en: "Open System Settings"))
-        alert.addButton(withTitle: loc("Plus tard", en: "Later"))
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
-            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!
-            NSWorkspace.shared.open(url)
-        }
+        PrivacyAlert.show(title: title, message: message, anchor: pane)
     }
 }

@@ -6,7 +6,6 @@ import SwiftUI
 /// Everything shown comes from `StreamDeckStatusModel`, which the app fills
 /// in: the pane reads no preference, looks in no folder and opens no socket,
 /// so a preview renders the same screen on every machine.
-@MainActor
 struct StreamDeckPane: View {
     @ObservedObject private var model = StreamDeckStatusModel.shared
 
@@ -56,8 +55,7 @@ struct StreamDeckPane: View {
                            en: "Set automatically: plugin detected")
                      : loc("Réglé automatiquement : plugin absent",
                            en: "Set automatically: plugin not found"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .settingsNote()
             } else {
                 Button(loc("Revenir à l'automatique", en: "Back to automatic")) {
                     model.backToAutomatic()
@@ -68,8 +66,7 @@ struct StreamDeckPane: View {
         } footer: {
             Text(loc("Installer le plugin suffit : Claudio ouvre alors un point d'écoute local, jamais exposé au réseau. L'interrupteur n'est là que pour forcer la main — à couper, ou à garder ouvert pour un plugin rangé ailleurs.",
                      en: "Installing the plugin is the whole setup: Claudio then opens a local listening point, never exposed to the network. The switch is only there to force the matter — off, or open for a plugin kept somewhere else."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .settingsNote()
         }
     }
 

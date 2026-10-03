@@ -25,10 +25,6 @@ final class UpdateChecker {
 
     private var timer: Timer?
 
-    var currentVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-    }
-
     /// Does the feed's version exceed the installed one? Numeric,
     /// field-by-field comparison: "1.10.0" beats "1.9.9", where alphabetical
     /// order would reverse it. Equal or older (feed rolled back) means
@@ -54,11 +50,11 @@ final class UpdateChecker {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return .failed
-            }
+            guard response.isSuccessful else { return .failed }
             let feed = try JSONDecoder().decode(Feed.self, from: data)
-            if Self.isNewer(feed.version, than: currentVersion) {
+            // "dev", from `swift run`, sorts after every version number: a
+            // build with no bundle never offers to replace itself.
+            if Self.isNewer(feed.version, than: Bundle.main.shortVersion) {
                 availableUpdate = feed
                 onUpdateFound?(feed)
                 return .updateAvailable(feed)

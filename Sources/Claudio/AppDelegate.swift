@@ -83,19 +83,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The Stream Deck keys, which are shortcuts by another road. Hooked
         // up whether or not the bridge runs, so Settings can switch it on
         // later without anything else to arrange; the plugin sitting in its
-        // folder is what opens the socket on a fresh launch.
+        // folder is what opens the socket on a fresh launch, through the
+        // first look the tab's wiring takes.
         streamDeck.attach(correction: coordinator, dictation: dictation)
         wireStreamDeckSettings()
-        syncStreamDeckBridge()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.statusMenu?.showUpdate(feed)
         }
         UpdateChecker.shared.startPeriodicChecks()
 
-        // First launch without a key: open Settings directly.
+        // First launch without a key: open Settings directly, on the tab
+        // where the key goes.
         if KeychainStore.currentAPIKey() == nil {
-            settingsController.show()
+            settingsController.show(initialSection: .apiKey)
         }
     }
 
@@ -146,10 +147,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What the tab reads every time it opens: the plugin may have been
     /// installed — or removed — since launch, and the bridge may have given
-    /// up on its own meanwhile.
+    /// up on its own meanwhile. The bridge follows the look: a plugin that
+    /// arrived since launch opens the socket now, as "Set automatically:
+    /// plugin detected" says it does, not at the next launch.
     private func refreshStreamDeckSettings() {
         let model = StreamDeckStatusModel.shared
-        model.pluginInstalled = StreamDeckPluginLocator().isInstalled
+        model.pluginInstalled = syncStreamDeckBridge()
         model.choice = AppSettings.streamDeckBridgeChoice()
         model.status = streamDeck.status
     }
@@ -164,8 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Opens or closes the socket as the setting and the plugin's presence
-    /// say, and reports whether the plugin is there.
-    @discardableResult
+    /// say, and reports whether the plugin is there. Opening an open socket
+    /// is nothing: `start()` returns at once.
     private func syncStreamDeckBridge() -> Bool {
         let installed = StreamDeckPluginLocator().isInstalled
         if AppSettings.streamDeckBridgeEnabled(pluginInstalled: installed) {

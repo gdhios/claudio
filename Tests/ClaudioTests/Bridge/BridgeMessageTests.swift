@@ -164,21 +164,21 @@ final class BridgeMessageTests: XCTestCase {
     /// string this test displays, so it goes through no `loc`. The app's
     /// language never enters into it: both sides of the comparison are fixed.
     func testAStreamingCorrection() throws {
-        let state = BridgeState(gaze: .veille, activity: .correction,
+        let state = BridgeState(gaze: .focused, activity: .correction,
                                 phase: "streaming", label: "Correction…", locked: false)
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(state),
                                           matches: "state-correction-streaming")
     }
 
     func testACorrectionWithNothingSelected() throws {
-        let state = BridgeState(gaze: .vide, activity: .correction,
+        let state = BridgeState(gaze: .blank, activity: .correction,
                                 phase: "noSelection", label: nil, locked: false)
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(state),
                                           matches: "state-correction-no-selection")
     }
 
     func testAListeningDictation() throws {
-        let state = BridgeState(gaze: .repos, activity: .dictation,
+        let state = BridgeState(gaze: .resting, activity: .dictation,
                                 phase: "listening", label: nil, locked: false)
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(state),
                                           matches: "state-dictation-listening")
@@ -186,14 +186,14 @@ final class BridgeMessageTests: XCTestCase {
 
     /// Same here: the label is the fixture's wire data, quoted verbatim.
     func testALockedDictationBeingCleanedUp() throws {
-        let state = BridgeState(gaze: .veille, activity: .dictation,
+        let state = BridgeState(gaze: .focused, activity: .dictation,
                                 phase: "cleaning", label: "Nettoyage…", locked: true)
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(state),
                                           matches: "state-dictation-cleaning-locked")
     }
 
     func testADictationThatIsOver() throws {
-        let state = BridgeState(gaze: .fait, activity: .dictation,
+        let state = BridgeState(gaze: .done, activity: .dictation,
                                 phase: "done", label: nil, locked: false)
         try BridgeFixtures.assertEncoding(BridgeOutbound.state(state),
                                           matches: "state-dictation-done")
@@ -216,7 +216,7 @@ final class BridgeMessageTests: XCTestCase {
         XCTAssertEqual(try BridgeFixtures.decode(BridgeState.self, from: "state-idle"), .idle)
         XCTAssertEqual(
             try BridgeFixtures.decode(BridgeState.self, from: "state-dictation-cleaning-locked"),
-            BridgeState(gaze: .veille, activity: .dictation,
+            BridgeState(gaze: .focused, activity: .dictation,
                         phase: "cleaning", label: "Nettoyage…", locked: true))
     }
 

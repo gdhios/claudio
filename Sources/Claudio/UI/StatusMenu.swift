@@ -20,14 +20,17 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     /// The "Recent ▸" entry and its submenu: hidden while history is empty,
     /// repopulated on every open (recents change).
-    private let recentsItem = NSMenuItem(title: loc("Récentes", en: "Recent"), action: nil, keyEquivalent: "")
+    private let recentsItem = NSMenuItem()
     private let recentsMenu = NSMenu()
     /// "Recent dictations ▸", on the same terms: hidden while no dictation
     /// was made, repopulated on every open.
-    private let recentDictationsItem = NSMenuItem(title: RecentDictationsMenu.menuTitle,
-                                                  action: nil, keyEquivalent: "")
+    private let recentDictationsItem = NSMenuItem()
     private let recentDictationsMenu = NSMenu()
     private var updateItem: NSMenuItem?
+    /// The rows built once, each with the way to say its title: the
+    /// interface language can change while the app runs, and they are
+    /// named again every time the menu opens.
+    private var fixedRows: [(item: NSMenuItem, title: @MainActor () -> String)] = []
 
     init(actions: StatusMenuActions) {
         self.actions = actions
@@ -43,16 +46,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private func build() {
         // At the top: the single entry point, which contains all the others.
-        add(PaletteCatalog.menuTitle, #selector(paletteFromMenu))
+        addFixed({ PaletteCatalog.menuTitle }, #selector(paletteFromMenu))
         menu.addItem(.separator())
 
         for action in ClaudioAction.allCases {
-            add(action.menuTitle, #selector(actionFromMenu(_:))).representedObject = action
+            addFixed({ action.menuTitle }, #selector(actionFromMenu(_:))).representedObject = action
         }
-        add(ClaudioRequest.freeMenuTitle, #selector(freeActionFromMenu))
+        addFixed({ ClaudioRequest.freeMenuTitle }, #selector(freeActionFromMenu))
         // Not a transformation of the selection: it reads what plays, and
         // Claude says a few words about it.
-        add(ListeningSession.menuTitle, #selector(whatsPlayingFromMenu))
+        addFixed({ ListeningSession.menuTitle }, #selector(whatsPlayingFromMenu))
 
         // No dictation entry: this menu lists titles without their
         // shortcuts, and dictation is a key held down — a click could only
@@ -63,18 +66,25 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         // gesture on the current selection; and the last few dictations, to
         // paste one again at the cursor when its first paste landed in the
         // wrong place. Both are rebuilt on open.
-        for (item, submenu) in [(recentsItem, recentsMenu), (recentDictationsItem, recentDictationsMenu)] {
+        let submenus: [(NSMenuItem, NSMenu, @MainActor () -> String)] = [
+            (recentsItem, recentsMenu, { loc("Récentes", en: "Recent") }),
+            (recentDictationsItem, recentDictationsMenu, { RecentDictationsMenu.menuTitle }),
+        ]
+        for (item, submenu, title) in submenus {
             submenu.autoenablesItems = false
             submenu.delegate = self
             item.submenu = submenu
+            keepNamed(item, title)
             menu.addItem(item)
         }
 
         menu.addItem(.separator())
-        add(loc("Réglages…", en: "Settings…"), #selector(openSettings), key: ",")
+        addFixed({ loc("Réglages…", en: "Settings…") }, #selector(openSettings), key: ",")
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: loc("Quitter Claudio", en: "Quit Claudio"),
-                                action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        // NSApp's to answer, not this menu's: no target.
+        let quit = NSMenuItem(title: "", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        keepNamed(quit, { loc("Quitter Claudio", en: "Quit Claudio") })
+        menu.addItem(quit)
         menu.delegate = self
     }
 
@@ -86,13 +96,31 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return item
     }
 
+    /// A row of the menu itself: `add`, then `keepNamed`.
+    @discardableResult
+    private func addFixed(_ title: @escaping @MainActor () -> String, _ action: Selector,
+                          key: String = "") -> NSMenuItem {
+        let item = add("", action, key: key)
+        keepNamed(item, title)
+        return item
+    }
+
+    /// Names the row now, and again in the current language every time the
+    /// menu opens.
+    private func keepNamed(_ item: NSMenuItem, _ title: @escaping @MainActor () -> String) {
+        item.title = title()
+        fixedRows.append((item, title))
+    }
+
     // MARK: - History submenus
 
-    /// When the main menu opens, "Recent ▸" and "Recent dictations ▸" only
-    /// appear if there's something in them. When a submenu itself opens,
-    /// it's repopulated: its history may have changed since last time.
+    /// When the main menu opens, its rows are named in the current language,
+    /// and "Recent ▸" and "Recent dictations ▸" only appear if there's
+    /// something in them. When a submenu itself opens, it's repopulated: its
+    /// history may have changed since last time.
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === self.menu {
+            for (item, title) in fixedRows { item.title = title() }
             recentsItem.isHidden = TransformHistory.shared.recents.entries.isEmpty
             recentDictationsItem.isHidden = DictationHistory.shared.recents.entries.isEmpty
         } else if menu === recentsMenu {
@@ -105,7 +133,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private func rebuildRecents() {
         recentsMenu.removeAllItems()
         for entry in TransformHistory.shared.recents.entries {
-            let item = add(Self.recentTitle(entry.instruction), #selector(recentFromMenu(_:)), to: recentsMenu)
+            let item = add(entry.instruction.menuRowTitle(length: Self.recentTitleLength),
+                           #selector(recentFromMenu(_:)), to: recentsMenu)
             item.representedObject = entry.instruction
             item.toolTip = entry.instruction  // the truncated label, in full on hover
         }
@@ -125,15 +154,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    /// The instruction for a menu row: on a single line, truncated so it
-    /// doesn't stretch the menu.
-    private static func recentTitle(_ instruction: String) -> String {
-        let flat = instruction.replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespaces)
-        let limit = 48
-        guard flat.count > limit else { return flat }
-        return String(flat.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…"
-    }
+    /// Characters in a recent instruction's row, "…" included.
+    private static let recentTitleLength = 48
 
     // MARK: - Update
 

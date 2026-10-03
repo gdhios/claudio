@@ -15,17 +15,6 @@ final class SettingsSelectionTests: XCTestCase {
         XCTAssertEqual(SettingsSelection().section, .general)
     }
 
-    /// The case the whole change exists for: a second request, with the
-    /// window long since built, moves the tab.
-    func testAskingForATabAgainMovesIt() {
-        let selection = SettingsSelection()
-        selection.section = .dictation
-        XCTAssertEqual(selection.section, .dictation)
-
-        selection.section = .streamDeck
-        XCTAssertEqual(selection.section, .streamDeck)
-    }
-
     /// The sidebar keeps its say: clicking a row is what moves the tab the
     /// rest of the time.
     func testTheSidebarMovesTheTabToo() {
@@ -44,11 +33,11 @@ final class SettingsSelectionTests: XCTestCase {
         var looks = 0
         selection.onShown = { looks += 1 }
 
-        selection.broughtUp(on: .streamDeck)
+        selection.broughtUp(on: .streamDeck, alreadyOnScreen: false)
         XCTAssertEqual(selection.section, .streamDeck)
         XCTAssertEqual(looks, 1)
 
-        selection.broughtUp(on: .streamDeck)
+        selection.broughtUp(on: .streamDeck, alreadyOnScreen: true)
         XCTAssertEqual(looks, 2)
     }
 
@@ -60,9 +49,28 @@ final class SettingsSelectionTests: XCTestCase {
         var looks = 0
         selection.onShown = { looks += 1 }
 
-        selection.broughtUp(on: nil)
+        selection.broughtUp(on: nil, alreadyOnScreen: true)
         XCTAssertEqual(selection.section, .dictation)
         XCTAssertEqual(looks, 1)
+    }
+
+    /// The window is reused from one opening to the next, and SwiftUI
+    /// replays no `.onAppear` or `.task` in a view that never left it: the
+    /// dictation history and the Claude model list stayed as the first
+    /// opening found them. Each opening is counted, for the view to rebuild
+    /// its pane on; a window brought forward while on screen is no opening.
+    func testOnlyAWindowComingOnScreenCountsAsAnOpening() {
+        let selection = SettingsSelection()
+        XCTAssertEqual(selection.openings, 0)
+
+        selection.broughtUp(on: nil, alreadyOnScreen: false)
+        XCTAssertEqual(selection.openings, 1)
+
+        selection.broughtUp(on: .streamDeck, alreadyOnScreen: true)
+        XCTAssertEqual(selection.openings, 1)
+
+        selection.broughtUp(on: nil, alreadyOnScreen: false)
+        XCTAssertEqual(selection.openings, 2)
     }
 
     /// A sidebar can end up with nothing selected — a ⌘-click on the row
