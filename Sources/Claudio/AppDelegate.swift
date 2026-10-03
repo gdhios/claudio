@@ -87,9 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         streamDeck.attach(correction: coordinator, dictation: dictation)
         wireStreamDeckSettings()
         syncStreamDeckBridge()
-        // Earlier builds muted the other apps with a tap that outlives a
-        // crash, and every app with it: a launch gives the sound back.
-        LeftoverMuteTaps.remove()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.statusMenu?.showUpdate(feed)

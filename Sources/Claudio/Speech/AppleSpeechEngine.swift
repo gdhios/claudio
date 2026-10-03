@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import Speech
 
@@ -6,9 +5,10 @@ import Speech
 /// opens the microphone, Apple's recognizer turns it into text.
 ///
 /// Two recognizers, one behaviour. On macOS 26, `SpeechAnalyzer` +
-/// `SpeechTranscriber` (`AppleSpeechEngine+Analyzer.swift`); below it,
-/// `SFSpeechRecognizer` forced on device. Both always emit the whole text of
-/// the session, never a delta, and both end their stream exactly once.
+/// `SpeechTranscriber` (`SpeechRun+Analyzer.swift`); below it,
+/// `SFSpeechRecognizer` forced on device (`SpeechRun+Legacy.swift`). Both
+/// always emit the whole text of the session, never a delta, and both end
+/// their stream exactly once.
 ///
 /// Thread safety: `start`, `stop` and `cancel` come from the main actor
 /// while the audio and recognition callbacks arrive on their own queues.
@@ -97,109 +97,5 @@ extension SpeechRun {
         }
         #endif
         await driveLegacy(locale: locale, contextualStrings: contextualStrings)
-    }
-
-    /// macOS 14 to 25: `SFSpeechRecognizer`, forced on device, which is also
-    /// the fallback whenever the newer transcriber isn't available.
-    ///
-    /// The order matters: everything that can refuse the dictation is
-    /// checked before the microphone is touched, so an unknown language
-    /// never opens it.
-    func driveLegacy(locale: Locale, contextualStrings: [String]) async {
-        guard let recognizer = SFSpeechRecognizer(locale: locale),
-              recognizer.supportsOnDeviceRecognition else {
-            sink.fail(.languageUnavailable(locale))
-            return
-        }
-        guard recognizer.isAvailable else {
-            sink.fail(.recognizer(loc("le moteur de reconnaissance n'est pas disponible",
-                                      en: "the recognition engine isn't available")))
-            return
-        }
-        if isCancelled { return }
-
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true
-        // The speaker's own words made likelier. No vocabulary leaves the
-        // request exactly as it was.
-        if !contextualStrings.isEmpty {
-            request.contextualStrings = Array(contextualStrings.prefix(AppleSpeechEngine.contextualStringsLimit))
-        }
-
-        let audio = AVAudioEngine()
-        let input = audio.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else {
-            sink.fail(.audioEngine(loc("aucune entrée audio", en: "no audio input")))
-            return
-        }
-
-        let gate = SpeechGate()
-        let sink = self.sink
-        let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            if let result {
-                let text = result.bestTranscription.formattedString
-                if result.isFinal {
-                    sink.emitFinal(text)
-                    gate.open()
-                    return
-                }
-                sink.emitPartial(text)
-            }
-            guard let error else { return }
-            // A cancelled run has nothing left to say: the error is the one
-            // we caused by tearing the recognizer down.
-            if self?.isCancelled != false {
-                gate.open()
-                return
-            }
-            // A recognizer that gives up after we asked it to stop still
-            // owes us the words we already have: a dictation is never lost.
-            if self?.isStopping == true {
-                sink.emitFinal()
-            } else {
-                sink.fail(.recognizer(error.localizedDescription))
-            }
-            gate.open()
-        }
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
-            sink.emitLevel(AudioLevel.level(of: buffer))
-            request.append(buffer)
-        }
-
-        let closeMicrophone = {
-            input.removeTap(onBus: 0)
-            audio.stop()
-        }
-        let teardown = {
-            closeMicrophone()
-            task.cancel()
-            gate.open()
-        }
-        let onStop = {
-            closeMicrophone()
-            request.endAudio()
-            Task {
-                try? await Task.sleep(for: AppleSpeechEngine.finalTimeout)
-                sink.emitFinal()
-                gate.open()
-            }
-        }
-        guard adopt(teardown: teardown, onStop: onStop) else {
-            closeMicrophone()
-            task.cancel()
-            return
-        }
-
-        do {
-            audio.prepare()
-            try audio.start()
-        } catch {
-            sink.fail(.audioEngine(error.localizedDescription))
-            return
-        }
-        if isCancelled { return }
-        await gate.wait()
     }
 }

@@ -19,8 +19,7 @@ enum NowPlaying {
     /// one sits on the way into every dictation, and the less it asks, the
     /// less there is to go wrong there.
     static let script = """
-        ObjC.import('Foundation');
-        $.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework/').load;
+        \(MediaRemote.jxaPrelude)
         $.NSClassFromString('MRNowPlayingRequest').localIsPlaying;
         """
 

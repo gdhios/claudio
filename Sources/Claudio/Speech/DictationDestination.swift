@@ -126,8 +126,7 @@ struct DictationDestination: Equatable, Sendable {
     /// anyone can name one: flattened, it can never become a line of the
     /// prompt itself.
     private var flattened: String? {
-        guard let name = name?.split(whereSeparator: \.isWhitespace).joined(separator: " "),
-              !name.isEmpty else { return nil }
+        guard let name = name?.collapsingWhitespace(), !name.isEmpty else { return nil }
         return name
     }
 }

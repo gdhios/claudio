@@ -26,6 +26,10 @@ struct RecentDictation: Codable, Equatable, Sendable {
     init(date: Date, language: DictationLanguage, raw: String, cleaned: String? = nil) {
         self.init(date: date, language: language.rawValue, raw: raw, cleaned: cleaned)
     }
+
+    /// What the dictation came to: the cleaned-up text, or the transcript
+    /// when there was no cleanup. What it pasted, and what pastes again.
+    var pastedText: String { cleaned ?? raw }
 }
 
 /// The latest dictations, most recent first, capped. A value type with no

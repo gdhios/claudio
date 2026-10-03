@@ -14,8 +14,7 @@ struct NowPlayingSource {
     /// `undefined`, which `JSON.stringify` leaves out: a missing field is
     /// simply absent. Nothing here sends a command.
     static let script = """
-        ObjC.import('Foundation');
-        $.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework/').load;
+        \(MediaRemote.jxaPrelude)
         const R = $.NSClassFromString('MRNowPlayingRequest');
         const info = R.localNowPlayingItem.nowPlayingInfo;
         const v = k => ObjC.unwrap(info.valueForKey(k));
