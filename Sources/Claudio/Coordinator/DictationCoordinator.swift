@@ -100,7 +100,7 @@ final class DictationCoordinator {
     private(set) var permission: Task<Void, Never>?
 
     init(engine: SpeechEngine,
-         model: @escaping @MainActor () -> ModelChoice = { AppSettings.dictationModel },
+         model: @escaping @MainActor () -> ModelChoice = { ModelSlot.dictation.current() },
          vocabulary: @escaping @MainActor () -> DictationVocabulary = {
              DictationVocabulary(parsing: AppSettings.dictationVocabulary)
          },

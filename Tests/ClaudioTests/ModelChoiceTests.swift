@@ -87,32 +87,27 @@ final class ModelChoiceTests: XCTestCase {
 
     // MARK: - An action's setting
 
-    /// The real settings path, storage key included: a setting written before
-    /// Ollama must still load, a local engine must read back, and reverting
-    /// to the default must remove the key so it follows app updates.
+    /// The real storage key: a setting written before Ollama must still
+    /// load, a local engine must read back, and reverting to the default
+    /// must remove the key so it follows app updates.
     func testAnActionsSettingReadsBackAndToleratesLegacyValues() {
         let key = "model.\(ClaudioAction.correct.rawValue)"
-        let defaults = UserDefaults.standard
-        let previous = defaults.string(forKey: key)
-        defer {
-            if let previous { defaults.set(previous, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
+        let slot = ModelSlot.action(.correct)
+        let defaults = InMemoryDefaults()
 
         // Legacy case: the bare value that pre-Ollama versions stored.
         defaults.set("claude-sonnet-5", forKey: key)
-        XCTAssertEqual(AppSettings.customModel(for: .correct), .claude(.sonnet5))
-        XCTAssertEqual(ClaudioAction.correct.model, .claude(.sonnet5))
+        XCTAssertEqual(slot.current(in: defaults), .claude(.sonnet5))
 
         // Round trip through a local engine.
-        AppSettings.setCustomModel(.ollama(model: "qwen2.5:14b"), for: .correct)
+        slot.set(.ollama(model: "qwen2.5:14b"), in: defaults)
         XCTAssertEqual(defaults.string(forKey: key), "ollama:qwen2.5:14b")
-        XCTAssertEqual(ClaudioAction.correct.model, .ollama(model: "qwen2.5:14b"))
+        XCTAssertEqual(slot.current(in: defaults), .ollama(model: "qwen2.5:14b"))
 
         // The default isn't stored: the action follows the app's updates.
-        AppSettings.setCustomModel(.claude(ClaudioAction.correct.defaultModel), for: .correct)
+        slot.set(.claude(ClaudioAction.correct.defaultModel), in: defaults)
         XCTAssertNil(defaults.string(forKey: key))
-        XCTAssertEqual(ClaudioAction.correct.model, .claude(ClaudioAction.correct.defaultModel))
+        XCTAssertEqual(slot.current(in: defaults), .claude(ClaudioAction.correct.defaultModel))
     }
 
     /// A value that can't be read (a setting written by a future version,

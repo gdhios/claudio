@@ -111,7 +111,7 @@ struct SettingsView: View {
 private struct GeneralPane: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
-    @State private var costCounterEnabled = AppSettings.costCounterEnabled
+    @State private var costCounterEnabled = AppSettings.costCounterEnabled()
     @State private var panelTextSize = AppSettings.panelTextSize
     @State private var language = AppSettings.language
     @ObservedObject private var ledger = CostLedger.shared
@@ -177,7 +177,7 @@ private struct GeneralPane: View {
             Section(loc("Dépense", en: "Spending")) {
                 Toggle(loc("Compter ce que je dépense", en: "Count what I spend"), isOn: $costCounterEnabled)
                     .onChange(of: costCounterEnabled) {
-                        AppSettings.costCounterEnabled = costCounterEnabled
+                        AppSettings.setCostCounterEnabled(costCounterEnabled)
                     }
                 if costCounterEnabled {
                     LabeledContent(loc("Aujourd'hui", en: "Today")) {
@@ -536,7 +536,7 @@ private struct PromptsPane: View {
                 ModelPicker(loc("Modèle de cette action", en: "Model for this action"),
                             selection: $selectedModel, localModels: localModels)
                     .onChange(of: selectedModel) {
-                        AppSettings.setCustomModel(selectedModel, for: selectedAction)
+                        ModelSlot.action(selectedAction).set(selectedModel)
                     }
                 ModelChoiceCaption(choice: selectedModel, defaultChoice: .claude(selectedAction.defaultModel))
                 if localModels.isEmpty {

@@ -204,7 +204,7 @@ struct CostGauge: View {
     @ObservedObject private var ledger = CostLedger.shared
 
     var body: some View {
-        if AppSettings.costCounterEnabled {
+        if AppSettings.costCounterEnabled() {
             HStack(spacing: 5) {
                 Text(loc("auj.", en: "today"))
                     .font(.system(size: 10.5, weight: .semibold, design: .monospaced))

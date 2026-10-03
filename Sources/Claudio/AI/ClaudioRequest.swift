@@ -165,7 +165,7 @@ extension ClaudioRequest {
                      model: ModelChoice? = nil,
                      panelTitle: String = loc("Action libre", en: "Custom action")) -> ClaudioRequest {
         let task = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-        let model = model ?? AppSettings.freeActionModel()
+        let model = model ?? ModelSlot.freeAction.current()
         let system = """
         Tu es un outil silencieux de transformation de texte, intégré à une application macOS.
         Tâche, formulée par l'utilisateur : \(task)

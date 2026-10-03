@@ -52,7 +52,9 @@ enum ModelSlot: Hashable, Sendable {
         switch self {
         case .action(let action): .claude(action.defaultModel)
         case .freeAction: .claude(.haiku45)
-        case .dictation: AppSettings.defaultDictationModel
+        // Static on purpose: probing Ollama to prefer a local model would
+        // mean talking to the network to read a setting.
+        case .dictation: .claude(.haiku45)
         case .listening: ListeningNotes.model
         case .essay: ListeningEssay.model
         }

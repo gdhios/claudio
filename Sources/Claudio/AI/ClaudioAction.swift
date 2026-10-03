@@ -315,5 +315,5 @@ extension ClaudioAction {
     }
 
     /// Effective engine: custom (Settings) otherwise the Claude default.
-    var model: ModelChoice { AppSettings.customModel(for: self) ?? .claude(defaultModel) }
+    var model: ModelChoice { ModelSlot.action(self).current() }
 }

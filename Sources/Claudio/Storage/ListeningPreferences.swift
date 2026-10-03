@@ -55,7 +55,7 @@ extension AppSettings {
     private static let listeningDetailKey = "listening.detail"
 
     static func musicBrainzEnabled(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: musicBrainzKey) as? Bool ?? true
+        defaults.flag(musicBrainzKey)
     }
 
     static func setMusicBrainzEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
@@ -63,7 +63,7 @@ extension AppSettings {
     }
 
     static func showsArtwork(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: showsArtworkKey) as? Bool ?? true
+        defaults.flag(showsArtworkKey)
     }
 
     static func setShowsArtwork(_ shows: Bool, in defaults: UserDefaults = .standard) {
@@ -72,7 +72,7 @@ extension AppSettings {
 
     /// A value this version doesn't know falls back to the default.
     static func listeningDetail(in defaults: UserDefaults = .standard) -> ListeningDetail {
-        defaults.string(forKey: listeningDetailKey).flatMap(ListeningDetail.init(rawValue:)) ?? .threeSentences
+        defaults.choice(listeningDetailKey, default: .threeSentences)
     }
 
     static func setListeningDetail(_ detail: ListeningDetail, in defaults: UserDefaults = .standard) {

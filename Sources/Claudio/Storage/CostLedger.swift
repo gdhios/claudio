@@ -95,7 +95,7 @@ final class CostLedger: ObservableObject {
     /// price is billed all the same: counted, and marked as unpriced.
     func record(model: ModelChoice, inputTokens: Int, outputTokens: Int, at date: Date = Date()) {
         guard !model.isLocal else { return }
-        guard AppSettings.costCounterEnabled else { return }
+        guard AppSettings.costCounterEnabled(in: defaults) else { return }
         guard inputTokens > 0 || outputTokens > 0 else { return }
         let dollars = model.cost(inputTokens: inputTokens, outputTokens: outputTokens)
         day = day.adding(dollars, priced: model.isPriced, at: date)

@@ -1,17 +1,18 @@
 import Foundation
 
-/// Non-secret settings (UserDefaults). The API key, meanwhile, lives in the Keychain.
+/// Non-secret settings (UserDefaults). The API key, meanwhile, lives in the
+/// Keychain, and each shortcut's model in its `ModelSlot`. A setting that
+/// code with injected defaults reads takes `in defaults:`; one only the
+/// interface reads is a plain property on the standard defaults.
 enum AppSettings {
+    private static var standard: UserDefaults { .standard }
+
     private static let workspaceIDKey = "workspaceID"
 
     /// Workspace ID (wrkspc_…), required by "identity-linked" keys.
     static var workspaceID: String? {
-        get {
-            let value = UserDefaults.standard.string(forKey: workspaceIDKey)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return (value?.isEmpty == false) ? value : nil
-        }
-        set { UserDefaults.standard.set(newValue ?? "", forKey: workspaceIDKey) }
+        get { standard.nonBlankString(workspaceIDKey)?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        set { standard.setNonBlank(newValue, forKey: workspaceIDKey) }
     }
 
     /// Same as for the key: the environment variable takes priority in dev.
@@ -29,9 +30,12 @@ enum AppSettings {
 
     /// Local running total of today's spend, on by default and can be turned
     /// off: the calculation happens on the machine, nothing is sent anywhere.
-    static var costCounterEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: costCounterKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: costCounterKey) }
+    static func costCounterEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.flag(costCounterKey)
+    }
+
+    static func setCostCounterEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: costCounterKey)
     }
 
     // MARK: - Window shortcuts
@@ -42,8 +46,8 @@ enum AppSettings {
     /// off, the shortcuts are unregistered so their keys fall back to whatever
     /// other tool the user runs on them.
     static var windowShortcutsEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: windowShortcutsEnabledKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: windowShortcutsEnabledKey) }
+        get { standard.flag(windowShortcutsEnabledKey) }
+        set { standard.set(newValue, forKey: windowShortcutsEnabledKey) }
     }
 
     // MARK: - Interface language
@@ -53,11 +57,8 @@ enum AppSettings {
     /// Interface language. Missing or unknown value (a setting written by a
     /// future version) falls back to the system's.
     static var language: AppLanguage {
-        get {
-            UserDefaults.standard.string(forKey: languageKey)
-                .flatMap(AppLanguage.init(rawValue:)) ?? .system
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: languageKey) }
+        get { standard.choice(languageKey, default: .system) }
+        set { standard.set(newValue.rawValue, forKey: languageKey) }
     }
 
     // MARK: - Panel text size
@@ -67,11 +68,8 @@ enum AppSettings {
     /// Text size for the floating panel and the palette. Missing or unknown
     /// value (a setting written by a future version) falls back to normal body.
     static var panelTextSize: PanelTextSize {
-        get {
-            UserDefaults.standard.string(forKey: panelTextSizeKey)
-                .flatMap(PanelTextSize.init(rawValue:)) ?? .normal
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: panelTextSizeKey) }
+        get { standard.choice(panelTextSizeKey, default: .normal) }
+        set { standard.set(newValue.rawValue, forKey: panelTextSizeKey) }
     }
 
     // MARK: - Custom system prompts
@@ -82,18 +80,12 @@ enum AppSettings {
 
     /// The action's custom system prompt (nil = the code's default prompt).
     static func customSystemPrompt(for action: ClaudioAction) -> String? {
-        let value = UserDefaults.standard.string(forKey: systemPromptKey(for: action))
-        return (value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? value : nil
+        standard.nonBlankString(systemPromptKey(for: action))
     }
 
     /// nil or empty string: fall back to the default prompt.
     static func setCustomSystemPrompt(_ prompt: String?, for action: ClaudioAction) {
-        let key = systemPromptKey(for: action)
-        if let prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            UserDefaults.standard.set(prompt, forKey: key)
-        } else {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+        standard.setNonBlank(prompt, forKey: systemPromptKey(for: action))
     }
 
     // MARK: - Ollama server
@@ -105,10 +97,10 @@ enum AppSettings {
     /// value falls back to the default rather than breaking every local action.
     static var ollamaBaseURL: URL {
         get {
-            UserDefaults.standard.string(forKey: ollamaBaseURLKey)
+            standard.string(forKey: ollamaBaseURLKey)
                 .flatMap(normalizedOllamaURL) ?? Constants.ollamaDefaultURL
         }
-        set { UserDefaults.standard.set(newValue.absoluteString, forKey: ollamaBaseURLKey) }
+        set { standard.set(newValue.absoluteString, forKey: ollamaBaseURLKey) }
     }
 
     /// An address is only usable with an http(s) scheme and a host. The
@@ -124,214 +116,20 @@ enum AppSettings {
         return url
     }
 
-    // MARK: - Models per shortcut
-
-    /// Each shortcut that calls a model is a `ModelSlot`, which owns its key
-    /// and its default. The accessors below are the historical names.
-
-    /// The action's custom engine (nil = the code's default). Settings written
-    /// before Ollama carried no prefix: `ModelChoice` reads them back.
-    static func customModel(for action: ClaudioAction) -> ModelChoice? {
-        UserDefaults.standard.string(forKey: ModelSlot.action(action).storageKey)
-            .flatMap(ModelChoice.init(storageValue:))
-    }
-
-    /// nil or identical to the default: fall back to the default (follows app updates).
-    static func setCustomModel(_ choice: ModelChoice?, for action: ClaudioAction) {
-        ModelSlot.action(action).set(choice ?? .claude(action.defaultModel))
-    }
-
-    /// The model behind the custom action and the spoken instruction.
-    static func freeActionModel(in defaults: UserDefaults = .standard) -> ModelChoice {
-        ModelSlot.freeAction.current(in: defaults)
-    }
-
-    /// The model behind "What's playing?"'s notes.
-    static func listeningModel(in defaults: UserDefaults = .standard) -> ModelChoice {
-        ModelSlot.listening.current(in: defaults)
-    }
-
-    /// The long text's model: its own setting, Sonnet 5.5 unless set.
-    static func essayModel(in defaults: UserDefaults = .standard) -> ModelChoice {
-        ModelSlot.essay.current(in: defaults)
-    }
-
-    // MARK: - Dictation
-
-    private static let dictationEnabledKey = "dictationEnabled"
-
-    /// Master switch for dictation, on by default. Off, the shortcuts are
-    /// unregistered and the lone key is let go, so those keys fall back to
-    /// whatever they did before Claudio.
-    static func dictationEnabled(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: dictationEnabledKey) as? Bool ?? true
-    }
-
-    static func setDictationEnabled(_ enabled: Bool, in defaults: UserDefaults = .standard) {
-        defaults.set(enabled, forKey: dictationEnabledKey)
-    }
-
-    private static let dictationPrimaryLanguageKey = "dictationPrimaryLanguage"
-    private static let dictationSecondaryLanguageKey = "dictationSecondaryLanguage"
-    private static let dictationSystemPromptKey = "dictationSystemPrompt"
-    private static let dictationVocabularyKey = "dictationVocabulary"
-    private static let dictationOutputKey = "dictationOutput"
-    private static let dictationSecondaryOutputKey = "dictationSecondaryOutput"
-
-    private static let dictationPausesMediaKey = "dictationPausesMedia"
-    /// "Mute other apps", which pausing replaced. No longer written, still
-    /// read: whoever switched it off keeps dictation away from their sound.
-    private static let dictationMutesOutputKey = "dictationMutesOutput"
-
-    /// Pause whatever is playing while dictation listens, and resume it when
-    /// the microphone closes. On by default — dictating over music is what
-    /// it's for — unless muting had been switched off before it.
-    static var dictationPausesMedia: Bool {
-        get {
-            let defaults = UserDefaults.standard
-            return defaults.object(forKey: dictationPausesMediaKey) as? Bool
-                ?? defaults.object(forKey: dictationMutesOutputKey) as? Bool
-                ?? true
-        }
-        set { UserDefaults.standard.set(newValue, forKey: dictationPausesMediaKey) }
-    }
-
-    /// Language of the "Dictate" shortcut. Missing or unknown value (a
-    /// setting written by a future version) falls back to French.
-    static var dictationPrimaryLanguage: DictationLanguage {
-        get {
-            UserDefaults.standard.string(forKey: dictationPrimaryLanguageKey)
-                .flatMap(DictationLanguage.init(rawValue:)) ?? .frFR
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationPrimaryLanguageKey) }
-    }
-
-    /// Language of the "Dictate in the other language" shortcut.
-    static var dictationSecondaryLanguage: DictationLanguage {
-        get {
-            UserDefaults.standard.string(forKey: dictationSecondaryLanguageKey)
-                .flatMap(DictationLanguage.init(rawValue:)) ?? .enUS
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationSecondaryLanguageKey) }
-    }
-
-    /// What the "Dictate" shortcut's dictation becomes. Cleanup by default:
-    /// what every dictation did before there was a choice. A value written
-    /// by a future version falls back to it rather than to no output at all.
-    static var dictationOutput: DictationOutput {
-        get {
-            UserDefaults.standard.string(forKey: dictationOutputKey)
-                .flatMap(DictationOutput.init(rawValue:)) ?? .cleanup
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationOutputKey) }
-    }
-
-    /// Same, for the other-language shortcut, and its own setting: speaking
-    /// French to paste English is what a second shortcut is good for.
-    static var dictationSecondaryOutput: DictationOutput {
-        get {
-            UserDefaults.standard.string(forKey: dictationSecondaryOutputKey)
-                .flatMap(DictationOutput.init(rawValue:)) ?? .cleanup
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: dictationSecondaryOutputKey) }
-    }
-
-    /// Model doing the cleanup pass, `.raw` to paste the transcript as is.
-    /// The default is static: probing Ollama to prefer a local model would
-    /// mean talking to the network to read a setting. The choice is made in
-    /// the Dictation tab.
-    static let defaultDictationModel = ModelChoice.claude(.haiku45)
-
-    /// Stored like an action's model, same encoding, so the two settings read
-    /// the same way (`ModelSlot.dictation`). Unreadable value: back to the
-    /// default.
-    static var dictationModel: ModelChoice {
-        get { ModelSlot.dictation.current() }
-        set { ModelSlot.dictation.set(newValue) }
-    }
-
-    /// Custom cleanup prompt (nil = the code's default). Same contract as the
-    /// actions' prompts: blank removes the key, so the prompt follows app
-    /// updates.
-    static var dictationSystemPrompt: String? {
-        get {
-            let value = UserDefaults.standard.string(forKey: dictationSystemPromptKey)
-            return (value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false) ? value : nil
-        }
-        set {
-            if let newValue, !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                UserDefaults.standard.set(newValue, forKey: dictationSystemPromptKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: dictationSystemPromptKey)
-            }
-        }
-    }
-
-    // MARK: - Dictation lone keys
-
-    /// Posted with the defaults written to, whenever a dictation shortcut's
-    /// lone key changes: the keyboard monitor and the Settings fields follow.
-    static let dictationLoneKeysDidChange = Notification.Name("ClaudioDictationLoneKeysDidChange")
-
-    private static func loneKeyStorageKey(for shortcut: DictationShortcut) -> String {
-        switch shortcut {
-        case .dictate: "dictationLoneKey"
-        case .dictateOtherLanguage: "dictationSecondaryLoneKey"
-        }
-    }
-
-    /// The modifier key a dictation shortcut is set to on its own, `nil` when
-    /// it is a key combination — or nothing. A key written by a future
-    /// version reads as none.
-    static func dictationLoneKey(for shortcut: DictationShortcut,
-                                 in defaults: UserDefaults = .standard) -> LoneModifierKey? {
-        defaults.string(forKey: loneKeyStorageKey(for: shortcut))
-            .flatMap(LoneModifierKey.init(rawValue:))
-    }
-
-    /// `nil` removes the storage key. A lone key serves one shortcut only:
-    /// given to this one, it is taken from the other. The shortcut's key
-    /// combination is Settings' to remove, through the library that stores it.
-    static func setDictationLoneKey(_ key: LoneModifierKey?,
-                                    for shortcut: DictationShortcut,
-                                    in defaults: UserDefaults = .standard) {
-        var changed = false
-        if let key {
-            for other in DictationShortcut.allCases
-            where other != shortcut && dictationLoneKey(for: other, in: defaults) == key {
-                defaults.removeObject(forKey: loneKeyStorageKey(for: other))
-                changed = true
-            }
-        }
-        let storageKey = loneKeyStorageKey(for: shortcut)
-        if defaults.string(forKey: storageKey) != key?.rawValue {
-            if let key {
-                defaults.set(key.rawValue, forKey: storageKey)
-            } else {
-                defaults.removeObject(forKey: storageKey)
-            }
-            changed = true
-        }
-        if changed {
-            NotificationCenter.default.post(name: dictationLoneKeysDidChange, object: defaults)
-        }
-    }
-
     // MARK: - Stream Deck bridge
 
-    /// Public because the pane and its tests name it: it is the one place an
-    /// explicit choice is stored, and a missing key is itself a value.
+    /// A missing key is itself a value: no explicit choice.
     static let streamDeckBridgeKey = "streamDeckBridgeEnabled"
 
     /// nil = the user never chose; the bridge then follows the plugin's presence.
-    static func streamDeckBridgeChoice(defaults: UserDefaults = .standard) -> Bool? {
+    static func streamDeckBridgeChoice(in defaults: UserDefaults = .standard) -> Bool? {
         defaults.object(forKey: streamDeckBridgeKey) as? Bool
     }
 
     /// `nil` removes the key rather than storing a third value: a `false`
     /// left behind would keep the bridge off even after the plugin is
     /// installed, which is the one thing automatic is meant to spare.
-    static func setStreamDeckBridgeChoice(_ choice: Bool?, defaults: UserDefaults = .standard) {
+    static func setStreamDeckBridgeChoice(_ choice: Bool?, in defaults: UserDefaults = .standard) {
         if let choice {
             defaults.set(choice, forKey: streamDeckBridgeKey)
         } else {
@@ -344,22 +142,7 @@ enum AppSettings {
     /// directions: no socket for whoever said no, a socket for whoever keeps
     /// their plugin somewhere this can't see.
     static func streamDeckBridgeEnabled(pluginInstalled: Bool,
-                                        defaults: UserDefaults = .standard) -> Bool {
-        streamDeckBridgeChoice(defaults: defaults) ?? pluginInstalled
-    }
-
-    // MARK: - Dictation vocabulary
-
-    /// The personal vocabulary, as typed in Settings: one entry per line,
-    /// read by `DictationVocabulary`. Empty by default; blank removes the key.
-    static var dictationVocabulary: String {
-        get { UserDefaults.standard.string(forKey: dictationVocabularyKey) ?? "" }
-        set {
-            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                UserDefaults.standard.removeObject(forKey: dictationVocabularyKey)
-            } else {
-                UserDefaults.standard.set(newValue, forKey: dictationVocabularyKey)
-            }
-        }
+                                        in defaults: UserDefaults = .standard) -> Bool {
+        streamDeckBridgeChoice(in: defaults) ?? pluginInstalled
     }
 }

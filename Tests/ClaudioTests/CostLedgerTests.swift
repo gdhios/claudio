@@ -115,10 +115,6 @@ final class CostLedgerTests: XCTestCase {
     /// the amount nor the count of billed actions.
     @MainActor
     func testOnlyClaudeCallsCountTowardTheSpend() {
-        let previous = AppSettings.costCounterEnabled
-        AppSettings.costCounterEnabled = true
-        defer { AppSettings.costCounterEnabled = previous }
-
         let defaults = InMemoryDefaults()
         let ledger = CostLedger(defaults: defaults, now: noon)
 
@@ -137,10 +133,6 @@ final class CostLedgerTests: XCTestCase {
     /// star rather than pretending to be complete.
     @MainActor
     func testACallToAnUnpricedModelIsCountedAndStarred() {
-        let previous = AppSettings.costCounterEnabled
-        AppSettings.costCounterEnabled = true
-        defer { AppSettings.costCounterEnabled = previous }
-
         let defaults = InMemoryDefaults()
         let ledger = CostLedger(defaults: defaults, now: noon)
         ledger.record(model: .claude(.haiku45), inputTokens: 200, outputTokens: 200, at: noon)

@@ -39,7 +39,7 @@ final class AppSettingsDictationTests: XCTestCase {
     func testTheDefaultsHoldWithNothingStored() {
         XCTAssertEqual(AppSettings.dictationPrimaryLanguage, .frFR)
         XCTAssertEqual(AppSettings.dictationSecondaryLanguage, .enUS)
-        XCTAssertEqual(AppSettings.dictationModel, .claude(.haiku45))
+        XCTAssertEqual(ModelSlot.dictation.current(), .claude(.haiku45))
         XCTAssertNil(AppSettings.dictationSystemPrompt)
         XCTAssertEqual(AppSettings.dictationOutput, .cleanup)
         XCTAssertEqual(AppSettings.dictationSecondaryOutput, .cleanup)
@@ -68,17 +68,17 @@ final class AppSettingsDictationTests: XCTestCase {
     /// The cleanup model is stored the same way as an action's: prefixed
     /// storage value, "raw" included, which only dictation can pick.
     func testTheModelReadsBackIncludingRaw() {
-        AppSettings.dictationModel = .ollama(model: "qwen3.5:4b")
+        ModelSlot.dictation.set(.ollama(model: "qwen3.5:4b"))
         XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationModel"), "ollama:qwen3.5:4b")
-        XCTAssertEqual(AppSettings.dictationModel, .ollama(model: "qwen3.5:4b"))
+        XCTAssertEqual(ModelSlot.dictation.current(), .ollama(model: "qwen3.5:4b"))
 
-        AppSettings.dictationModel = .raw
+        ModelSlot.dictation.set(.raw)
         XCTAssertEqual(UserDefaults.standard.string(forKey: "dictationModel"), "raw")
-        XCTAssertEqual(AppSettings.dictationModel, .raw)
+        XCTAssertEqual(ModelSlot.dictation.current(), .raw)
 
         // Unreadable value: back to the default rather than no model at all.
         UserDefaults.standard.set("openrouter:mixtral", forKey: "dictationModel")
-        XCTAssertEqual(AppSettings.dictationModel, .claude(.haiku45))
+        XCTAssertEqual(ModelSlot.dictation.current(), .claude(.haiku45))
     }
 
     /// Same contract as the actions' prompts: nil or blank means "the code's

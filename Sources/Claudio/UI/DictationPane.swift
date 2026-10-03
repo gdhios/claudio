@@ -22,7 +22,7 @@ struct DictationPane: View {
     @State private var secondaryOutput = PreviewRun.isActive
         ? DictationOutput.translateEN : AppSettings.dictationSecondaryOutput
     @State private var model = PreviewRun.isActive
-        ? AppSettings.defaultDictationModel : AppSettings.dictationModel
+        ? ModelSlot.dictation.defaultChoice : ModelSlot.dictation.current()
     @State private var pausesMedia = PreviewRun.isActive ? true : AppSettings.dictationPausesMedia
     @State private var vocabularyText = PreviewRun.isActive
         ? DictationPane.frozenVocabulary : AppSettings.dictationVocabulary
@@ -159,7 +159,7 @@ struct DictationPane: View {
         Section(loc("Modèle de nettoyage", en: "Cleanup model")) {
             ModelPicker(loc("Modèle", en: "Model"), selection: $model,
                         localModels: localModels, allowsRaw: true)
-                .onChange(of: model) { AppSettings.dictationModel = model }
+                .onChange(of: model) { ModelSlot.dictation.set(model) }
 
             Text("\(model.costHint). \(model == .raw ? loc("La transcription est collée telle qu'elle a été entendue : sans ponctuation, avec les hésitations.", en: "The transcript is pasted exactly as it was heard: no punctuation, hesitations and all.") : loc("Le modèle ponctue la transcription et retire les hésitations, sans jamais reformuler. S'il échoue, le brut est collé quand même.", en: "The model punctuates the transcript and drops the hesitations, never rephrasing. If it fails, the raw text is pasted anyway."))")
                 .font(.caption)

@@ -34,7 +34,7 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(ModelSlot.action(.correct).defaultChoice, .claude(.haiku45))
         XCTAssertEqual(ModelSlot.action(.expertPrompt).defaultChoice, .claude(.sonnet5))
         XCTAssertEqual(ModelSlot.freeAction.defaultChoice, .claude(.haiku45))
-        XCTAssertEqual(ModelSlot.dictation.defaultChoice, AppSettings.defaultDictationModel)
+        XCTAssertEqual(ModelSlot.dictation.defaultChoice, .claude(.haiku45))
         XCTAssertEqual(ModelSlot.listening.defaultChoice, ListeningNotes.model)
         XCTAssertEqual(ModelSlot.essay.defaultChoice, ListeningEssay.model)
         XCTAssertEqual(ListeningEssay.model, .claude(.sonnet55),
@@ -75,8 +75,8 @@ final class ModelSlotTests: XCTestCase {
     /// The listening setting is what the coordinator reads for its session.
     func testTheListeningSettingIsReadFromTheDefaults() {
         ModelSlot.listening.set(.claude(.haiku45), in: defaults)
-        XCTAssertEqual(AppSettings.listeningModel(in: defaults), .claude(.haiku45))
-        XCTAssertEqual(AppSettings.listeningModel(in: InMemoryDefaults()),
+        XCTAssertEqual(ModelSlot.listening.current(in: defaults), .claude(.haiku45))
+        XCTAssertEqual(ModelSlot.listening.current(in: InMemoryDefaults()),
                        ListeningNotes.model)
     }
 
@@ -84,10 +84,10 @@ final class ModelSlotTests: XCTestCase {
     /// text on its default.
     func testTheEssaySettingIsItsOwn() {
         ModelSlot.listening.set(.claude(.haiku45), in: defaults)
-        XCTAssertEqual(AppSettings.essayModel(in: defaults), ListeningEssay.model)
+        XCTAssertEqual(ModelSlot.essay.current(in: defaults), ListeningEssay.model)
         ModelSlot.essay.set(.claude(.opus55), in: defaults)
-        XCTAssertEqual(AppSettings.essayModel(in: defaults), .claude(.opus55))
-        XCTAssertEqual(AppSettings.listeningModel(in: defaults), .claude(.haiku45))
+        XCTAssertEqual(ModelSlot.essay.current(in: defaults), .claude(.opus55))
+        XCTAssertEqual(ModelSlot.listening.current(in: defaults), .claude(.haiku45))
     }
 
     /// The custom action's request carries the model set for it. Through the

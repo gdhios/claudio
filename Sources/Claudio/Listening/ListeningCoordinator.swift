@@ -67,8 +67,8 @@ final class ListeningCoordinator {
          facts: FactsSource = .system,
          remoteArtwork: RemoteArtworkSource = .system,
          preferences: @escaping () -> ListeningPreferences = { .current() },
-         model: @escaping () -> ModelChoice = { AppSettings.listeningModel() },
-         essayModel: @escaping () -> ModelChoice = { AppSettings.essayModel() },
+         model: @escaping () -> ModelChoice = { ModelSlot.listening.current() },
+         essayModel: @escaping () -> ModelChoice = { ModelSlot.essay.current() },
          openLink: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
          claudeDesktop: @escaping @MainActor () -> Bool = ClaudeSearch.desktopInstalled,
          activatePlayer: @escaping @MainActor (String) -> Void = ListeningCoordinator.activateApp) {
