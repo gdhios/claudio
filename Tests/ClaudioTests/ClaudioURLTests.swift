@@ -1,11 +1,11 @@
 import XCTest
 @testable import Claudio
 
-/// The `claudio://` links the app answers. Only one so far — a tab of
-/// Settings — and that is the point of parsing it as a value: a link that
-/// says nothing Claudio knows opens nothing at all, rather than a window at
-/// random. Nothing here is a URL the system would hand to another app: the
-/// scheme is Claudio's own.
+/// The `claudio://` links the app answers: a tab of Settings, and a music
+/// subject from Galette. That is the point of parsing them as values: a
+/// link that says nothing Claudio knows opens nothing at all, rather than a
+/// window at random. Nothing here is a URL the system would hand to another
+/// app: the scheme is Claudio's own.
 final class ClaudioURLTests: XCTestCase {
 
     private func parse(_ string: String) -> ClaudioURL? {
@@ -44,15 +44,11 @@ final class ClaudioURLTests: XCTestCase {
         XCTAssertNil(parse("claudio://music"))
     }
 
-    /// The link the plugin and the website hand out: straight to the tab
-    /// where the bridge is switched on.
-    func testASectionLinkOpensThatSection() {
-        XCTAssertEqual(parse("claudio://settings/streamdeck"), .settings(.streamDeck))
-    }
-
     /// Typed by hand, or capitalized by whatever passed it on: the section
-    /// is matched whatever its case.
+    /// is matched whatever its case. The plugin and the website hand out
+    /// the first one, straight to the tab where the bridge is switched on.
     func testTheSectionIsMatchedWhateverItsCase() {
+        XCTAssertEqual(parse("claudio://settings/streamdeck"), .settings(.streamDeck))
         XCTAssertEqual(parse("claudio://settings/STREAMDECK"), .settings(.streamDeck))
     }
 

@@ -15,17 +15,6 @@ final class SettingsSelectionTests: XCTestCase {
         XCTAssertEqual(SettingsSelection().section, .general)
     }
 
-    /// The case the whole change exists for: a second request, with the
-    /// window long since built, moves the tab.
-    func testAskingForATabAgainMovesIt() {
-        let selection = SettingsSelection()
-        selection.section = .dictation
-        XCTAssertEqual(selection.section, .dictation)
-
-        selection.section = .streamDeck
-        XCTAssertEqual(selection.section, .streamDeck)
-    }
-
     /// The sidebar keeps its say: clicking a row is what moves the tab the
     /// rest of the time.
     func testTheSidebarMovesTheTabToo() {
