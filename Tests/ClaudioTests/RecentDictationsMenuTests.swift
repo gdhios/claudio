@@ -9,18 +9,12 @@ final class RecentDictationsMenuTests: XCTestCase {
 
     /// The submenu's label is compared in French: the suite pins the language
     /// rather than inheriting it from the machine.
-    private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
-        AppSettings.language = .french
+        useLanguage(.french)
     }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     private let noon = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

@@ -8,17 +8,14 @@ import XCTest
 /// answer is given.
 final class DictationOutputTests: XCTestCase {
 
-    private var previousLanguage: AppLanguage = .system
     private var previousPrompt: String?
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
         previousPrompt = AppSettings.dictationSystemPrompt
     }
 
     override func tearDown() {
-        AppSettings.language = previousLanguage
         AppSettings.dictationSystemPrompt = previousPrompt
         super.tearDown()
     }
@@ -35,7 +32,7 @@ final class DictationOutputTests: XCTestCase {
     /// The two model-backed outputs borrow the name of the action they
     /// reuse, so the picker and the palette say the same thing.
     func testEachOutputNamesItselfAfterTheActionItReuses() {
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(DictationOutput.cleanup.title, "Nettoyer")
         XCTAssertEqual(DictationOutput.translateEN.title, "Traduire en anglais")
         XCTAssertEqual(DictationOutput.makePrompt.title, "Structurer en prompt")
@@ -44,7 +41,7 @@ final class DictationOutputTests: XCTestCase {
     /// The panel says which of the three is running while the model works,
     /// rather than "cleaning up" for all of them.
     func testThePanelLabelNamesWhatIsRunning() {
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(DictationOutput.cleanup.progressLabel, "Nettoyage…")
         XCTAssertEqual(DictationOutput.translateEN.progressLabel, "Traduction…")
         XCTAssertEqual(DictationOutput.makePrompt.progressLabel, "Structuration…")
@@ -56,7 +53,7 @@ final class DictationOutputTests: XCTestCase {
     /// cleanup prompt of before there was a choice, to the byte, vocabulary
     /// included.
     func testTheCleanupSendsTodaysPromptToTheByte() {
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(Array(DictationOutput.cleanup.systemPrompt(keeping: []).utf8),
                        Array(DictationCleanup.systemPrompt.utf8))
         XCTAssertEqual(Array(DictationOutput.cleanup.systemPrompt(keeping: ["Okonoma"]).utf8),
@@ -66,7 +63,7 @@ final class DictationOutputTests: XCTestCase {
     /// Speak French, paste corrected English: a short transcript preamble,
     /// then the translation action. One call, and one instruction.
     func testTranslatingComposesTheTranscriptPreambleThenTheAction() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
 
         XCTAssertTrue(prompt.hasPrefix(DictationOutput.transcriptPreamble), prompt)
@@ -82,7 +79,7 @@ final class DictationOutputTests: XCTestCase {
     /// one time in two, same keystroke. A transforming output must carry no
     /// rule it is about to break.
     func testATransformingOutputCarriesNoneOfTheCleanupsContradictions() {
-        AppSettings.language = .french
+        useLanguage(.french)
         for output in DictationOutput.allCases where output != .cleanup {
             let prompt = output.systemPrompt(keeping: [])
             // The cleanup's own wording, not the actions': an action saying
@@ -101,7 +98,7 @@ final class DictationOutputTests: XCTestCase {
     /// No arbitration paragraph left to write: there is nothing to arbitrate
     /// between any more. Its absence is the fix, so it is pinned.
     func testNothingArbitratesBetweenTwoPromptsAnyMore() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
         XCTAssertFalse(prompt.contains("Deuxième étape"), prompt)
         XCTAssertFalse(prompt.contains("ce sont elles qui l'emportent"), prompt)
@@ -125,7 +122,7 @@ final class DictationOutputTests: XCTestCase {
     /// "Turn a rough idea into a clear prompt" is the simple action, not the
     /// expert one: a dictation is one breath, not a spec.
     func testStructuringReusesTheSimplePromptActionNotTheExpertOne() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationOutput.makePrompt.systemPrompt(keeping: [])
 
         XCTAssertTrue(prompt.hasSuffix(ClaudioAction.makePrompt.system), prompt)
@@ -136,7 +133,7 @@ final class DictationOutputTests: XCTestCase {
     /// The vocabulary clause stays where it has always been: last, after
     /// everything the model is asked to do.
     func testTheVocabularyClauseComesAfterTheWholeComposition() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"])
 
         XCTAssertTrue(prompt.hasPrefix(DictationOutput.translateEN.systemPrompt(keeping: [])),
@@ -149,7 +146,7 @@ final class DictationOutputTests: XCTestCase {
     /// a second way for a rule like "keep the language" to reach an output
     /// whose whole job is to change it.
     func testAnEditedCleanupPromptSteersTheCleanupAndNothingElse() {
-        AppSettings.language = .french
+        useLanguage(.french)
         AppSettings.dictationSystemPrompt = "Ponctue seulement, et garde le français."
 
         XCTAssertTrue(DictationOutput.cleanup.systemPrompt(keeping: [])
@@ -160,7 +157,7 @@ final class DictationOutputTests: XCTestCase {
 
     /// The transcript preamble is said in English too.
     func testTheTranscriptPreambleIsSaidInEnglishAsWell() {
-        AppSettings.language = .english
+        useLanguage(.english)
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: [])
         XCTAssertTrue(prompt.contains("voice dictation"), prompt)
         XCTAssertTrue(prompt.hasSuffix(ClaudioAction.translateEN.system), prompt)
@@ -172,7 +169,7 @@ final class DictationOutputTests: XCTestCase {
     /// shortcut asked for, the model is told the name of the app it is
     /// writing into.
     func testEveryOutputIsToldWhichAppTheTextIsGoingInto() {
-        AppSettings.language = .french
+        useLanguage(.french)
         for output in DictationOutput.allCases {
             let prompt = output.systemPrompt(keeping: [], landingIn: DictationDestination(name: "Slack", bundleID: nil))
             XCTAssertTrue(prompt.contains("Ce texte sera collé dans Slack."), output.rawValue)
@@ -182,7 +179,7 @@ final class DictationOutputTests: XCTestCase {
     /// The destination sits after the whole composition and before the
     /// vocabulary, which stays the last word whatever else is said.
     func testTheDestinationSitsBetweenTheCompositionAndTheVocabulary() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationOutput.translateEN.systemPrompt(keeping: ["Okonoma"],
                                                               landingIn: DictationDestination(name: "Mail", bundleID: nil))
 
@@ -195,7 +192,7 @@ final class DictationOutputTests: XCTestCase {
     /// An app with no name adds nothing at all: every output sends the prompt
     /// it sent before there was a destination, byte for byte.
     func testANamelessAppAddsNothingToAnyOutput() {
-        AppSettings.language = .french
+        useLanguage(.french)
         for output in DictationOutput.allCases {
             let prompt = output.systemPrompt(keeping: ["Okonoma"], landingIn: DictationDestination(name: "  ", bundleID: nil))
             XCTAssertEqual(Array(prompt.utf8),

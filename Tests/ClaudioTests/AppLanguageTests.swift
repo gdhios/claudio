@@ -20,12 +20,9 @@ final class AppLanguageTests: XCTestCase {
     /// The safety net: every palette label must actually change language.
     /// A forgotten `loc` would leave French in an English interface.
     func testTheWholeCatalogSwitchesToEnglish() {
-        let previous = AppSettings.language
-        defer { AppSettings.language = previous }
-
-        AppSettings.language = .french
+        useLanguage(.french)
         let french = ClaudioAction.allCases.map { [$0.paletteTitle, $0.paletteDetail] }
-        AppSettings.language = .english
+        useLanguage(.english)
         let english = ClaudioAction.allCases.map { [$0.paletteTitle, $0.paletteDetail] }
 
         for (action, (fr, en)) in zip(ClaudioAction.allCases, zip(french, english)) {

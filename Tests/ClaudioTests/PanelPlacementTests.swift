@@ -4,6 +4,7 @@ import AppKit
 
 /// The panel always opens centered on the active screen (never in a corner,
 /// never overflowing), and it stays centered as its height follows the content.
+@MainActor
 final class PanelCenteringTests: XCTestCase {
     /// A 1920×1080 screen with its menu bar: what `visibleFrame` sees.
     private let visible = NSRect(x: 0, y: 52, width: 1920, height: 998)
@@ -45,6 +46,7 @@ final class PanelCenteringTests: XCTestCase {
 /// these small steps instantly, frame by frame, and slides with an easeOut
 /// only on the big jumps (opening, switching to the palette or to an error).
 /// Without this split, an easeOut on every notch would make the growth jerky.
+@MainActor
 final class PanelResizeAnimationTests: XCTestCase {
     func testASmallStepFollowsTheTextWithoutAnimating() {
         XCTAssertFalse(ResultPanel.shouldAnimateResize(from: 200, to: 200))

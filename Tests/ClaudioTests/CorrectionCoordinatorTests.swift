@@ -11,18 +11,12 @@ final class CorrectionCoordinatorTests: XCTestCase {
 
     /// The labels compared are French: the suite pins the language rather
     /// than inheriting it from the machine.
-    private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
-        AppSettings.language = .french
+        useLanguage(.french)
     }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     /// Without Accessibility nothing can be read or pasted back: nothing is
     /// captured and no panel opens.

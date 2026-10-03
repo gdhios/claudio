@@ -33,9 +33,7 @@ final class ModelChoiceTests: XCTestCase {
     /// The marker shown next to the selector: the price for Claude, "free"
     /// for local.
     func testTheCostHintAnnouncesLocalIsFree() {
-        let previous = AppSettings.language
-        AppSettings.language = .french
-        defer { AppSettings.language = previous }
+        useLanguage(.french)
 
         XCTAssertEqual(ModelChoice.ollama(model: "llama3.2").costHint, "Gratuit (local)")
         XCTAssertEqual(ModelChoice.claude(.haiku45).costHint, ClaudioModel.haiku45.costHint)

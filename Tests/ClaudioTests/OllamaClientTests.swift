@@ -165,9 +165,7 @@ final class OllamaClientTests: XCTestCase {
     /// running. The message must name the targeted URL, not a URLSession
     /// code.
     func testTheDeadServerNamesItsURL() {
-        let previous = AppSettings.language
-        AppSettings.language = .french
-        defer { AppSettings.language = previous }
+        useLanguage(.french)
 
         let message = OllamaError.notReachable(url: Constants.ollamaDefaultURL).localizedDescription
         XCTAssertEqual(message, "Ollama ne répond pas sur http://localhost:11434 — est-il lancé ?")

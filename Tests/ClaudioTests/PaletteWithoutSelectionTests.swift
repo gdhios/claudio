@@ -12,18 +12,12 @@ final class PaletteWithoutSelectionTests: XCTestCase {
 
     /// The labels searched are French: the suite pins the language rather
     /// than inheriting it from the machine.
-    private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
-        AppSettings.language = .french
+        useLanguage(.french)
     }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     /// The capture came back empty: this is where each kind of session goes.
     /// Only the catalog stops there.

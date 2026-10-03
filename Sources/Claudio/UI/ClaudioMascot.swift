@@ -201,7 +201,7 @@ extension ClaudioMascot {
     /// The arc `M199,194 A21,21 0 0 1 239,194` from the master file, and its
     /// mirror: a chord of 40 for a radius of 21, so a center placed
     /// just below the chord and an arc bowing upward.
-    fileprivate static func smile(centeredOn x: CGFloat) -> Path {
+    nonisolated fileprivate static func smile(centeredOn x: CGFloat) -> Path {
         let r: CGFloat = 21, demiCorde: CGFloat = 20, y: CGFloat = 194
         let creuse = (r * r - demiCorde * demiCorde).squareRoot()
         let centre = CGPoint(x: x, y: y + creuse)

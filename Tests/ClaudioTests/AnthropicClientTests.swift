@@ -11,18 +11,12 @@ final class AnthropicClientTests: XCTestCase {
     /// The expected labels are French: the suite pins the language rather than
     /// inheriting it from the machine, otherwise it fails on an English runner
     /// (CI) and passes on a French Mac.
-    private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
-        AppSettings.language = .french
+        useLanguage(.french)
     }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     /// Feeds a transcript to the parser, checking along the way that the
     /// fragments delivered as they stream in recompose exactly the final text:

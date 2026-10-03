@@ -36,15 +36,12 @@ final class DictationLanguageTests: XCTestCase {
     /// Two Englishes sit in the same picker: their labels have to tell them
     /// apart, in both interface languages.
     func testTheLabelsTellTheTwoEnglishesApart() {
-        let previous = AppSettings.language
-        defer { AppSettings.language = previous }
-
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(DictationLanguage.frFR.displayName, "Français")
         XCTAssertEqual(DictationLanguage.enUS.displayName, "Anglais (États-Unis)")
         XCTAssertEqual(DictationLanguage.enGB.displayName, "Anglais (Royaume-Uni)")
 
-        AppSettings.language = .english
+        useLanguage(.english)
         XCTAssertEqual(DictationLanguage.frFR.displayName, "French")
         XCTAssertEqual(DictationLanguage.enUS.displayName, "English (US)")
         XCTAssertEqual(DictationLanguage.enGB.displayName, "English (UK)")

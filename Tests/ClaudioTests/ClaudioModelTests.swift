@@ -6,18 +6,12 @@ import XCTest
 /// knows it, and shows up with a readable name.
 final class ClaudioModelTests: XCTestCase {
 
-    private var previousLanguage: AppLanguage = .system
 
     override func setUp() {
         super.setUp()
-        previousLanguage = AppSettings.language
-        AppSettings.language = .french
+        useLanguage(.french)
     }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     // MARK: - Identity
 

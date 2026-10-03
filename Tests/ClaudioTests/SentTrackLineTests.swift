@@ -4,6 +4,7 @@ import XCTest
 /// The line under an answer that went out with the track playing names that
 /// track the way "What's playing?" copies it: whether it shows at all is the
 /// session's `sentTrack`, set from what was sent (`CorrectionCoordinatorTests`).
+@MainActor
 final class SentTrackLineTests: XCTestCase {
 
     func testTheLineNamesTheTrackAndItsArtist() {

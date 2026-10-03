@@ -8,17 +8,8 @@ import XCTest
 /// that never fires, or one that fires on every ⌥ typed.
 final class LoneModifierKeyTests: XCTestCase {
 
-    private var previousLanguage: AppLanguage = .system
 
-    override func setUp() {
-        super.setUp()
-        previousLanguage = AppSettings.language
-    }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     /// Written to the preferences: added to, never renamed.
     func testTheRawValuesAreTheStorageKeys() {
@@ -52,10 +43,10 @@ final class LoneModifierKeyTests: XCTestCase {
 
     /// What the Settings field shows once the key is recorded.
     func testTheNamesShownInSettings() {
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(LoneModifierKey.allCases.map(\.title),
                        ["⌥ droite", "⌘ droite", "⇧ droite", "⌃ droite"])
-        AppSettings.language = .english
+        useLanguage(.english)
         XCTAssertEqual(LoneModifierKey.allCases.map(\.title),
                        ["Right ⌥", "Right ⌘", "Right ⇧", "Right ⌃"])
     }

@@ -42,12 +42,10 @@ final class MicrophonePermissionTests: XCTestCase {
     /// Each error says where to go: a message that names no pane sends the
     /// user nowhere.
     func testEachErrorNamesItsSettingsPane() {
-        let previous = AppSettings.language
-        defer { AppSettings.language = previous }
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertTrue(SpeechEngineError.microphoneDenied.errorDescription?.contains("Microphone") == true)
         XCTAssertTrue(SpeechEngineError.recognitionDenied.errorDescription?.contains("Reconnaissance vocale") == true)
-        AppSettings.language = .english
+        useLanguage(.english)
         XCTAssertTrue(SpeechEngineError.microphoneDenied.errorDescription?.contains("Microphone") == true)
         XCTAssertTrue(SpeechEngineError.recognitionDenied.errorDescription?.contains("Speech Recognition") == true)
     }

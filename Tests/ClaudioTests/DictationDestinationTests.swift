@@ -5,17 +5,8 @@ import XCTest
 /// value: the classification of an app, and the prompt that follows from it.
 final class DictationDestinationTests: XCTestCase {
 
-    private var previousLanguage: AppLanguage = .system
 
-    override func setUp() {
-        super.setUp()
-        previousLanguage = AppSettings.language
-    }
 
-    override func tearDown() {
-        AppSettings.language = previousLanguage
-        super.tearDown()
-    }
 
     // MARK: - Telling prose from the rest
 
@@ -59,7 +50,7 @@ final class DictationDestinationTests: XCTestCase {
     /// A prose destination sends the cleanup prompt of before, to the byte,
     /// with the one sentence naming the app.
     func testAProseDestinationOnlyNamesTheApp() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationCleanup.systemPrompt(
             keeping: [], landingIn: DictationDestination(name: "Slack", bundleID: nil))
 
@@ -72,7 +63,7 @@ final class DictationDestinationTests: XCTestCase {
     /// punctuate" under twenty lines of "punctuate and split into sentences"
     /// is the contradiction that made the output a coin toss elsewhere.
     func testATerminalGetsItsOwnPromptRatherThanTheProseOnePlusAWarning() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationCleanup.systemPrompt(
             keeping: [],
             landingIn: DictationDestination(name: "Terminal", bundleID: "com.apple.Terminal"))
@@ -86,7 +77,7 @@ final class DictationDestinationTests: XCTestCase {
     /// What a verbatim destination asks for, said plainly: the words as
     /// dictated, no punctuation invented, no capital, no final period.
     func testTheVerbatimPromptForbidsPunctuatingAndCapitalising() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationCleanup.systemPrompt(
             keeping: [],
             landingIn: DictationDestination(name: "Terminal", bundleID: "com.apple.Terminal"))
@@ -97,7 +88,7 @@ final class DictationDestinationTests: XCTestCase {
 
     /// Said in English as well.
     func testTheVerbatimPromptIsSaidInEnglishToo() {
-        AppSettings.language = .english
+        useLanguage(.english)
         let prompt = DictationCleanup.systemPrompt(
             keeping: [],
             landingIn: DictationDestination(name: "Terminal", bundleID: "com.apple.Terminal"))
@@ -109,7 +100,7 @@ final class DictationDestinationTests: XCTestCase {
     /// The vocabulary is a setting of its own: it survives a destination that
     /// changes everything else, and stays the last word.
     func testTheVocabularySurvivesAVerbatimDestination() {
-        AppSettings.language = .french
+        useLanguage(.french)
         let prompt = DictationCleanup.systemPrompt(
             keeping: ["Okonoma"],
             landingIn: DictationDestination(name: "Terminal", bundleID: "com.apple.Terminal"))
@@ -120,7 +111,7 @@ final class DictationDestinationTests: XCTestCase {
     /// Nowhere to paste: the prompt is the one of before, to the byte. A
     /// dictation with no destination is not a dictation into a terminal.
     func testNoDestinationLeavesThePromptUntouched() {
-        AppSettings.language = .french
+        useLanguage(.french)
         XCTAssertEqual(Array(DictationCleanup.systemPrompt(keeping: [], landingIn: nil).utf8),
                        Array(DictationCleanup.systemPrompt.utf8))
     }
