@@ -95,7 +95,10 @@ final class LoneKeyMonitor {
         switch intent {
         case .press(let key):
             guard let shortcut = shortcuts[key] else { return }
-            coordinator?.keyDown(language: shortcut.language, output: shortcut.output)
+            // A held press arrives once the arming delay ran out; a tap,
+            // sooner, and still well under the hold threshold.
+            coordinator?.keyDown(language: shortcut.language, output: shortcut.output,
+                                 heldFor: LoneKeyGesture.armingDelay)
         case .release:
             coordinator?.keyUp()
         case .cancel:

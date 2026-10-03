@@ -591,6 +591,22 @@ final class DictationCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.pasted, ["Bonjour."])
     }
 
+    /// A lone key reaches the coordinator only once it armed: the time it was
+    /// already down counts, so a 0.35 s hold of right ⌥ is a hold, as it is
+    /// on a key combination, not a tap that locks hands-free.
+    func testALoneKeyHoldCountsItsArmingTime() async throws {
+        let bench = Bench()
+        bench.coordinator.keyDown(language: .frFR, heldFor: LoneKeyGesture.armingDelay)
+        let session = try XCTUnwrap(bench.coordinator.session)
+        await bench.settle { bench.engine.starts == 1 }
+
+        bench.hold(for: 0.35 - LoneKeyGesture.armingDelay)
+        bench.coordinator.keyUp()
+        XCTAssertFalse(session.isLocked)
+        XCTAssertEqual(session.phase, .finishing)
+        await bench.cycleEnds()
+    }
+
     /// The press after a tap is the release a hold would have had: the
     /// microphone closes, the music resumes behind it, and the cleaned-up
     /// text is pasted — the same way out as a hold, phase for phase.

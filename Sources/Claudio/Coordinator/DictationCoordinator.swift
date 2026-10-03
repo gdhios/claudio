@@ -120,8 +120,11 @@ final class DictationCoordinator {
     /// a dictation locked by a tap, it's the press that finishes it.
     /// `output` is what the shortcut turns what is said into: each of the
     /// two has its own, which is why it arrives with the language rather
-    /// than being read from the settings here.
-    func keyDown(language: DictationLanguage, output: DictationOutput = .cleanup) {
+    /// than being read from the settings here. `heldFor` is how long the key
+    /// was already down when the press reached here: a lone key arms first,
+    /// and that time counts towards telling a hold from a tap.
+    func keyDown(language: DictationLanguage, output: DictationOutput = .cleanup,
+                 heldFor: TimeInterval = 0) {
         // Switched off in the Settings. The shortcuts are unregistered with
         // it, so this catches what still gets through: a lone key, or a
         // registration that outlived the switch.
@@ -145,7 +148,7 @@ final class DictationCoordinator {
             askForTheMicrophone()
             return
         }
-        beginListening(language: language, output: output)
+        beginListening(language: language, output: output, heldFor: heldFor)
     }
 
     /// The first press, on a machine that hasn't been asked yet: the two
@@ -169,8 +172,9 @@ final class DictationCoordinator {
     }
 
     /// Opens the microphone and puts the panel on screen.
-    private func beginListening(language: DictationLanguage, output: DictationOutput) {
-        pressedAt = now()
+    private func beginListening(language: DictationLanguage, output: DictationOutput,
+                                heldFor: TimeInterval) {
+        pressedAt = now() - heldFor
         // Captured BEFORE showing anything, while the app being dictated
         // into is still the frontmost one.
         target = pasting.capture()
