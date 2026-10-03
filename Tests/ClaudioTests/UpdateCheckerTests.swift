@@ -35,7 +35,7 @@ final class UpdateCheckerTests: XCTestCase {
     /// `.failed`, never into "up to date".
     @MainActor
     func testAnIncompleteFeedIsRejected() {
-        let sansURL = Data(#"{"version":"1.5.1"}"#.utf8)
-        XCTAssertThrowsError(try JSONDecoder().decode(UpdateChecker.Feed.self, from: sansURL))
+        let withoutURL = Data(#"{"version":"1.5.1"}"#.utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(UpdateChecker.Feed.self, from: withoutURL))
     }
 }

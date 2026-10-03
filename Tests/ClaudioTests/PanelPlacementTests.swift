@@ -35,10 +35,10 @@ final class PanelCenteringTests: XCTestCase {
     /// On a second screen (offset origin), the targeted center is that
     /// screen's own, not the main screen's.
     func testCenteringOnTheGivenScreen() {
-        let autre = NSRect(x: 1920, y: 0, width: 1440, height: 900)
-        let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: autre)
-        XCTAssertEqual(placed.midX, autre.midX, accuracy: 0.01)
-        XCTAssertEqual(placed.midY, autre.midY, accuracy: 0.01)
+        let secondScreen = NSRect(x: 1920, y: 0, width: 1440, height: 900)
+        let placed = ResultPanel.centered(size: NSSize(width: 460, height: 200), in: secondScreen)
+        XCTAssertEqual(placed.midX, secondScreen.midX, accuracy: 0.01)
+        XCTAssertEqual(placed.midY, secondScreen.midY, accuracy: 0.01)
     }
 }
 

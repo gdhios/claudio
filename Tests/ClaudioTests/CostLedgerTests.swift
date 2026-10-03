@@ -64,30 +64,30 @@ final class CostLedgerTests: XCTestCase {
 
     func testTheTotalAddsUpWithinTheDay() {
         let start = Calendar.current.startOfDay(for: noon)
-        var jour = DailyCost(dayStart: start, total: 0, actions: 0)
-        jour = jour.adding(0.10, at: noon)
-        jour = jour.adding(0.32, at: noon.addingTimeInterval(3600))
-        XCTAssertEqual(jour.total, 0.42, accuracy: 1e-9)
-        XCTAssertEqual(jour.actions, 2)
+        var day = DailyCost(dayStart: start, total: 0, actions: 0)
+        day = day.adding(0.10, at: noon)
+        day = day.adding(0.32, at: noon.addingTimeInterval(3600))
+        XCTAssertEqual(day.total, 0.42, accuracy: 1e-9)
+        XCTAssertEqual(day.actions, 2)
         useLanguage(.french)
-        XCTAssertEqual(jour.formattedTotal, "0,42 $")
+        XCTAssertEqual(day.formattedTotal, "0,42 $")
     }
 
     func testTheTotalStartsOverAtZeroTheNextDay() {
         let start = Calendar.current.startOfDay(for: noon)
-        let veille = DailyCost(dayStart: start, total: 5, actions: 12)
-        let lendemain = noon.addingTimeInterval(24 * 3600)
+        let yesterday = DailyCost(dayStart: start, total: 5, actions: 12)
+        let aDayLater = noon.addingTimeInterval(24 * 3600)
 
-        let apres = veille.adding(0.10, at: lendemain)
-        XCTAssertEqual(apres.total, 0.10, accuracy: 1e-9)
-        XCTAssertEqual(apres.actions, 1)
-        XCTAssertEqual(apres.dayStart, Calendar.current.startOfDay(for: lendemain))
+        let added = yesterday.adding(0.10, at: aDayLater)
+        XCTAssertEqual(added.total, 0.10, accuracy: 1e-9)
+        XCTAssertEqual(added.actions, 1)
+        XCTAssertEqual(added.dayStart, Calendar.current.startOfDay(for: aDayLater))
 
         // Even with no new action, the display doesn't show yesterday's total.
-        let affiche = veille.current(at: lendemain)
-        XCTAssertEqual(affiche.total, 0)
-        XCTAssertEqual(affiche.actions, 0)
-        XCTAssertEqual(veille.current(at: noon), veille, "the current day is untouched")
+        let shown = yesterday.current(at: aDayLater)
+        XCTAssertEqual(shown.total, 0)
+        XCTAssertEqual(shown.actions, 0)
+        XCTAssertEqual(yesterday.current(at: noon), yesterday, "the current day is untouched")
     }
 
     /// Storage inherited from an earlier version, or empty, must not show up

@@ -23,9 +23,9 @@ final class PaletteDigitTests: XCTestCase {
 
     func testABareDigitGivesItsRank() {
         // QWERTY: the 1 key gives "1" with nothing held.
-        let touche = ResultPanel.digitKey(keyCode: 18, characters: "1", modifiers: [])
-        XCTAssertEqual(touche?.rank, 1)
-        XCTAssertEqual(touche?.withCommand, false)
+        let key = ResultPanel.digitKey(keyCode: 18, characters: "1", modifiers: [])
+        XCTAssertEqual(key?.rank, 1)
+        XCTAssertEqual(key?.withCommand, false)
     }
 
     func testAzertyNeedsShiftForTheDigit() {
@@ -34,9 +34,9 @@ final class PaletteDigitTests: XCTestCase {
         XCTAssertNil(ResultPanel.digitKey(keyCode: 18, characters: "&", modifiers: []))
         XCTAssertNil(ResultPanel.digitKey(keyCode: 19, characters: "é", modifiers: []))
         // With ⇧, the character is a real digit: it launches.
-        let avecMajuscule = ResultPanel.digitKey(keyCode: 19, characters: "2", modifiers: [.shift])
-        XCTAssertEqual(avecMajuscule?.rank, 2)
-        XCTAssertEqual(avecMajuscule?.withCommand, false)
+        let shifted = ResultPanel.digitKey(keyCode: 19, characters: "2", modifiers: [.shift])
+        XCTAssertEqual(shifted?.rank, 2)
+        XCTAssertEqual(shifted?.withCommand, false)
     }
 
     func testWithCommandThePhysicalPositionIsEnough() {
@@ -66,9 +66,9 @@ final class PaletteDigitTests: XCTestCase {
 
     func testTheNumericKeypadLaunchesToo() {
         // The 5 on the keypad: a digit is still a digit.
-        let pave = ResultPanel.digitKey(keyCode: 87, characters: "5", modifiers: [.numericPad])
-        XCTAssertEqual(pave?.rank, 5)
-        XCTAssertEqual(pave?.withCommand, false)
+        let keypad = ResultPanel.digitKey(keyCode: 87, characters: "5", modifiers: [.numericPad])
+        XCTAssertEqual(keypad?.rank, 5)
+        XCTAssertEqual(keypad?.withCommand, false)
     }
 
     // MARK: - What the session does with it
@@ -118,9 +118,9 @@ final class PaletteDigitTests: XCTestCase {
         // Otherwise "summarize in 3 sentences" would be impossible to type.
         XCTAssertNil(session.paletteIndex(forRank: 3, withCommand: false))
         // A leading space is enough to start an instruction with a digit.
-        let echappatoire = palette()
-        echappatoire.paletteQuery = " "
-        XCTAssertNil(echappatoire.paletteIndex(forRank: 3, withCommand: false))
+        let escapeHatch = palette()
+        escapeHatch.paletteQuery = " "
+        XCTAssertNil(escapeHatch.paletteIndex(forRank: 3, withCommand: false))
     }
 
     @MainActor
@@ -133,9 +133,9 @@ final class PaletteDigitTests: XCTestCase {
     @MainActor
     func testARankOutsideTheListLaunchesNothing() {
         let session = palette()
-        let apres = session.paletteRows.count + 1
-        XCTAssertNil(session.paletteIndex(forRank: apres, withCommand: true))
-        XCTAssertNil(session.paletteIndex(forRank: apres, withCommand: false))
+        let pastTheEnd = session.paletteRows.count + 1
+        XCTAssertNil(session.paletteIndex(forRank: pastTheEnd, withCommand: true))
+        XCTAssertNil(session.paletteIndex(forRank: pastTheEnd, withCommand: false))
         // Filtered down to a single action, only rank 1 (and the free row) exists.
         session.paletteQuery = "trad ang"
         XCTAssertEqual(session.paletteRows.count, 2)

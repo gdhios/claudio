@@ -27,8 +27,8 @@ final class ClaudioRequestTests: XCTestCase {
         XCTAssertEqual(ClaudioAction.summarize.request.maxTokens(forText: ""), 384)
         // "Retry +" doubles it, without exceeding the hard ceiling.
         XCTAssertEqual(ClaudioAction.correct.request.maxTokens(forText: text, multiplier: 2), 656)
-        let enorme = String(repeating: "a", count: 500_000)
-        XCTAssertEqual(ClaudioAction.expertPrompt.request.maxTokens(forText: enorme, multiplier: 4), 16384)
+        let huge = String(repeating: "a", count: 500_000)
+        XCTAssertEqual(ClaudioAction.expertPrompt.request.maxTokens(forText: huge, multiplier: 4), 16384)
     }
 
     func testOnlyCorrectionSendsBareText() {
@@ -92,8 +92,8 @@ final class ClaudioRequestTests: XCTestCase {
     /// title.
     func testThePendingPaletteDoesNotPassItselfOffAsAFreeAction() {
         let palette = ClaudioRequest.awaitingChoice
-        let libre = ClaudioRequest.awaitingInstruction
-        XCTAssertNotEqual(palette.panelTitle, libre.panelTitle,
+        let customAction = ClaudioRequest.awaitingInstruction
+        XCTAssertNotEqual(palette.panelTitle, customAction.panelTitle,
                           "the palette with no selection must not be titled \"Free action\"")
         XCTAssertFalse(palette.panelTitle.isEmpty)
     }

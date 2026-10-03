@@ -24,10 +24,10 @@ final class PanelTextSizeTests: XCTestCase {
     /// Body size, width, and height grow together, from small to extra large.
     func testEverythingGrowsInTheSameDirection() {
         let ordered = PanelTextSize.allCases
-        for (petit, grand) in zip(ordered, ordered.dropFirst()) {
-            XCTAssertLessThan(petit.bodyPoints, grand.bodyPoints, "\(petit) → \(grand)")
-            XCTAssertLessThanOrEqual(petit.panelWidth, grand.panelWidth, "\(petit) → \(grand)")
-            XCTAssertLessThanOrEqual(petit.maxTextHeight, grand.maxTextHeight, "\(petit) → \(grand)")
+        for (smaller, larger) in zip(ordered, ordered.dropFirst()) {
+            XCTAssertLessThan(smaller.bodyPoints, larger.bodyPoints, "\(smaller) → \(larger)")
+            XCTAssertLessThanOrEqual(smaller.panelWidth, larger.panelWidth, "\(smaller) → \(larger)")
+            XCTAssertLessThanOrEqual(smaller.maxTextHeight, larger.maxTextHeight, "\(smaller) → \(larger)")
         }
     }
 

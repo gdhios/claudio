@@ -24,8 +24,8 @@ final class PaletteCatalogTests: XCTestCase {
     func testEveryWordMustMatch() {
         // "trad ang": both words are found in the English translation action,
         // but not in the French one.
-        let deuxMots = PaletteCatalog.matches("trad ang")
-        XCTAssertEqual(deuxMots, [.translateEN])
+        let twoWords = PaletteCatalog.matches("trad ang")
+        XCTAssertEqual(twoWords, [.translateEN])
         // Either word alone is enough to bring back both translations.
         XCTAssertEqual(Set(PaletteCatalog.matches("trad")), Set([.translateFR, .translateEN]))
     }
@@ -47,11 +47,11 @@ final class PaletteCatalogTests: XCTestCase {
         // No action matches: only the free row remains, which reuses the
         // input as its instruction — over a selection or over nothing.
         for hasSelection in [true, false] {
-            let orphelines = PaletteCatalog.rows(matching: "Traduis en espagnol", hasSelection: hasSelection)
-            XCTAssertEqual(orphelines.count, 1)
-            XCTAssertEqual(orphelines[0].title, "Traduis en espagnol")
-            XCTAssertEqual(orphelines[0].origin, .free(instruction: "Traduis en espagnol"))
-            XCTAssertEqual(orphelines[0].request?.needsInstruction, false)
+            let unmatched = PaletteCatalog.rows(matching: "Traduis en espagnol", hasSelection: hasSelection)
+            XCTAssertEqual(unmatched.count, 1)
+            XCTAssertEqual(unmatched[0].title, "Traduis en espagnol")
+            XCTAssertEqual(unmatched[0].origin, .free(instruction: "Traduis en espagnol"))
+            XCTAssertEqual(unmatched[0].request?.needsInstruction, false)
         }
 
         // Nothing selected and nothing typed: there too, after "What's playing?".
@@ -61,11 +61,11 @@ final class PaletteCatalogTests: XCTestCase {
 
     @MainActor
     func testTheFreeRowWithNoInstructionStaysPendingToSendLater() {
-        let libre = PaletteCatalog.rows(matching: "").last { $0.origin != nil }
-        XCTAssertEqual(libre?.origin, .free(instruction: ""))
+        let freeRow = PaletteCatalog.rows(matching: "").last { $0.origin != nil }
+        XCTAssertEqual(freeRow?.origin, .free(instruction: ""))
         // With no instruction, the request can't be sent: the panel switches
         // to the input field instead of dispatching an empty instruction.
-        XCTAssertEqual(libre?.request?.needsInstruction, true)
+        XCTAssertEqual(freeRow?.request?.needsInstruction, true)
     }
 
     /// Nothing typed, "What's playing?" — which transforms no selection —

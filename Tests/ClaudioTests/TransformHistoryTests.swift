@@ -67,13 +67,13 @@ final class TransformHistoryTests: XCTestCase {
     func testTheStoreSurvivesARestart() {
         let defaults = InMemoryDefaults()
 
-        let magasin = TransformHistory(defaults: defaults, limit: 20)
-        magasin.record("Traduis en espagnol", at: noon)
-        magasin.record("Résume en trois points", at: noon.addingTimeInterval(60))
+        let history = TransformHistory(defaults: defaults, limit: 20)
+        history.record("Traduis en espagnol", at: noon)
+        history.record("Résume en trois points", at: noon.addingTimeInterval(60))
 
         // A new instance, as at the next launch, reads back the same storage.
-        let relu = TransformHistory(defaults: defaults, limit: 20)
-        XCTAssertEqual(relu.recents.entries.map(\.instruction),
+        let nextLaunch = TransformHistory(defaults: defaults, limit: 20)
+        XCTAssertEqual(nextLaunch.recents.entries.map(\.instruction),
                        ["Résume en trois points", "Traduis en espagnol"])
     }
 
@@ -81,11 +81,11 @@ final class TransformHistoryTests: XCTestCase {
     func testClearingTheStoreErasesStorage() {
         let defaults = InMemoryDefaults()
 
-        let magasin = TransformHistory(defaults: defaults, limit: 20)
-        magasin.record("Traduis en espagnol", at: noon)
-        magasin.clear()
+        let history = TransformHistory(defaults: defaults, limit: 20)
+        history.record("Traduis en espagnol", at: noon)
+        history.clear()
 
-        XCTAssertTrue(magasin.recents.entries.isEmpty)
+        XCTAssertTrue(history.recents.entries.isEmpty)
         XCTAssertTrue(TransformHistory(defaults: defaults, limit: 20).recents.entries.isEmpty)
     }
 

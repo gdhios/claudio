@@ -65,8 +65,8 @@ final class ClaudioCatalogTests: XCTestCase {
     /// of transforming it.
     func testPromptAndWrappingStayInSync() {
         for action in ClaudioAction.allCases {
-            let annonceLaBalise = action.defaultSystem.contains("<texte_source>")
-            XCTAssertEqual(annonceLaBalise, action.request.wrapsSource, action.rawValue)
+            let announcesTheTag = action.defaultSystem.contains("<texte_source>")
+            XCTAssertEqual(announcesTheTag, action.request.wrapsSource, action.rawValue)
         }
     }
 }

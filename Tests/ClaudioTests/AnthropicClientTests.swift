@@ -156,8 +156,8 @@ final class AnthropicClientTests: XCTestCase {
         XCTAssertEqual(AnthropicClient.apiErrorMessage(from: json), "invalid x-api-key")
 
         // Unreadable response: show what was received rather than nothing.
-        let brut = Data("mauvaise passerelle".utf8)
-        XCTAssertEqual(AnthropicClient.apiErrorMessage(from: brut), "mauvaise passerelle")
+        let raw = Data("mauvaise passerelle".utf8)
+        XCTAssertEqual(AnthropicClient.apiErrorMessage(from: raw), "mauvaise passerelle")
     }
 
     /// The statuses a user actually encounters carry a message that says what

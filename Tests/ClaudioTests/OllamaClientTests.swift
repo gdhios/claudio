@@ -137,12 +137,12 @@ final class OllamaClientTests: XCTestCase {
                        Constants.ollamaContextLength)
 
         let long = String(repeating: "a", count: 40_000)  // ~10,000 tokens
-        let fenetre = OllamaClient.contextLength(text: long, system: "Corrige.", maxTokens: 8192)
-        XCTAssertGreaterThanOrEqual(fenetre, 10_000 + 8192)
-        XCTAssertEqual(fenetre % 4096, 0, "steps, not one value per text")
+        let window = OllamaClient.contextLength(text: long, system: "Corrige.", maxTokens: 8192)
+        XCTAssertGreaterThanOrEqual(window, 10_000 + 8192)
+        XCTAssertEqual(window % 4096, 0, "steps, not one value per text")
         let options = OllamaClient.makeBody(text: long, system: "Corrige.",
                                             model: "qwen3.5:4b", maxTokens: 8192)["options"] as? [String: Any]
-        XCTAssertEqual(options?["num_ctx"] as? Int, fenetre)
+        XCTAssertEqual(options?["num_ctx"] as? Int, window)
     }
 
     // MARK: - Installed Models
