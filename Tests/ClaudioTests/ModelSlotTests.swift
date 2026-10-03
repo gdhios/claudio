@@ -1,9 +1,9 @@
 import XCTest
 @testable import Claudio
 
-/// Every shortcut that calls a model is a slot: the Models tab lists them,
-/// each slot reads and writes its own setting, and the two newcomers — the
-/// custom action and "What's playing?" — get a setting at all.
+/// Every shortcut that calls a model is a slot: each slot reads and writes
+/// its own setting, and the two newcomers — the custom action and "What's
+/// playing?" — get a setting at all.
 final class ModelSlotTests: XCTestCase {
 
     private var defaults: UserDefaults!
@@ -11,13 +11,6 @@ final class ModelSlotTests: XCTestCase {
     override func setUp() {
         super.setUp()
         defaults = InMemoryDefaults()
-    }
-
-    /// One row per shortcut, in the order the tab shows them: the catalog's
-    /// eight actions, the custom action, dictation, listening, the long text.
-    func testTheTabListsEveryShortcutThatCallsAModel() {
-        XCTAssertEqual(ModelSlot.all,
-                       ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening, .essay])
     }
 
     /// Each slot keeps its historical storage key: a setting written by an
@@ -121,4 +114,11 @@ final class ModelSlotTests: XCTestCase {
         XCTAssertEqual(sections[key + 1], .models)
         XCTAssertEqual(SettingsSection.models.rawValue, "models")
     }
+}
+
+private extension ModelSlot {
+    /// Every slot, for the tests that go through them all: the catalog's
+    /// actions, the custom action, dictation, listening, the long text.
+    static let all: [ModelSlot] = ClaudioAction.allCases.map(ModelSlot.action)
+        + [.freeAction, .dictation, .listening, .essay]
 }

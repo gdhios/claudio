@@ -20,11 +20,6 @@ enum ModelSlot: Hashable, Sendable {
     /// that answers for the facts.
     case essay
 
-    /// Every slot, in the order the Models tab shows them.
-    static var all: [ModelSlot] {
-        ClaudioAction.allCases.map(ModelSlot.action) + [.freeAction, .dictation, .listening, .essay]
-    }
-
     /// The UserDefaults key. Historical where a setting predates this type.
     var storageKey: String {
         switch self {
