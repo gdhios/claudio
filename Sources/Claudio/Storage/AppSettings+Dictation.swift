@@ -25,18 +25,12 @@ extension AppSettings {
     private static let dictationSecondaryOutputKey = "dictationSecondaryOutput"
 
     private static let dictationPausesMediaKey = "dictationPausesMedia"
-    /// "Mute other apps", which pausing replaced. No longer written, still
-    /// read: whoever switched it off keeps dictation away from their sound.
-    private static let dictationMutesOutputKey = "dictationMutesOutput"
 
     /// Pause whatever is playing while dictation listens, and resume it when
-    /// the microphone closes. On by default — dictating over music is what
-    /// it's for — unless muting had been switched off before it.
+    /// the microphone closes. On by default: dictating over music is what
+    /// it's for.
     static var dictationPausesMedia: Bool {
-        get {
-            UserDefaults.standard.object(forKey: dictationPausesMediaKey) as? Bool
-                ?? UserDefaults.standard.flag(dictationMutesOutputKey)
-        }
+        get { UserDefaults.standard.flag(dictationPausesMediaKey) }
         set { UserDefaults.standard.set(newValue, forKey: dictationPausesMediaKey) }
     }
 
