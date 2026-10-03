@@ -9,6 +9,12 @@ import SwiftUI
 final class SettingsSelection: ObservableObject {
     @Published var section: SettingsSection = .general
 
+    /// How many times the window has come on screen. It is reused from one
+    /// opening to the next, and SwiftUI replays no `.onAppear` or `.task`
+    /// in a view that never left it: the view rebuilds its pane on each new
+    /// count, so every opening reads this Mac afresh.
+    @Published private(set) var openings = 0
+
     /// Called each time Settings is brought up. A pane that reads this Mac
     /// gets a fresh look even when the window never closed: the Stream Deck
     /// tab looks for the plugin's folder, and a plugin installed while that
@@ -17,9 +23,11 @@ final class SettingsSelection: ObservableObject {
 
     /// Settings is being brought up — on a named tab, or wherever it was
     /// left. Named means named: the tab moves whether the window is being
-    /// built or has been open for an hour.
-    func broughtUp(on section: SettingsSection?) {
+    /// built or has been open for an hour. Only a window that wasn't on
+    /// screen makes an opening.
+    func broughtUp(on section: SettingsSection?, alreadyOnScreen: Bool) {
         if let section { self.section = section }
+        if !alreadyOnScreen { openings += 1 }
         onShown?()
     }
 

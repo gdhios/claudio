@@ -85,23 +85,31 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
         } detail: {
-            switch selection.section {
-            case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
-            case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
-            case .models: ModelsPane().navigationTitle(SettingsSection.models.title)
-            case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
-            case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
-            case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
-            case .music: MusicPane().navigationTitle(SettingsSection.music.title)
-            case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
-            case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
-            case .about: AboutPane().navigationTitle(SettingsSection.about.title)
-            }
+            // Built again on every opening: the window is reused, and a pane
+            // that never left it would replay neither its `.onAppear` nor its
+            // `.task`, which is where it reads this Mac.
+            pane.id(selection.openings)
         }
         .frame(minWidth: 700, minHeight: 500)
         // The Claude list is a day old at most: asked here, where it is
-        // read, and nowhere on the way to an action.
-        .task { await ModelCatalog.shared.refreshIfStale() }
+        // read, and nowhere on the way to an action. Asked again on every
+        // opening, since the window outlives this view's first appearance.
+        .task(id: selection.openings) { await ModelCatalog.shared.refreshIfStale() }
+    }
+
+    @ViewBuilder private var pane: some View {
+        switch selection.section {
+        case .general: GeneralPane().navigationTitle(SettingsSection.general.title)
+        case .apiKey: APIKeyPane().navigationTitle(SettingsSection.apiKey.title)
+        case .models: ModelsPane().navigationTitle(SettingsSection.models.title)
+        case .ollama: OllamaPane().navigationTitle(SettingsSection.ollama.title)
+        case .shortcuts: ShortcutsPane().navigationTitle(SettingsSection.shortcuts.title)
+        case .dictation: DictationPane().navigationTitle(SettingsSection.dictation.title)
+        case .music: MusicPane().navigationTitle(SettingsSection.music.title)
+        case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
+        case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
+        case .about: AboutPane().navigationTitle(SettingsSection.about.title)
+        }
     }
 }
 

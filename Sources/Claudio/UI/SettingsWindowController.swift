@@ -12,8 +12,7 @@ final class SettingsWindowController {
     /// Opens Settings where it was left. The menu's own entry: someone
     /// reopening Settings means to come back, not to be sent to the top.
     func show() {
-        selection.broughtUp(on: nil)
-        present()
+        present(on: nil)
     }
 
     /// Opens Settings on a named tab — a `claudio://` link, or the plugin
@@ -21,11 +20,14 @@ final class SettingsWindowController {
     /// window is being built or has been open for an hour, which is the case
     /// the plugin's own way out depends on.
     func show(initialSection: SettingsSection) {
-        selection.broughtUp(on: initialSection)
-        present()
+        present(on: initialSection)
     }
 
-    private func present() {
+    /// The selection hears about the opening before the window is built, so
+    /// a first opening builds its pane once, not twice.
+    private func present(on section: SettingsSection?) {
+        let onScreen = window?.isVisible == true
+        selection.broughtUp(on: section, alreadyOnScreen: onScreen)
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView(selection: selection))
             let win = NSWindow(contentViewController: hosting)
@@ -37,7 +39,7 @@ final class SettingsWindowController {
             window = win
         }
         NSApp.activate(ignoringOtherApps: true)
-        if window?.isVisible != true { window?.center() }
+        if !onScreen { window?.center() }
         window?.makeKeyAndOrderFront(nil)
     }
 }
