@@ -6,11 +6,11 @@ import XCTest
 final class PasteboardSnapshotTests: XCTestCase {
     private var pasteboard: NSPasteboard!
 
-    override func setUp() {
+    override func setUp() async throws {
         pasteboard = NSPasteboard(name: .init("claudio-tests-\(UUID().uuidString)"))
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         pasteboard.releaseGlobally()
     }
 
