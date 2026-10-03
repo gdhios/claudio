@@ -24,22 +24,7 @@ struct DictationPanelView: View {
             ClaudioTheme.panelSeparator.frame(height: 1)
             footer
         }
-        .frame(width: textSize.panelWidth)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: DictationPanelHeightKey.self, value: geo.size.height)
-            }
-        }
-        .onPreferenceChange(DictationPanelHeightKey.self) { [onHeightChange] height in
-            MainActor.assumeIsolated { onHeightChange?(height) }
-        }
-        .background(ClaudioTheme.panelBackground,
-                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
-                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        .panelChrome(width: textSize.panelWidth, onHeightChange: onHeightChange)
     }
 
     private var header: some View {
@@ -175,14 +160,10 @@ struct DictationPanelView: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(14)
-                .background {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: DictationTextHeightKey.self, value: geo.size.height)
-                    }
-                }
+                .reportsHeight(PanelTextHeightKey.self)
             }
             .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
-            .onPreferenceChange(DictationTextHeightKey.self) { height in
+            .onPreferenceChange(PanelTextHeightKey.self) { height in
                 Task { @MainActor in
                     withAnimation(.easeOut(duration: 0.18)) { textHeight = height }
                 }
@@ -273,17 +254,4 @@ struct DictationPanelView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
-}
-
-/// Ideal height of the whole panel, reported to the window so it hugs its
-/// content.
-private struct DictationPanelHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Height of the text inside the ScrollView, to bound the content area.
-private struct DictationTextHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

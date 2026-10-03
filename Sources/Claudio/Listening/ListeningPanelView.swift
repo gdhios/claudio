@@ -34,22 +34,7 @@ struct ListeningPanelView: View {
             ClaudioTheme.panelSeparator.frame(height: 1)
             footer
         }
-        .frame(width: textSize.panelWidth)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: ListeningPanelHeightKey.self, value: geo.size.height)
-            }
-        }
-        .onPreferenceChange(ListeningPanelHeightKey.self) { [onHeightChange] height in
-            MainActor.assumeIsolated { onHeightChange?(height) }
-        }
-        .background(ClaudioTheme.panelBackground,
-                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
-                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        .panelChrome(width: textSize.panelWidth, onHeightChange: onHeightChange)
     }
 
     private var header: some View {
@@ -284,14 +269,10 @@ struct ListeningPanelView: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
                 .padding(.bottom, 14)
-                .background {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ListeningNotesHeightKey.self, value: geo.size.height)
-                    }
-                }
+                .reportsHeight(PanelTextHeightKey.self)
         }
         .frame(height: min(notesHeight, textSize.maxTextHeight))
-        .onPreferenceChange(ListeningNotesHeightKey.self) { height in
+        .onPreferenceChange(PanelTextHeightKey.self) { height in
             // Interpolated, as in the other panels: the measured height
             // jumps a line at a time, and the window follows it smoothly.
             Task { @MainActor in
@@ -404,17 +385,4 @@ struct ListeningPanelView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
-}
-
-/// Ideal height of the whole panel, reported to the window so it hugs its
-/// content.
-private struct ListeningPanelHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Height of the notes inside their ScrollView, to bound it.
-private struct ListeningNotesHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

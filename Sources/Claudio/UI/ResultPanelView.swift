@@ -1,18 +1,5 @@
 import SwiftUI
 
-/// Ideal height of the whole panel: reported to the window so it
-/// hugs the content (no more half-empty rectangle).
-private struct PanelHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Height of the text in the ScrollView: used to bound the content area.
-private struct TextHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
 struct ResultPanelView: View {
     @ObservedObject var session: CorrectionSession
     /// Body text size, read once when the panel is built: the setting
@@ -44,27 +31,7 @@ struct ResultPanelView: View {
                 footer
             }
         }
-        .frame(width: textSize.panelWidth)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: PanelHeightKey.self, value: geo.size.height)
-            }
-        }
-        .onPreferenceChange(PanelHeightKey.self) { [onHeightChange] height in
-            // Report the height to the window in the same pass as the layout,
-            // with no loop-turn delay: it follows the text frame by frame
-            // instead of lagging one frame behind. That lag is what was
-            // clipping the bottom then revealing it, hence the jerks. The report
-            // is synchronous; it's the window that decides whether to animate the jump.
-            MainActor.assumeIsolated { onHeightChange?(height) }
-        }
-        .background(ClaudioTheme.panelBackground,
-                    in: RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClaudioTheme.panelCornerRadius, style: .continuous)
-                .strokeBorder(ClaudioTheme.panelBorder, lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        .panelChrome(width: textSize.panelWidth, onHeightChange: onHeightChange)
     }
 
     private var header: some View {
@@ -178,14 +145,10 @@ struct ResultPanelView: View {
                             .padding(14)
                         Color.clear.frame(height: 1).id("bottom")
                     }
-                    .background {
-                        GeometryReader { geo in
-                            Color.clear.preference(key: TextHeightKey.self, value: geo.size.height)
-                        }
-                    }
+                    .reportsHeight(PanelTextHeightKey.self)
                 }
                 .frame(height: min(max(textHeight, textSize.minTextHeight), textSize.maxTextHeight))
-                .onPreferenceChange(TextHeightKey.self) { height in
+                .onPreferenceChange(PanelTextHeightKey.self) { height in
                     // The measured height jumps a whole line at a time.
                     // Interpolating it here rather than reporting it as-is
                     // makes the window follow frame by frame: it slides
@@ -404,25 +367,5 @@ struct ResultPanelView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-    }
-}
-
-/// Panel close button: discreet in the header, becomes a circle on hover.
-/// Shared with the dictation panel, which has the same one.
-struct PanelCloseButton: View {
-    let action: () -> Void
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 8.5, weight: .bold))
-                .foregroundStyle(hovered ? .white : .white.opacity(0.45))
-                .frame(width: 18, height: 18)
-                .background(Color.white.opacity(hovered ? 0.14 : 0), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-        .help(loc("Fermer (Échap)", en: "Close (esc)"))
     }
 }
