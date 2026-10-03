@@ -27,39 +27,28 @@ struct RecentTransforms: Equatable, Sendable {
         kept.insert(RecentTransform(instruction: trimmed, date: date), at: 0)
         return RecentTransforms(Array(kept.prefix(limit)))
     }
-
-    func cleared() -> RecentTransforms { RecentTransforms() }
 }
 
 /// History of free-form instructions, to relaunch them with a single gesture
 /// on the current selection. Persisted as JSON in the preferences; nothing
-/// is sent anywhere. Modeled on `CostLedger`.
+/// is sent anywhere.
 @MainActor
 final class TransformHistory {
     static let shared = TransformHistory()
 
-    private enum Key { static let entries = "history.recentTransforms" }
-
     private(set) var recents: RecentTransforms
 
-    private let defaults: UserDefaults
-    private let limit: Int
+    private let store: StoredList<RecentTransform>
 
     init(defaults: UserDefaults = .standard, limit: Int = 20) {
-        self.defaults = defaults
-        self.limit = limit
-        if let data = defaults.data(forKey: Key.entries),
-           let stored = try? JSONDecoder().decode([RecentTransform].self, from: data) {
-            recents = RecentTransforms(Array(stored.prefix(limit)))
-        } else {
-            recents = RecentTransforms()
-        }
+        store = StoredList(defaults: defaults, key: "history.recentTransforms", limit: limit)
+        recents = RecentTransforms(store.load())
     }
 
     /// Records a free-form instruction that just succeeded. An empty or
     /// unchanged instruction writes nothing.
     func record(_ instruction: String, at date: Date = Date()) {
-        let updated = recents.adding(instruction, at: date, limit: limit)
+        let updated = recents.adding(instruction, at: date, limit: store.limit)
         guard updated != recents else { return }
         recents = updated
         persist()
@@ -68,13 +57,9 @@ final class TransformHistory {
     /// Forgets the whole history.
     func clear() {
         guard !recents.entries.isEmpty else { return }
-        recents = recents.cleared()
+        recents = RecentTransforms()
         persist()
     }
 
-    private func persist() {
-        if let data = try? JSONEncoder().encode(recents.entries) {
-            defaults.set(data, forKey: Key.entries)
-        }
-    }
+    private func persist() { store.save(recents.entries) }
 }

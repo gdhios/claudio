@@ -51,11 +51,14 @@ final class TransformHistoryTests: XCTestCase {
         XCTAssertEqual(recents.entries.count, 1)
     }
 
-    func testClearing() {
-        var recents = RecentTransforms()
-        recents = recents.adding("Traduis en espagnol", at: noon)
-        recents = recents.cleared()
-        XCTAssertTrue(recents.entries.isEmpty)
+    @MainActor
+    func testClearingForgetsTheStoredList() {
+        let defaults = InMemoryDefaults()
+        let history = TransformHistory(defaults: defaults)
+        history.record("Traduis en espagnol", at: noon)
+        history.clear()
+        XCTAssertTrue(history.recents.entries.isEmpty)
+        XCTAssertTrue(TransformHistory(defaults: defaults).recents.entries.isEmpty)
     }
 
     // MARK: - Persistent store

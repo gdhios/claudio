@@ -7,6 +7,7 @@ import Foundation
 /// Non-zero exit code if the call fails: that's what lets
 /// `Scripts/test.sh --release` use it as a release gate.
 enum SelfTest {
+    @MainActor
     static func runBlocking() {
         let arguments = CommandLine.arguments
         let extras = arguments.firstIndex(of: "--selftest").map { Array(arguments[($0 + 1)...]) } ?? []
@@ -18,21 +19,13 @@ enum SelfTest {
 
         // The action's engine decides the client, just like in the app. An
         // action set to a local model is tested without an API key.
-        let client: TextStreamClient
-        switch request.model {
-        case .claude(let model):
-            guard let apiKey = KeychainStore.currentAPIKey() else {
-                print("❌ No API key: export \(Constants.apiKeyEnvVar) or save a key in Settings.")
-                exit(1)
-            }
-            client = AnthropicClient(apiKey: apiKey,
-                                     workspaceID: AppSettings.currentWorkspaceID(),
-                                     model: model)
-        case .ollama(let name):
-            client = OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: name)
-        case .raw:
+        if case .raw = request.model {
             // "Raw" only exists for dictation: nothing to send here.
             print("❌ “Raw” only applies to dictation: pick a model for this action in Settings.")
+            exit(1)
+        }
+        guard let client = TextStreamClientFactory.make(for: request.model) else {
+            print("❌ No API key: export \(Constants.apiKeyEnvVar) or save a key in Settings.")
             exit(1)
         }
 

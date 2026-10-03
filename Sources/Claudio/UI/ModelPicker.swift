@@ -54,12 +54,11 @@ enum LocalModels {
     static let frozen = ["qwen2.5:14b", "llama3.2:3b"]
 
     /// The models the Ollama server has pulled, `frozen` in a preview, which
-    /// never talks to the network. Discovery doesn't depend on a model: any
-    /// one would do, this only populates the menu.
+    /// never talks to the network.
     @MainActor
     static func discover() async -> [String] {
         guard !PreviewRun.isActive else { return frozen }
-        return await OllamaClient(baseURL: AppSettings.ollamaBaseURL, model: "").availableModels()
+        return await OllamaClient.availableModels(at: AppSettings.ollamaBaseURL)
     }
 }
 

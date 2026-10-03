@@ -67,33 +67,22 @@ struct RecentDictations: Equatable, Sendable {
         kept[index].cleaned = cleaned
         return RecentDictations(kept)
     }
-
-    func cleared() -> RecentDictations { RecentDictations() }
 }
 
 /// History of dictations, shown in Settings so a text can be copied back
 /// after the fact. Persisted as JSON in the preferences; nothing is sent
-/// anywhere, and no audio is ever written. Modeled on `TransformHistory`.
+/// anywhere, and no audio is ever written.
 @MainActor
 final class DictationHistory {
     static let shared = DictationHistory()
 
-    private enum Key { static let entries = "dictationHistory" }
-
     private(set) var recents: RecentDictations
 
-    private let defaults: UserDefaults
-    private let limit: Int
+    private let store: StoredList<RecentDictation>
 
     init(defaults: UserDefaults = .standard, limit: Int = 50) {
-        self.defaults = defaults
-        self.limit = limit
-        if let data = defaults.data(forKey: Key.entries),
-           let stored = try? JSONDecoder().decode([RecentDictation].self, from: data) {
-            recents = RecentDictations(Array(stored.prefix(limit)))
-        } else {
-            recents = RecentDictations()
-        }
+        store = StoredList(defaults: defaults, key: "dictationHistory", limit: limit)
+        recents = RecentDictations(store.load())
     }
 
     /// Records a dictation that produced text, whether or not it was cleaned
@@ -107,7 +96,7 @@ final class DictationHistory {
                                                      language: language,
                                                      raw: raw,
                                                      cleaned: cleaned),
-                                     limit: limit)
+                                     limit: store.limit)
         guard updated != recents else { return }
         recents = updated
         persist()
@@ -127,13 +116,9 @@ final class DictationHistory {
     /// Forgets the whole history.
     func clear() {
         guard !recents.entries.isEmpty else { return }
-        recents = recents.cleared()
+        recents = RecentDictations()
         persist()
     }
 
-    private func persist() {
-        if let data = try? JSONEncoder().encode(recents.entries) {
-            defaults.set(data, forKey: Key.entries)
-        }
-    }
+    private func persist() { store.save(recents.entries) }
 }

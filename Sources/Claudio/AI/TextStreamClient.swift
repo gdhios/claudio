@@ -36,3 +36,13 @@ protocol TextStreamClient: Sendable {
         onDelta: @escaping @Sendable (String) async -> Void
     ) async throws -> StreamResult
 }
+
+extension URLSession.AsyncBytes {
+    /// The whole body, for an HTTP error that arrives as one JSON block
+    /// rather than as a stream.
+    func collect() async throws -> Data {
+        var data = Data()
+        for try await byte in self { data.append(byte) }
+        return data
+    }
+}

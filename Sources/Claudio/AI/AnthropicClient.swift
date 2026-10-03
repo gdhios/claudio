@@ -40,15 +40,9 @@ struct AnthropicClient: TextStreamClient {
         maxTokens: Int,
         onDelta: @escaping @Sendable (String) async -> Void
     ) async throws -> StreamResult {
-        var request = URLRequest(url: Constants.apiURL)
+        var request = Self.request(to: Constants.apiURL, apiKey: apiKey, workspaceID: workspaceID)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue(Constants.anthropicVersion, forHTTPHeaderField: "anthropic-version")
-        if let workspaceID, !workspaceID.isEmpty {
-            request.setValue(workspaceID, forHTTPHeaderField: "anthropic-workspace-id")
-        }
-
         request.httpBody = try JSONSerialization.data(
             withJSONObject: Self.makeBody(text: text, system: system, model: model, maxTokens: maxTokens))
 
@@ -56,9 +50,8 @@ struct AnthropicClient: TextStreamClient {
         guard let http = response as? HTTPURLResponse else { throw AnthropicError.badResponse }
         guard http.statusCode == 200 else {
             // HTTP errors arrive as plain JSON, not SSE.
-            var data = Data()
-            for try await byte in bytes { data.append(byte) }
-            throw AnthropicError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
+            throw AnthropicError.http(status: http.statusCode,
+                                      message: Self.apiErrorMessage(from: try await bytes.collect()))
         }
 
         var parser = StreamParser()
@@ -68,6 +61,18 @@ struct AnthropicClient: TextStreamClient {
             }
         }
         return parser.result
+    }
+
+    /// Any call to the API: the key, the version, and the workspace that
+    /// "identity-linked" keys require.
+    static func request(to url: URL, apiKey: String, workspaceID: String?) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(Constants.anthropicVersion, forHTTPHeaderField: "anthropic-version")
+        if let workspaceID, !workspaceID.isEmpty {
+            request.setValue(workspaceID, forHTTPHeaderField: "anthropic-workspace-id")
+        }
+        return request
     }
 
     /// Tokens added to the budget of a model that always thinks, so its
@@ -159,7 +164,7 @@ struct AnthropicClient: TextStreamClient {
                     outputTokens = usage["output_tokens"] as? Int ?? outputTokens
                 }
             case "error":
-                let message = ((event["error"] as? [String: Any])?["message"] as? String) ?? "erreur inconnue"
+                let message = ((event["error"] as? [String: Any])?["message"] as? String) ?? loc("erreur inconnue", en: "unknown error")
                 throw AnthropicError.stream(message)
             default:
                 break  // content_block_stop, message_stop, ping

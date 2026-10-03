@@ -1,13 +1,14 @@
 import AppKit
 
-// Command-line self-test mode: `Claudio --selftest [text]`
+// Command-line self-test mode: `Claudio --selftest [text] [instruction]`
 // (uses the ANTHROPIC_API_KEY env var or Keychain key, no UI).
 if CommandLine.arguments.contains("--selftest") {
     SelfTest.runBlocking()
     exit(0)
 }
 
-// UI preview mode (dev): `Claudio --preview <panel|panel-streaming|panel-long|panel-error|panel-noselection|settings>`
+// UI preview mode (dev): `Claudio --preview <mode>`, the modes listed in
+// Support/PreviewMode.swift.
 if let previewIndex = CommandLine.arguments.firstIndex(of: "--preview") {
     let mode = CommandLine.arguments.count > previewIndex + 1
         ? CommandLine.arguments[previewIndex + 1] : "panel"

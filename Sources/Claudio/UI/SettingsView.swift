@@ -237,7 +237,7 @@ private struct APIKeyPane: View {
                     Button(loc("Enregistrer", en: "Save")) {
                         let trimmed = apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
-                        KeychainStore.saveAPIKey(trimmed)
+                        guard KeychainStore.saveAPIKey(trimmed) else { return }
                         apiKeyField = ""
                         hasStoredKey = true
                     }
@@ -354,9 +354,7 @@ private struct OllamaPane: View {
         defer { testing = false }
 
         do {
-            // Discovery doesn't depend on a model: any one would do,
-            // none is chosen here yet.
-            let found = try await OllamaClient(baseURL: url, model: "").reachableModels()
+            let found = try await OllamaClient.reachableModels(at: url)
             models = found
             failed = false
             report = found.isEmpty

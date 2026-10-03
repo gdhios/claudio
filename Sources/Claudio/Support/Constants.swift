@@ -5,6 +5,7 @@ enum Constants {
     static let temperature = 0.2
 
     static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
+    static let modelsURL = URL(string: "https://api.anthropic.com/v1/models?limit=1000")!
     static let anthropicVersion = "2023-06-01"
 
     // Local engine: Ollama on this machine. The URL is editable in Settings

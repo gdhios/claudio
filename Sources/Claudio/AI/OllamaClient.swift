@@ -53,9 +53,8 @@ struct OllamaClient: TextStreamClient {
         guard let http = response as? HTTPURLResponse else { throw OllamaError.badResponse }
         guard http.statusCode == 200 else {
             // HTTP errors arrive as a single JSON block, not as NDJSON.
-            var data = Data()
-            for try await byte in bytes { data.append(byte) }
-            throw OllamaError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
+            throw OllamaError.http(status: http.statusCode,
+                                   message: Self.apiErrorMessage(from: try await bytes.collect()))
         }
 
         var parser = OllamaStreamParser()
@@ -110,26 +109,25 @@ struct OllamaClient: TextStreamClient {
 
     // MARK: - Installed models
 
-    /// Models pulled on the machine serving Ollama. Unreachable → empty list:
-    /// the Settings picker simply has nothing to offer.
-    func availableModels() async -> [String] {
-        (try? await reachableModels()) ?? []
+    /// Models pulled on the machine serving Ollama at `baseURL`. Unreachable
+    /// → empty list: the Settings picker simply has nothing to offer.
+    static func availableModels(at baseURL: URL) async -> [String] {
+        (try? await reachableModels(at: baseURL)) ?? []
     }
 
     /// Same list, but the failure is reported: that's what the "Test
     /// connection" button expects, since it must distinguish "unreachable"
     /// from "reachable, no model pulled".
-    func reachableModels() async throws -> [String] {
+    static func reachableModels(at baseURL: URL) async throws -> [String] {
         let request = URLRequest(url: baseURL.appending(path: "api/tags"))
-        let (bytes, response) = try await Self.send(request, baseURL: baseURL)
-        var data = Data()
-        for try await byte in bytes { data.append(byte) }
+        let (bytes, response) = try await send(request, baseURL: baseURL)
+        let data = try await bytes.collect()
 
         guard let http = response as? HTTPURLResponse else { throw OllamaError.badResponse }
         guard http.statusCode == 200 else {
-            throw OllamaError.http(status: http.statusCode, message: Self.apiErrorMessage(from: data))
+            throw OllamaError.http(status: http.statusCode, message: apiErrorMessage(from: data))
         }
-        return Self.modelNames(from: data)
+        return modelNames(from: data)
     }
 
     /// Names from `GET /api/tags`, in the order Ollama returns them.

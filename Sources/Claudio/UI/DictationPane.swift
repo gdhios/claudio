@@ -284,18 +284,8 @@ struct DictationPane: View {
     /// server for its models, and shows a fixed history instead of whatever
     /// this Mac happens to have dictated.
     private func load() {
-        guard !PreviewRun.isActive else {
-            localModels = ["qwen2.5:14b", "llama3.2:3b"]
-            entries = DictationPane.frozenHistory
-            return
-        }
-        entries = DictationHistory.shared.recents.entries
-        Task {
-            // Discovery doesn't depend on a model: any one would do,
-            // this is only meant to populate the menu.
-            localModels = await OllamaClient(baseURL: AppSettings.ollamaBaseURL,
-                                             model: "").availableModels()
-        }
+        entries = PreviewRun.isActive ? DictationPane.frozenHistory : DictationHistory.shared.recents.entries
+        Task { localModels = await LocalModels.discover() }
     }
 
     /// A vocabulary nobody typed, for the preview: two terms and a

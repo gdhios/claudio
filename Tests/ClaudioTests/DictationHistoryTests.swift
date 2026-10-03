@@ -72,10 +72,14 @@ final class DictationHistoryTests: XCTestCase {
         XCTAssertNil(recents.entries.first?.cleaned)
     }
 
-    func testClearing() {
-        var recents = RecentDictations()
-        recents = recents.adding(dictation("bonjour", at: noon))
-        XCTAssertTrue(recents.cleared().entries.isEmpty)
+    @MainActor
+    func testClearingForgetsTheStoredList() {
+        let defaults = InMemoryDefaults()
+        let history = DictationHistory(defaults: defaults)
+        history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
+        history.clear()
+        XCTAssertTrue(history.recents.entries.isEmpty)
+        XCTAssertTrue(DictationHistory(defaults: defaults).recents.entries.isEmpty)
     }
 
     /// The raw text, the cleaned one, the language and the date all survive
