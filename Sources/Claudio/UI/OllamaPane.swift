@@ -17,7 +17,7 @@ struct OllamaPane: View {
                     .onSubmit { save() }
                 HStack {
                     Button(loc("Tester la connexion", en: "Test connection")) {
-                        Task { await test() }
+                        Task { await testTypedAddress() }
                     }
                     .disabled(testing)
                     if testing { ProgressView().controlSize(.small) }
@@ -49,7 +49,9 @@ struct OllamaPane: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            if PreviewRun.isActive { showFixedState() } else { Task { await test() } }
+            // The address kept, tried as it is: opening the tab writes no
+            // default into the preferences.
+            if PreviewRun.isActive { showFixedState() } else { Task { await test(AppSettings.ollamaBaseURL) } }
         }
     }
 
@@ -74,7 +76,8 @@ struct OllamaPane: View {
         return url
     }
 
-    private func test() async {
+    /// The button: the address typed is kept first, then tried.
+    private func testTypedAddress() async {
         guard let url = save() else {
             models = []
             failed = true
@@ -82,6 +85,11 @@ struct OllamaPane: View {
                          en: "Unreadable address: expected “http://host:11434”.")
             return
         }
+        await test(url)
+    }
+
+    /// Asks the server at `url` which models it has pulled.
+    private func test(_ url: URL) async {
         testing = true
         defer { testing = false }
 
