@@ -64,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.spokenInstruction.cancel()
             self?.listening.dismiss()
         }
+        // One panel on screen: a correction or a spoken instruction ends a
+        // dictation left listening hands-free. What it heard is kept in
+        // "Recent dictations" and the music resumes, as for "What's playing?".
+        coordinator.onOpen = { [weak self] in self?.dictation.dismiss() }
         listening.openSettings = { [weak self] in self?.settingsController.show() }
         // One panel on screen, the other way round.
         listening.onOpen = { [weak self] in

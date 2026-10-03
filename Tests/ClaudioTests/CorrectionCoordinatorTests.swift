@@ -28,6 +28,24 @@ final class CorrectionCoordinatorTests: XCTestCase {
         XCTAssertEqual(bench.panels, 0)
     }
 
+    /// A correction opening tells the app, which closes a hands-free
+    /// dictation on it; closing the panel doesn't, and a correction that
+    /// can't open for lack of Accessibility doesn't either.
+    func testOnlyACorrectionThatOpensAnnouncesItself() async throws {
+        let bench = Bench(selection: "Bonjour")
+        var opens = 0
+        bench.coordinator.onOpen = { opens += 1 }
+        bench.coordinator.triggerFreeAction()
+        XCTAssertEqual(opens, 1)
+        bench.coordinator.dismiss()
+        XCTAssertEqual(opens, 1)
+
+        let refused = Bench(selection: "Bonjour", allowed: false)
+        refused.coordinator.onOpen = { opens += 1 }
+        refused.coordinator.trigger(action: .correct)
+        XCTAssertEqual(opens, 1)
+    }
+
     /// The core gesture: the selection goes out under the action's prompt,
     /// the answer streams in, and Enter pastes it back, closing the panel.
     func testACatalogActionStreamsTheSelectionThenPastesItBack() async throws {

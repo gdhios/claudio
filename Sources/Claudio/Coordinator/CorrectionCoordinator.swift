@@ -24,6 +24,11 @@ final class CorrectionCoordinator {
     /// ending on it — a microphone left open behind a closed panel would go
     /// on listening, and the other apps would stay quiet.
     var onDismiss: (() -> Void)?
+    /// Called as a correction is about to open, once Accessibility is there:
+    /// the app closes a dictation still listening hands-free on this, as it
+    /// does for "What's playing?". Not on a dismissal: Esc on this panel
+    /// leaves a dictation alone.
+    var onOpen: (() -> Void)?
     /// Called when the correction under way changes, the end of one included.
     /// What watches from outside — the Stream Deck bridge — can't poll for a
     /// panel, and reads the session through this.
@@ -131,6 +136,7 @@ final class CorrectionCoordinator {
         // Asks for Accessibility, and explains itself, when it's missing:
         // without it nothing can be read, nor pasted back.
         guard pasting.isAllowed() else { return nil }
+        onOpen?()
 
         // Captured BEFORE showing anything.
         target = pasting.capture()
