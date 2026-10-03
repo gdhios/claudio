@@ -13,7 +13,7 @@ struct ArtistFacts: Equatable, Sendable, Codable {
         var secondaryTypes: [String]
         var firstReleaseDate: String?
 
-        var year: String? { firstReleaseDate.map { String($0.prefix(4)) } }
+        var year: String? { firstReleaseDate?.year }
     }
 
     var artistID: String
@@ -34,7 +34,7 @@ struct ArtistFacts: Equatable, Sendable, Codable {
     var promptBlock: String {
         PromptBlock.make("artiste", attributes: "source=\"MusicBrainz\"", fields: [
             ("nom", name),
-            ("précision", disambiguation.flatMap { $0.isEmpty ? nil : $0 }),
+            ("précision", disambiguation?.nonEmpty),
             ("type", type.map(Self.typeName)),
             ("pays", country),
             (beginLabel, beginDate),

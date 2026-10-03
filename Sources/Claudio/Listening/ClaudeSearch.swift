@@ -34,13 +34,13 @@ enum ClaudeSearch {
                        language: AppLanguage = AppSettings.language) -> String {
         let english = language.showsEnglish
         var parts: [String] = []
-        let facts = [subject.firstReleaseDate.map { String($0.prefix(4)) },
+        let facts = [subject.firstReleaseDate?.year,
                      subject.type.map { TrackFacts.typeName($0, english: english) }]
             .compactMap { $0 }
         let detail = facts.isEmpty ? "" : " (\(facts.joined(separator: ", ")))"
         // The track's own line names its album as context, with the year.
         let album = [subject.title.map { english ? "album “\($0)”" : "album « \($0) »" },
-                     subject.firstReleaseDate.map { String($0.prefix(4)) }].compactMap { $0 }
+                     subject.firstReleaseDate?.year].compactMap { $0 }
         let context = album.isEmpty ? "" : " (\(album.joined(separator: ", ")))"
         switch (subject.kind, english) {
         case (.track, false):

@@ -104,7 +104,10 @@ enum MusicBrainzLookup {
 
         let groups = (best["releases"] as? [[String: Any]] ?? [])
             .compactMap { $0["release-group"] as? [String: Any] }
-        let chosen = groups.first { sameTitle($0["title"] as? String, playerAlbum) }
+        let named = playerAlbum.flatMap { album in
+            groups.first { ($0["title"] as? String)?.isSameName(as: album) == true }
+        }
+        let chosen = named
             ?? groups.first { ($0["primary-type"] as? String)?.lowercased() == "album"
                 && ($0["secondary-types"] as? [String] ?? []).isEmpty }
             ?? groups.first
@@ -115,7 +118,7 @@ enum MusicBrainzLookup {
                           albumTitle: chosen?["title"] as? String,
                           primaryType: chosen?["primary-type"] as? String,
                           secondaryTypes: chosen?["secondary-types"] as? [String] ?? [],
-                          firstReleaseDate: nonEmpty(best["first-release-date"] as? String),
+                          firstReleaseDate: (best["first-release-date"] as? String)?.nonEmpty,
                           artistID: credited?["id"] as? String)
     }
 
@@ -129,7 +132,7 @@ enum MusicBrainzLookup {
         filled.albumTitle = group["title"] as? String ?? facts.albumTitle
         filled.primaryType = group["primary-type"] as? String ?? facts.primaryType
         filled.secondaryTypes = group["secondary-types"] as? [String] ?? facts.secondaryTypes
-        filled.firstReleaseDate = nonEmpty(group["first-release-date"] as? String) ?? facts.firstReleaseDate
+        filled.firstReleaseDate = (group["first-release-date"] as? String)?.nonEmpty ?? facts.firstReleaseDate
         return filled
     }
 
@@ -156,10 +159,10 @@ enum MusicBrainzLookup {
         return ArtistFacts(artistID: id,
                            name: name,
                            type: artist["type"] as? String,
-                           country: nonEmpty(artist["country"] as? String),
-                           beginDate: nonEmpty(lifeSpan?["begin"] as? String),
-                           endDate: nonEmpty(lifeSpan?["end"] as? String),
-                           disambiguation: nonEmpty(artist["disambiguation"] as? String))
+                           country: (artist["country"] as? String)?.nonEmpty,
+                           beginDate: (lifeSpan?["begin"] as? String)?.nonEmpty,
+                           endDate: (lifeSpan?["end"] as? String)?.nonEmpty,
+                           disambiguation: (artist["disambiguation"] as? String)?.nonEmpty)
     }
 
     /// The browse lists the release groups in no order: they are kept by
@@ -177,7 +180,7 @@ enum MusicBrainzLookup {
             return ArtistFacts.Release(id: id, title: title,
                                        primaryType: group["primary-type"] as? String,
                                        secondaryTypes: secondary,
-                                       firstReleaseDate: nonEmpty(group["first-release-date"] as? String))
+                                       firstReleaseDate: (group["first-release-date"] as? String)?.nonEmpty)
         }
         .sorted { ($0.firstReleaseDate ?? "9999") < ($1.firstReleaseDate ?? "9999") }
         return filled
@@ -189,15 +192,5 @@ enum MusicBrainzLookup {
         func score(_ entry: [String: Any]) -> Int { entry["score"] as? Int ?? 0 }
         guard let best = entries?.max(by: { score($0) < score($1) }), score(best) >= minimumScore else { return nil }
         return best
-    }
-
-    private static func nonEmpty(_ text: String?) -> String? {
-        guard let text, !text.isEmpty else { return nil }
-        return text
-    }
-
-    private static func sameTitle(_ a: String?, _ b: String?) -> Bool {
-        guard let a, let b else { return false }
-        return a.compare(b, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame
     }
 }

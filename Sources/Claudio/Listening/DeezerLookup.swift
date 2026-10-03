@@ -41,7 +41,7 @@ enum DeezerLookup {
               let albums = root["data"] as? [[String: Any]] else { return nil }
         let match = albums.first { album in
             let credited = (album["artist"] as? [String: Any])?["name"] as? String ?? ""
-            return credited.compare(artist, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame
+            return credited.isSameName(as: artist)
         }
         return match?["id"] as? Int
     }
@@ -52,10 +52,9 @@ enum DeezerLookup {
         guard let album = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               album["id"] is Int, let title = album["title"] as? String else { return nil }
         let (primary, secondary) = types(of: album["record_type"] as? String)
-        let date = album["release_date"] as? String
         return TrackFacts(recordingID: "", releaseGroupID: nil, albumTitle: title,
                           primaryType: primary, secondaryTypes: secondary,
-                          firstReleaseDate: (date?.isEmpty ?? true) ? nil : date,
+                          firstReleaseDate: (album["release_date"] as? String)?.nonEmpty,
                           origin: .deezer)
     }
 

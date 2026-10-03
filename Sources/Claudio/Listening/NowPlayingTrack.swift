@@ -44,9 +44,7 @@ struct NowPlayingTrack: Sendable, Equatable {
               let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         func text(_ key: String) -> String? {
-            guard let value = (fields[key] as? String)?
-                .trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
-            return value
+            (fields[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
         }
         // A player that played something once can stay the Now Playing
         // client with nothing in it: without a title there is no track.
