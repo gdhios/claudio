@@ -93,7 +93,7 @@ final class DictationHistoryTests: XCTestCase {
 
     @MainActor
     func testTheStoreSurvivesARestart() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "bonjour", cleaned: "Bonjour.", language: .frFR, at: noon)
@@ -112,7 +112,7 @@ final class DictationHistoryTests: XCTestCase {
 
     @MainActor
     func testClearingTheStoreErasesStorage() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
@@ -125,7 +125,7 @@ final class DictationHistoryTests: XCTestCase {
     /// Nothing heard: the store writes nothing at all.
     @MainActor
     func testABlankDictationIsNotStored() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "  ", cleaned: nil, language: .frFR, at: noon)
@@ -139,7 +139,7 @@ final class DictationHistoryTests: XCTestCase {
     /// rather than start a second one.
     @MainActor
     func testTheCleanedTextJoinsTheEntryAlreadyRecorded() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
@@ -156,7 +156,7 @@ final class DictationHistoryTests: XCTestCase {
     /// the end by fifty others. A late answer then writes nothing at all.
     @MainActor
     func testCompletingADictationThatIsNoLongerThereWritesNothing() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
@@ -170,7 +170,7 @@ final class DictationHistoryTests: XCTestCase {
     /// empty cleanup is no cleanup, exactly as `record` treats it.
     @MainActor
     func testAnEmptyCleanupLeavesTheTranscriptAlone() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
 
         let history = DictationHistory(defaults: defaults)
         history.record(raw: "bonjour", cleaned: nil, language: .frFR, at: noon)
@@ -181,7 +181,7 @@ final class DictationHistoryTests: XCTestCase {
 
     @MainActor
     func testEmptyStorageStartsEmpty() {
-        let defaults = UserDefaults(suiteName: "ClaudioTests.dictation.\(UUID().uuidString)")!
+        let defaults = InMemoryDefaults()
         XCTAssertTrue(DictationHistory(defaults: defaults).recents.entries.isEmpty)
     }
 }

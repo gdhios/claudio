@@ -4,21 +4,18 @@ import XCTest
 /// Whether the Stream Deck bridge runs. Three states, not two: with nothing
 /// stored the bridge follows the plugin, which is what makes installing the
 /// plugin the whole setup. An explicit choice then outranks the plugin, in
-/// both directions. Each test writes to a throwaway suite, never to this
-/// Mac's preferences.
+/// both directions. Each test writes to throwaway defaults held in memory,
+/// never to this Mac's preferences.
 final class AppSettingsStreamDeckTests: XCTestCase {
 
-    private var suiteName = ""
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
-        suiteName = "ClaudioTests.streamDeck.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        defaults = InMemoryDefaults()
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         super.tearDown()
     }
