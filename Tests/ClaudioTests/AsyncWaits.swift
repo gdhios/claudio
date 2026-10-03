@@ -16,6 +16,13 @@ extension AsyncWaiting {
         }
     }
 
+    /// Lets every task already woken run as far as it can, for a test that
+    /// proves something never happens: the work it watches is on the main
+    /// actor and only needs turns of the loop, never a sleep.
+    func drain() async {
+        await settle { false }
+    }
+
     /// Waits for something a timer decides rather than a turn of the loop: a
     /// panel closing itself is the only thing that takes real time. The
     /// ceiling keeps a panel that never closes from hanging the suite.

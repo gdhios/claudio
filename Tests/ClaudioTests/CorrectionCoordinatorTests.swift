@@ -303,7 +303,7 @@ final class CorrectionCoordinatorTests: XCTestCase {
 
         session.instruction = "c'est quoi ce morceau ?"
         bench.coordinator.confirm()
-        await bench.settle { false }
+        await bench.drain()
         XCTAssertEqual(bench.client.calls, 0)
 
         bench.answerRead()

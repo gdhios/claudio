@@ -198,7 +198,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         let session = try XCTUnwrap(bench.coordinator.session)
 
         await bench.runs()
-        try await Task.sleep(for: .milliseconds(30))
+        await bench.drain()
         XCTAssertNil(session.artwork)
         XCTAssertEqual(bench.artworkRequests, [])
         XCTAssertEqual(bench.remoteCoverRequests, [])
@@ -232,7 +232,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         XCTAssertEqual(session.facts, Bench.otherFacts)
 
         bench.answerFacts()
-        try await Task.sleep(for: .milliseconds(50))
+        await bench.drain()
         XCTAssertEqual(session.facts, Bench.otherFacts, "the old track's facts land nowhere")
     }
 
@@ -253,7 +253,7 @@ final class ListeningCoordinatorTests: XCTestCase {
         await bench.runs()
 
         bench.answerRemoteCover()
-        try await Task.sleep(for: .milliseconds(50))
+        await bench.drain()
         XCTAssertNil(session.artwork, "the old track's cover lands nowhere")
     }
 
@@ -478,7 +478,7 @@ final class ListeningCoordinatorTests: XCTestCase {
 
         bench.coordinator.dismiss()
         bench.answerArtwork()
-        try await Task.sleep(for: .milliseconds(50))
+        await bench.drain()
         XCTAssertNil(session.artwork)
         XCTAssertNil(bench.coordinator.session)
     }

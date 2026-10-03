@@ -75,13 +75,15 @@ final class AppSettingsLoneKeyTests: XCTestCase {
         wait(for: [announced], timeout: 1)
     }
 
-    /// Setting what is already set changes nothing, and says nothing.
+    /// Setting what is already set changes nothing, and says nothing. The
+    /// announcement is posted synchronously: none by the time the setter
+    /// returns means none at all.
     func testSettingTheSameKeyAgainIsNotAnnounced() {
         AppSettings.setDictationLoneKey(.rightControl, for: .dictate, in: defaults)
         let announced = expectation(forNotification: AppSettings.dictationLoneKeysDidChange,
                                     object: defaults)
         announced.isInverted = true
         AppSettings.setDictationLoneKey(.rightControl, for: .dictate, in: defaults)
-        wait(for: [announced], timeout: 0.1)
+        wait(for: [announced], timeout: 0)
     }
 }
