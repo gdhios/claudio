@@ -140,16 +140,18 @@ extension ClaudioRequest {
 
     /// Custom action still without an instruction: dresses the panel (title,
     /// icon, tint) while it's being typed. Never sent as is: validation
-    /// replaces it with `free(instruction:)`.
-    static let awaitingInstruction = ClaudioRequest.free(instruction: "")
+    /// replaces it with `free(instruction:)`. Built on each read, so the
+    /// footer names the model set now, not the one set at first use.
+    static var awaitingInstruction: ClaudioRequest { .free(instruction: "") }
 
     /// Palette open: no action chosen yet. Serves as filler while choosing
     /// (the panel hides the action badge in this phase), and the picked row
     /// replaces it with the real request. Its title is "Palette", not "Custom
     /// action": with nothing selected, the panel shows this header, and the
     /// palette isn't (yet) a custom action.
-    static let awaitingChoice = ClaudioRequest.free(instruction: "",
-                                                    panelTitle: loc("Palette", en: "Palette"))
+    static var awaitingChoice: ClaudioRequest {
+        .free(instruction: "", panelTitle: loc("Palette", en: "Palette"))
+    }
 
     /// Custom action: the user's instruction becomes the task, inserted into
     /// the catalog prompts' template (bare output, tagged text, language and

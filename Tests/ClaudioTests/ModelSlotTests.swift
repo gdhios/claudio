@@ -107,8 +107,8 @@ final class ModelSlotTests: XCTestCase {
 
         ModelSlot.freeAction.set(.claude(.sonnet55), in: standard)
         XCTAssertEqual(ClaudioRequest.free(instruction: "Traduis").model, .claude(.sonnet55))
-        XCTAssertEqual(ClaudioRequest.awaitingInstruction.model, .claude(.haiku45),
-                       "the panel's filler is built once and names no setting")
+        XCTAssertEqual(ClaudioRequest.awaitingInstruction.model, .claude(.sonnet55),
+                       "the footer names the model set now, not the one set at first use")
     }
 
     // MARK: - The tab
