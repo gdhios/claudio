@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>Dictate</title>
+		<meta charset="utf-8" />
+		<script src="./vendor/sdpi-components.js"></script>
+		<script src="./locale.js"></script>
+	</head>
+
+	<body>
+		<sdpi-item label="__MSG_inspector.language__">
+			<sdpi-select setting="language" default="primary">
+				<option value="primary">__MSG_language.primary.label__</option>
+				<option value="secondary">__MSG_language.secondary.label__</option>
+			</sdpi-select>
+		</sdpi-item>
+
+		<!--
+			Only sdpi-i18n resolves a message outside a component's own attributes, and an
+			item with no label at all leaves the label column empty rather than a lone colon.
+		-->
+		<sdpi-item>
+			<small><sdpi-i18n key="inspector.secondary"></sdpi-i18n></small>
+		</sdpi-item>
+
+		<sdpi-item label="__MSG_inspector.output__">
+			<sdpi-select setting="output" default="cleanup">
+				<option value="cleanup">__MSG_dictate.cleanup.label__</option>
+				<option value="translateEN">__MSG_dictate.translateEN.label__</option>
+				<option value="makePrompt">__MSG_dictate.makePrompt.label__</option>
+			</sdpi-select>
+		</sdpi-item>
+	</body>
+</html>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20">
+	<!-- A screen with a window in its left half, in the line weight of the action list. -->
+	<rect x="1.5" y="4" width="17" height="12" rx="1.5" fill="none" stroke="#FFFFFF" stroke-width="1.4"/>
+	<rect x="3.6" y="6.1" width="6.4" height="7.8" rx="0.8" fill="#FFFFFF"/>
+</svg>

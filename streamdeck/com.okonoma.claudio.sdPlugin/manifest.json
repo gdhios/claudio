@@ -1,0 +1,124 @@
+{
+	"Name": "Claudio",
+	"UUID": "com.okonoma.claudio",
+	"Version": "0.1.0.0",
+	"Author": "Guillaume Dhios",
+	"Description": "Claudio on your Stream Deck: correct, translate and arrange your windows, with a key for each.",
+	"Category": "Claudio",
+	"CategoryIcon": "imgs/category/icon",
+	"Icon": "imgs/plugin/marketplace",
+	"CodePath": "bin/plugin.js",
+	"SDKVersion": 2,
+	"Software": {
+		"MinimumVersion": "6.6"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "14"
+		}
+	],
+	"Nodejs": {
+		"Version": "20"
+	},
+	"ApplicationsToMonitor": {
+		"mac": ["com.guillaumedhios.claudio"]
+	},
+	"Actions": [
+		{
+			"Name": "Claudio action",
+			"UUID": "com.okonoma.claudio.action",
+			"Icon": "imgs/actions/action/icon",
+			"Tooltip": "Runs one of Claudio's actions on the current selection.",
+			"PropertyInspectorPath": "ui/action.html",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/action/key"
+				}
+			]
+		},
+		{
+			"Name": "Dictate",
+			"UUID": "com.okonoma.claudio.dictate",
+			"Icon": "imgs/actions/dictate/icon",
+			"Tooltip": "Hold the key to dictate; let go and Claudio writes it down.",
+			"PropertyInspectorPath": "ui/dictate.html",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/dictate/key"
+				}
+			]
+		},
+		{
+			"Name": "Window",
+			"UUID": "com.okonoma.claudio.window",
+			"Icon": "imgs/actions/window/icon",
+			"Tooltip": "Sends the frontmost window where you want it.",
+			"PropertyInspectorPath": "ui/window.html",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/window/key"
+				}
+			]
+		},
+		{
+			"Name": "Claudio",
+			"UUID": "com.okonoma.claudio.claudio",
+			"Icon": "imgs/actions/claudio/icon",
+			"PropertyInspectorPath": "ui/claudio.html",
+			"Tooltip": "Opens Claudio's palette.",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"States": [
+				{
+					"Image": "imgs/actions/claudio/key"
+				}
+			]
+		},
+		{
+			"Name": "Claudio's face",
+			"UUID": "com.okonoma.claudio.face",
+			"Icon": "imgs/actions/face/icon",
+			"Tooltip": "Shows Claudio's face across the page's fifteen keys.",
+			"PropertyInspectorPath": "ui/face.html",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"VisibleInActionsList": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/face/key"
+				}
+			]
+		},
+		{
+			"Name": "Navigation",
+			"UUID": "com.okonoma.claudio.navigate",
+			"Icon": "imgs/actions/navigate/icon",
+			"Tooltip": "Moves between the pages of the Claudio profile.",
+			"Controllers": ["Keypad"],
+			"UserTitleEnabled": false,
+			"VisibleInActionsList": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/navigate/key"
+				}
+			]
+		}
+	],
+	"Profiles": [
+		{
+			"Name": "Claudio",
+			"DeviceType": 0,
+			"Readonly": false,
+			"DontAutoSwitchWhenInstalled": false
+		}
+	]
+}

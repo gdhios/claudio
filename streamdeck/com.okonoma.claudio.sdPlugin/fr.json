@@ -1,0 +1,78 @@
+{
+	"Name": "Claudio",
+	"Description": "Claudio sur votre Stream Deck : corriger, traduire et ranger vos fenêtres, une touche pour chaque.",
+	"com.okonoma.claudio.action": {
+		"Name": "Action Claudio",
+		"Tooltip": "Lance une des actions de Claudio sur la sélection."
+	},
+	"com.okonoma.claudio.dictate": {
+		"Name": "Dicter",
+		"Tooltip": "Maintenez la touche pour dicter ; relâchez, Claudio écrit."
+	},
+	"com.okonoma.claudio.window": {
+		"Name": "Fenêtre",
+		"Tooltip": "Envoie la fenêtre du premier plan là où vous la voulez."
+	},
+	"com.okonoma.claudio.claudio": {
+		"Name": "Claudio",
+		"Tooltip": "Ouvre la palette de Claudio."
+	},
+	"com.okonoma.claudio.face": {
+		"Name": "Visage de Claudio",
+		"Tooltip": "Affiche le visage de Claudio sur les quinze touches de la page."
+	},
+	"com.okonoma.claudio.navigate": {
+		"Name": "Navigation",
+		"Tooltip": "Passe d'une page à l'autre du profil Claudio."
+	},
+	"Localization": {
+		"action": {
+			"correct": { "label": "Corriger" },
+			"translateFR": { "label": "Traduire (FR)" },
+			"translateEN": { "label": "Traduire (EN)" },
+			"professionalTone": { "label": "Ton pro" },
+			"summarize": { "label": "Résumer" },
+			"makePrompt": { "label": "Prompt" },
+			"expertPrompt": { "label": "Prompt expert" },
+			"simplify": { "label": "Lapacompris" },
+			"free": { "label": "Action libre" },
+			"palette": { "label": "Palette" },
+			"whatsPlaying": { "label": "J'écoute quoi ?" }
+		},
+		"dictate": {
+			"cleanup": { "label": "Dicter" },
+			"translateEN": { "label": "Dicter → EN" },
+			"makePrompt": { "label": "Dicter → Prompt" },
+			"listening": "Parlez…",
+			"locked": "Mains libres",
+			"working": "Nettoyage…",
+			"done": "Collé"
+		},
+		"window": {
+			"leftHalf": { "label": "Moitié gauche" },
+			"rightHalf": { "label": "Moitié droite" },
+			"topHalf": { "label": "Moitié haute" },
+			"bottomHalf": { "label": "Moitié basse" },
+			"topLeft": { "label": "Quart haut gauche" },
+			"topRight": { "label": "Quart haut droit" },
+			"bottomLeft": { "label": "Quart bas gauche" },
+			"bottomRight": { "label": "Quart bas droit" },
+			"maximize": { "label": "Plein écran" },
+			"center": { "label": "Centrer" },
+			"nextScreen": { "label": "Écran suivant" }
+		},
+		"claudio": {
+			"label": "Claudio"
+		},
+		"face": {
+			"disconnected": {
+				"message": "Ouvrir Claudio"
+			}
+		},
+		"navigate": {
+			"actions": { "label": "Retour" },
+			"windows": { "label": "Fenêtres" },
+			"leave": { "label": "Quitter" }
+		}
+	}
+}

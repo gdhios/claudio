@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>Claudio</title>
+		<meta charset="utf-8" />
+		<script src="./vendor/sdpi-components.js"></script>
+		<script src="./locale.js"></script>
+	</head>
+
+	<body>
+		<sdpi-item label="__MSG_inspector.profile__">
+			<sdpi-button onclick="SDPIComponents.streamDeckClient.send('sendToPlugin', { event: 'installProfile' })">
+				<sdpi-i18n key="inspector.installProfile"></sdpi-i18n>
+			</sdpi-button>
+		</sdpi-item>
+		<sdpi-item>
+			<sdpi-i18n key="inspector.installProfileHint"></sdpi-i18n>
+		</sdpi-item>
+	</body>
+</html>

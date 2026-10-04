@@ -1,0 +1,78 @@
+{
+	"Name": "Claudio",
+	"Description": "Claudio on your Stream Deck: correct, translate and arrange your windows, with a key for each.",
+	"com.okonoma.claudio.action": {
+		"Name": "Claudio action",
+		"Tooltip": "Runs one of Claudio's actions on the current selection."
+	},
+	"com.okonoma.claudio.dictate": {
+		"Name": "Dictate",
+		"Tooltip": "Hold the key to dictate; let go and Claudio writes it down."
+	},
+	"com.okonoma.claudio.window": {
+		"Name": "Window",
+		"Tooltip": "Sends the frontmost window where you want it."
+	},
+	"com.okonoma.claudio.claudio": {
+		"Name": "Claudio",
+		"Tooltip": "Opens Claudio's palette."
+	},
+	"com.okonoma.claudio.face": {
+		"Name": "Claudio's face",
+		"Tooltip": "Shows Claudio's face across the page's fifteen keys."
+	},
+	"com.okonoma.claudio.navigate": {
+		"Name": "Navigation",
+		"Tooltip": "Moves between the pages of the Claudio profile."
+	},
+	"Localization": {
+		"action": {
+			"correct": { "label": "Correct" },
+			"translateFR": { "label": "Translate (FR)" },
+			"translateEN": { "label": "Translate (EN)" },
+			"professionalTone": { "label": "Professional tone" },
+			"summarize": { "label": "Summarize" },
+			"makePrompt": { "label": "Prompt" },
+			"expertPrompt": { "label": "Expert prompt" },
+			"simplify": { "label": "Explain simply" },
+			"free": { "label": "Free action" },
+			"palette": { "label": "Palette" },
+			"whatsPlaying": { "label": "What's playing?" }
+		},
+		"dictate": {
+			"cleanup": { "label": "Dictate" },
+			"translateEN": { "label": "Dictate → EN" },
+			"makePrompt": { "label": "Dictate → Prompt" },
+			"listening": "Speak…",
+			"locked": "Hands-free",
+			"working": "Cleaning up…",
+			"done": "Pasted"
+		},
+		"window": {
+			"leftHalf": { "label": "Left half" },
+			"rightHalf": { "label": "Right half" },
+			"topHalf": { "label": "Top half" },
+			"bottomHalf": { "label": "Bottom half" },
+			"topLeft": { "label": "Top left" },
+			"topRight": { "label": "Top right" },
+			"bottomLeft": { "label": "Bottom left" },
+			"bottomRight": { "label": "Bottom right" },
+			"maximize": { "label": "Full screen" },
+			"center": { "label": "Centre" },
+			"nextScreen": { "label": "Next screen" }
+		},
+		"claudio": {
+			"label": "Claudio"
+		},
+		"face": {
+			"disconnected": {
+				"message": "Open Claudio"
+			}
+		},
+		"navigate": {
+			"actions": { "label": "Back" },
+			"windows": { "label": "Windows" },
+			"leave": { "label": "Leave" }
+		}
+	}
+}

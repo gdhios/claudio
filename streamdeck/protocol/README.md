@@ -14,3 +14,8 @@ the app does not know is ignored, never guessed at.
 
 Text frames over a WebSocket bound to 127.0.0.1. `v` is carried by `hello` and
 `welcome` only; everything else is implied by that handshake.
+
+The `state-*` frames are the ones a key draws from: the app idle, a correction
+streaming or finding nothing selected, and a dictation reaching `listening`,
+`cleaning` (locked, with the app's own progress label), `done`, `empty` or `error`.
+The last two are the ends that paste nothing, and both carry the blank gaze.
