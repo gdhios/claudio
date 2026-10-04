@@ -23,7 +23,9 @@ enum CleanupPlausibility {
         let answer = words(in: cleaned)
         guard answer.count >= minimumWords else { return true }
         let said = Set(words(in: raw))
-        let kept = answer.filter(said.contains).count
+        // A figure was said in words ("douze" comes back "12"): digits
+        // count as said, or a dictation of numbers would be thrown away.
+        let kept = answer.filter { said.contains($0) || $0.allSatisfy(\.isNumber) }.count
         return Double(kept) / Double(answer.count) >= minimumShare
     }
 

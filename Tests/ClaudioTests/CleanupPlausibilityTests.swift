@@ -28,6 +28,14 @@ final class CleanupPlausibilityTests: XCTestCase {
             of: "euh on se voit mardi non mercredi à quatorze heures"))
     }
 
+    /// Figures said in words come back as digits, which were never "said":
+    /// a dictation that is mostly numbers is still a cleanup.
+    func testFiguresWrittenAsDigitsCountAsSaid() {
+        XCTAssertTrue(CleanupPlausibility.isCleanup(
+            "Les chiffres sont 345, 12, 8, 14 et 32.",
+            of: "les chiffres sont trois cent quarante-cinq, douze, huit, quatorze et trente-deux"))
+    }
+
     /// Too short to judge: "trois" becoming "3" is a cleanup.
     func testAShortAnswerIsNeverJudged() {
         XCTAssertTrue(CleanupPlausibility.isCleanup("3", of: "trois"))
