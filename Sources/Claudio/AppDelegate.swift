@@ -177,10 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Settings coming up: what the tabs show of this Mac is read again,
     /// the plugin's folder and Claude Code's settings, either of which may
-    /// have changed since.
+    /// have changed since, a failure of an earlier try forgotten with it.
     private func settingsShown() {
         refreshStreamDeckSettings()
-        refreshHookState()
+        UlanziStatusModel.shared.hookRead(hookInstaller.state())
     }
 
     /// What the tab reads every time it opens: the plugin may have been
@@ -237,6 +237,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.show(clocks)
         fleet.apply(clocks)
         hub.apply(clocks)
+        // An update of the app may ship another relay: the hook installed
+        // runs the new one from now on. A copy that can't be written
+        // leaves the one there as it was.
+        try? hookInstaller.refreshRelay()
         refreshHookState()
     }
 

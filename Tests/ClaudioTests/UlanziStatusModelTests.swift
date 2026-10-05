@@ -322,6 +322,18 @@ final class UlanziStatusModelTests: XCTestCase {
         XCTAssertEqual(model.clocks.map(\.alertsStatus), [.unreachable("Délai dépassé"), nil])
     }
 
+    /// The hook read again as Settings comes up: where it stands now, and
+    /// the failure of an earlier try forgotten, fixed by hand since or not.
+    func testTheHookReadAgainForgetsAnEarlierFailure() {
+        let model = UlanziStatusModel()
+        model.hookFailure = "Permission denied"
+
+        model.hookRead(.installed)
+
+        XCTAssertEqual(model.hook, .installed)
+        XCTAssertNil(model.hookFailure)
+    }
+
     // MARK: - The lines
 
     /// The face's line: out of reach and in error are two things to fix, a

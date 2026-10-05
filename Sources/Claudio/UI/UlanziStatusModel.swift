@@ -159,6 +159,14 @@ final class UlanziStatusModel: ObservableObject {
         clocks[index].alertsStatus = status
     }
 
+    /// The hook read again as Settings comes up: where it stands now, and
+    /// no failure of an earlier try, which may have been fixed by hand
+    /// since.
+    func hookRead(_ state: ClaudeCodeHookInstaller.HookState) {
+        hook = state
+        hookFailure = nil
+    }
+
     // MARK: - The lines
 
     /// The face's status in one line. Out of reach and in error are two

@@ -3,9 +3,10 @@ import Foundation
 /// Hooks the relay into Claude Code from Settings, and takes it out again.
 /// The relay ships inside the app; installing copies it to a place that
 /// doesn't move with the app, then adds its four entries to Claude Code's
-/// settings, after keeping the file as it was next to it. Removing takes
-/// the entries out, the same way. Nothing else in the file changes, and a
-/// file that can't be read is never written over.
+/// settings, after keeping the file as it was next to it, the first time.
+/// Removing takes the entries out, the same way. Nothing else in the file
+/// changes, and a file that can't be read is never written over. At
+/// launch, the copy is brought up to the relay the app ships.
 ///
 /// The three paths are injected: a test works in a temporary folder, never
 /// on this Mac's settings.
@@ -54,7 +55,8 @@ struct ClaudeCodeHookInstaller {
         Bundle.main.url(forResource: "claudio-claude-code", withExtension: "py")
     }
 
-    /// The copy kept before every write, next to the settings.
+    /// The settings as they were before Claudio first wrote them, next to
+    /// them.
     var backupURL: URL {
         settingsURL.deletingLastPathComponent().appendingPathComponent(settingsURL.lastPathComponent + ".claudio-backup")
     }
@@ -83,12 +85,20 @@ struct ClaudeCodeHookInstaller {
     func install() throws {
         guard let relaySource, hasRelay else { throw Failure.noRelay }
         let (settings, original) = try read()
-        try FileManager.default.createDirectory(at: relayDestination.deletingLastPathComponent(),
-                                                withIntermediateDirectories: true)
-        try Data(contentsOf: relaySource).write(to: relayDestination, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: relayDestination.path)
+        try copyRelay(Data(contentsOf: relaySource))
         let installed = Self.install(into: settings, command: Self.command(for: relayDestination))
         try write(installed, over: settings, original: original)
+    }
+
+    /// At launch: the hook installed, the copy is brought up to the relay
+    /// this version ships, an update of the app having changed it, and
+    /// made again if it went. Nothing when the hook isn't installed, the
+    /// app has no relay, or the copy is the same already.
+    func refreshRelay() throws {
+        guard state() == .installed, let relaySource, hasRelay else { return }
+        let shipped = try Data(contentsOf: relaySource)
+        guard (try? Data(contentsOf: relayDestination)) != shipped else { return }
+        try copyRelay(shipped)
     }
 
     /// Takes every entry running the relay out. The copy of the relay
@@ -102,6 +112,14 @@ struct ClaudeCodeHookInstaller {
 
     private var hasRelay: Bool {
         relaySource.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    /// The relay written where it stays put, runnable.
+    private func copyRelay(_ relay: Data) throws {
+        try FileManager.default.createDirectory(at: relayDestination.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try relay.write(to: relayDestination, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: relayDestination.path)
     }
 
     /// The file a symbolic link points at, written in its place.
@@ -127,16 +145,20 @@ struct ClaudeCodeHookInstaller {
         return (settings, data)
     }
 
-    /// Writes `settings` in place of `previous`, keeping the bytes as they
-    /// were aside first. Unchanged, nothing is written, not even a copy.
-    /// Indented with sorted keys, slashes left as they are, under the
-    /// permissions the file had.
+    /// Writes `settings` in place of `previous`. The bytes as they were go
+    /// aside first, the first time only: that copy is the settings before
+    /// Claudio, and no later write replaces it. Unchanged, nothing is
+    /// written, not even a copy. Indented with sorted keys, slashes left as
+    /// they are; the file, and its copy, under the permissions it had.
     private func write(_ settings: [String: Any], over previous: [String: Any], original: Data?) throws {
         guard !NSDictionary(dictionary: settings).isEqual(to: previous) else { return }
         let manager = FileManager.default
         try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let original { try original.write(to: backupURL, options: .atomic) }
         let permissions = try? manager.attributesOfItem(atPath: target.path)[.posixPermissions]
+        if let original, !manager.fileExists(atPath: backupURL.path) {
+            try original.write(to: backupURL, options: .atomic)
+            if let permissions { try manager.setAttributes([.posixPermissions: permissions], ofItemAtPath: backupURL.path) }
+        }
         let data = try JSONSerialization.data(withJSONObject: settings,
                                               options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: target, options: .atomic)

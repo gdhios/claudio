@@ -293,20 +293,89 @@ final class ClaudeCodeHookInstallerTests: XCTestCase {
         }
     }
 
-    /// Removing: kept aside first, then the relay's entries out; the relay
-    /// itself stays where it was copied.
-    func testRemovingBacksUpAndTakesTheEntriesOut() throws {
+    /// Removing: the relay's entries out; the relay itself stays where it
+    /// was copied.
+    func testRemovingTakesTheEntriesOut() throws {
         let installer = try installer()
         try writeSettings(#"{"model":"opus"}"#)
         try installer.install()
-        let installed = try String(contentsOf: settingsURL, encoding: .utf8)
 
         try installer.remove()
 
-        XCTAssertEqual(try String(contentsOf: backupURL, encoding: .utf8), installed)
         XCTAssertEqual(text(try readSettings()), #"{"model":"opus"}"#)
         XCTAssertTrue(FileManager.default.fileExists(atPath: relayDestination.path))
         XCTAssertEqual(installer.state(), .absent)
+    }
+
+    /// The first copy kept aside is the one that matters, the settings as
+    /// they were before Claudio ever wrote them: no later write replaces
+    /// it, an install, a removal, or a change made by hand in between.
+    func testTheFirstBackupIsKept() throws {
+        let original = #"{"model":"opus"}"#
+        try writeSettings(original)
+        let installer = try installer()
+        try installer.install()
+
+        try writeSettings(#"{"model":"sonnet"}"#)
+        try installer.install()
+        try installer.remove()
+
+        XCTAssertEqual(try String(contentsOf: backupURL, encoding: .utf8), original)
+    }
+
+    /// The copy kept aside is read by no more people than the settings:
+    /// it gets their permissions.
+    func testTheBackupHasTheSettingsPermissions() throws {
+        try writeSettings(#"{"env":{"TOKEN":"x"}}"#)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: settingsURL.path)
+
+        try installer().install()
+
+        XCTAssertEqual(try permissions(backupURL), 0o600)
+    }
+
+    // MARK: - The relay brought up to date
+
+    /// The hook installed, an update of the app ships another relay: at
+    /// launch the copy the hook runs is brought up to it, runnable.
+    func testANewerRelayReplacesTheCopyAtLaunch() throws {
+        let installer = try installer()
+        try installer.install()
+        let newer = "#!/usr/bin/env python3\nprint('relay 2')\n"
+        try Data(newer.utf8).write(to: relaySource)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: relayDestination.path)
+
+        try installer.refreshRelay()
+
+        XCTAssertEqual(try String(contentsOf: relayDestination, encoding: .utf8), newer)
+        XCTAssertEqual(try permissions(relayDestination), 0o755)
+    }
+
+    /// The hook installed, its copy gone: it is made again.
+    func testAMissingCopyIsMadeAgainAtLaunch() throws {
+        let installer = try installer()
+        try installer.install()
+        try FileManager.default.removeItem(at: relayDestination)
+
+        try installer.refreshRelay()
+
+        XCTAssertEqual(try String(contentsOf: relayDestination, encoding: .utf8), relayScript)
+    }
+
+    /// Nothing is copied when the hook isn't installed, when the app has no
+    /// relay, or when the copy is the same already, written or not.
+    func testTheRelayIsLeftAloneOtherwise() throws {
+        try installer().refreshRelay()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relayDestination.path))
+
+        try installer().install()
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: relayDestination.path)
+        try installer().refreshRelay()
+        XCTAssertEqual(try permissions(relayDestination), 0o644, "the same relay is not written again")
+
+        try FileManager.default.removeItem(at: relayDestination)
+        try installer(relay: false).refreshRelay()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: relayDestination.path))
     }
 
     /// Nothing to remove: nothing is written, not even a backup.
