@@ -120,23 +120,44 @@ final class UlanziBridge {
         chain { try? await client.setGaze(Self.off) }
     }
 
+    /// The off a bridge let go at quit still has to send. It runs off the
+    /// main actor, which waits for it.
+    typealias PutAway = @Sendable () async -> Void
+
     /// Quitting: the bridge lets go, and the face, if it may be up, goes
     /// before the app does, or is given up on after `limit` seconds,
     /// whichever comes first: a clock that doesn't answer never holds the
     /// quit back.
+    func prepareToQuit(within limit: TimeInterval) {
+        Self.putAway([letGoForQuit()].compactMap { $0 }, within: limit)
+    }
+
+    /// Lets go for good, and hands back the off to send, nil when the face
+    /// can't be up: what `prepareToQuit` does before it waits, for a fleet
+    /// that waits for all its clocks at once.
+    func letGoForQuit() -> PutAway? {
+        let mayBeUp = faceMayBeUp
+        guard let client = letGo(), mayBeUp else { return nil }
+        return { try? await client.setGaze(Self.off) }
+    }
+
+    /// Sends every off at once, and waits for them all, `limit` seconds at
+    /// most: the clocks answer side by side, so the wait is the slowest
+    /// one's, never the sum.
     ///
-    /// It waits right here, holding the main thread, so the off can't go
-    /// through the main actor, behind the gazes: it goes at once, on its
+    /// It waits right here, holding the main thread, so the offs can't go
+    /// through the main actor, behind the gazes: they go at once, on their
     /// own, and a gaze already on its way got there first. Quit can come
     /// from a task of the main actor too (the updater's), which then runs
     /// nothing more before the app is gone: a `.terminateLater` waiting on
     /// the main actor would never be answered.
-    func prepareToQuit(within limit: TimeInterval) {
-        let mayBeUp = faceMayBeUp
-        guard let client = letGo(), mayBeUp else { return }
+    nonisolated static func putAway(_ offs: [PutAway], within limit: TimeInterval) {
+        guard !offs.isEmpty else { return }
         let answered = DispatchSemaphore(value: 0)
         Task.detached {
-            try? await client.setGaze(Self.off)
+            await withTaskGroup(of: Void.self) { group in
+                for off in offs { group.addTask { await off() } }
+            }
             answered.signal()
         }
         _ = answered.wait(timeout: .now() + limit)
