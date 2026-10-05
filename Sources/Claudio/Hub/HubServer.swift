@@ -8,8 +8,9 @@ import Network
 ///
 /// Transport only, which is why no test opens one, as with `BridgeServer`:
 /// the request is a value (`HubRequest`), and so is the one decision made
-/// here, what to answer and what to hand on (`HubRoute.answer`), which takes
-/// hook events from this Mac alone (`HubPeer`).
+/// here, what to answer and what to hand on with this server's token
+/// (`answer(_:fromLoopback:)`), which takes hook events from this Mac alone
+/// (`HubPeer`).
 @MainActor
 final class HubServer {
     /// A request bigger than this is nobody's. A Stop brings the turn's last
@@ -57,6 +58,12 @@ final class HubServer {
         }
         self.listener = listener
         listener.start(queue: .main)
+    }
+
+    /// What this server answers `request`, and the route it hands on: the
+    /// one decision taken here, on its own token, and a value.
+    func answer(_ request: HubRequest, fromLoopback: Bool) -> (status: Int, route: HubRoute?) {
+        HubRoute.answer(request, token: token, fromLoopback: fromLoopback)
     }
 
     func stop() {
@@ -124,25 +131,25 @@ final class HubServer {
         guard connections.contains(where: { $0 === client }), !client.answered else { return }
         if let data { client.buffer.append(data) }
         guard !failed else { return drop(client) }
-        guard client.buffer.count <= Self.maximumRequestSize else { return answer(413, to: client) }
+        guard client.buffer.count <= Self.maximumRequestSize else { return send(413, to: client) }
         switch HubRequest.read(client.buffer) {
         case .complete(let request):
-            let (status, route) = HubRoute.answer(request, token: token, fromLoopback: client.fromLoopback)
+            let (status, route) = answer(request, fromLoopback: client.fromLoopback)
             // Answered before the hub does anything: neither the relay nor
             // the clock waits for the work.
-            answer(status, to: client)
+            send(status, to: client)
             if let route { onRoute(route) }
         case .malformed:
-            answer(400, to: client)
+            send(400, to: client)
         case .incomplete where isComplete:
-            answer(400, to: client)  // the sender stopped short
+            send(400, to: client)  // the sender stopped short
         case .incomplete:
             receive(on: client)
         }
     }
 
-    /// Answers, and closes once the answer is out.
-    private func answer(_ status: Int, to client: HubConnection) {
+    /// Sends the answer, and closes once it is out.
+    private func send(_ status: Int, to client: HubConnection) {
         client.answered = true
         let connection = client.connection
         connection.send(content: HubResponse.data(status: status), isComplete: true,

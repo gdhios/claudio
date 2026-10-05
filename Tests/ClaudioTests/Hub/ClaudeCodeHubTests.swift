@@ -22,6 +22,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     private var opened: [URL] = []
     private var statuses: [ClaudeCodeHub.Status] = []
     private var listened = 0
+    private var servers: [HubServer] = []
     private var listenFailure: Error?
     private var time = Date(timeIntervalSince1970: 1_800_000_000)
     private var hub: ClaudeCodeHub!
@@ -45,8 +46,9 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
             now: { [unowned self] in time },
             handshake: BridgeHandshakeFile(directory: support, name: ClaudeCodeHub.handshakeName),
             boardFile: ClaudeCodeBoardFile(directory: support),
-            listen: { [unowned self] _ in
+            listen: { [unowned self] server in
                 listened += 1
+                servers.append(server)
                 if let listenFailure { throw listenFailure }
             })
         hub.onStatusChange = { [unowned self] in statuses.append($0) }
@@ -168,7 +170,8 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// indicator orange, in that order. Then the press: the firmware takes
     /// the alert off the screen itself, the hub dismisses it all the same
     /// (404, no failure), puts the indicator out, and opens the
-    /// conversation in the Claude app. The release beside it does nothing.
+    /// conversation in the Claude app. The releases before and after it do
+    /// nothing.
     func testADecisionThenTheMiddleButtonOpensItsConversation() async throws {
         await listening()
         try writeSession(app: "local_0d6e")
@@ -184,6 +187,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         device.dismissOnScreen()
         button("middle", down: false)
         button("middle", down: true)
+        button("middle", down: false)
         await settle()
 
         XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "DELETE /api/v1/indicators/1"])
@@ -191,6 +195,27 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_0d6e")!])
         // Not one failure on the way, the two dismissals of nothing included.
         XCTAssertEqual(statuses, [.listening(port: 51234)])
+    }
+
+    /// Only the press takes an alert, not the releases around it: with two
+    /// held, one goes, and the other stays on the clock.
+    func testOnlyThePressTakesAnAlertNotItsReleases() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        stop("🟧 DÉCISION")
+        stop("🟧 DÉCISION", session: otherSession)
+        await settle()
+        device.clearRequests()
+
+        device.dismissOnScreen()
+        button("middle", down: false)
+        button("middle", down: true)
+        button("middle", down: false)
+        await settle()
+
+        XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)"])
+        XCTAssertEqual(device.heldNotifications, [otherAlert])
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!])
     }
 
     /// The clock out of reach when A is answered: its alert stays on the
@@ -409,6 +434,29 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.indicator, ##"{"blinkMs":0,"color":"#FF851B","fadeMs":2000}"##)
     }
 
+    /// A call still on its way when the hub starts again writes nothing over
+    /// the new run: its failure doesn't reach the new status, and the calls
+    /// queued behind it never go.
+    func testACallInFlightAcrossARestartWritesNothingOverTheNewRun() async {
+        await listening()
+        device.answer("DELETE /api/v1/notifications/\(alert)", status: 500,
+                      body: FakeUlanzi.refusal("internal", "no memory"))
+        device.holdAnswers()
+        stop("🟧 DÉCISION")
+        await device.waitUntilReceived(1)
+
+        hub.stop()
+        statuses = []
+        hub.start(address: address)
+        hub.listenerReady(port: port)
+        device.releaseAnswers()
+        await settle()
+
+        XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "PUT /api/v1/system"])
+        XCTAssertEqual(statuses, [.listening(port: 51234)])
+        XCTAssertEqual(hub.status, .listening(port: 51234))
+    }
+
     /// What isn't an event, or an event of no interest, sends nothing.
     func testWhatIsNoEventSendsNothing() async {
         await listening()
@@ -583,12 +631,23 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
                        ClaudeCodeBoard.Snapshot())
     }
 
-    /// A new start is a new token: the old one opens nothing more.
+    /// A new start is a new token: the old one opens nothing more, neither
+    /// for the relay nor for the clock.
     func testEachStartHasItsOwnToken() async throws {
         await listening()
         let first = try token()
 
         await listening()
-        XCTAssertNotEqual(try token(), first)
+        let second = try token()
+        XCTAssertNotEqual(second, first)
+
+        let door = try XCTUnwrap(servers.last)
+        for path in ["/claude-code/", "/ulanzi/button/"] {
+            let body = Data(#"{"hook_event_name":"Stop","button":"middle","state":true}"#.utf8)
+            XCTAssertEqual(door.answer(HubRequest(method: "POST", path: path + first, body: body),
+                                       fromLoopback: true).status, 404, path)
+            XCTAssertEqual(door.answer(HubRequest(method: "POST", path: path + second, body: body),
+                                       fromLoopback: true).status, 200, path)
+        }
     }
 }
