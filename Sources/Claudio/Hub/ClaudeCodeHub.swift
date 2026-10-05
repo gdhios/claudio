@@ -8,7 +8,8 @@ import AppKit
 ///
 /// It holds the server, the handshake file and the one board, and a link
 /// per clock with the flags ticked (`ClaudeCodeHub+Clocks.swift`): every
-/// clock hears every command, one call at a time, in order, on its own. The
+/// clock hears every command, one call at a time, in order, on its own
+/// device's line. The
 /// board outlives Claudio in a file of its own, as the clocks outlive it.
 /// What the hub reaches outside is injected: the devices, the Mac's
 /// address, the sessions folder, how a link opens, the time, the two files,
@@ -46,6 +47,13 @@ final class ClaudeCodeHub {
     var links: [ClaudeCodeClockLink] = []
     /// The board's commands on their way, until every clock has answered.
     var deliveries = ClaudeCodeDeliveries()
+    /// The last call queued for each device, by its address, whichever
+    /// link queued it: one call at a time reaches a device, in order. A
+    /// link that follows another on the same device, the flags ticked
+    /// again or the clock back from elsewhere, goes after what the one
+    /// before still had on its way, its button given back above all. Kept
+    /// through a stop: a call still under way lands before the next run's.
+    var lines: [URL: Task<Void, Never>] = [:]
     /// Bumped by every start and stop: a call still on its way from an
     /// earlier run writes nothing over the current one.
     private(set) var run = 0

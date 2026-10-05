@@ -24,9 +24,11 @@ extension ClaudeCodeHub {
         links.first { $0.id == id }?.status ?? .pending
     }
 
-    /// The last call queued for each clock, for a test to wait on.
+    /// The last call queued for each device the hub speaks to, for a test
+    /// to wait on.
     var sending: [Task<Void, Never>] {
-        links.compactMap(\.sending)
+        var seen = Set<URL>()
+        return links.compactMap { seen.insert($0.address).inserted ? lines[$0.address] : nil }
     }
 
     // MARK: - The links
@@ -51,10 +53,12 @@ extension ClaudeCodeHub {
     /// buttons nowhere, after whatever was still queued for it, which goes
     /// nowhere now: its middle button is its own again, not a press on the
     /// alerts of the clocks that stay. Only a clock Claudio told the door.
+    /// A link that comes to the same device later goes after it, in the
+    /// device's line: the door it tells is never cleared behind its back.
     private func giveButtonBack(_ link: ClaudeCodeClockLink) {
-        guard link.callbackHost != nil else { return }
+        guard link.doorSent else { return }
         let client = link.client
-        link.chain { try? await client.clearButtonCallback() }
+        chain(at: link.address) { try? await client.clearButtonCallback() }
     }
 
     private func makeLink(for clock: UlanziClock) -> ClaudeCodeClockLink {
@@ -90,7 +94,8 @@ extension ClaudeCodeHub {
               let url = URL(string: "http://\(host):\(port)/ulanzi/button/\(token)") else { return }
         for link in links where link.callbackHost != host {
             link.callbackHost = host
-            attempt({ try await $0.setButtonCallback(url) }, on: link) { [weak link] failure in
+            attempt({ try await $0.setButtonCallback(url) }, on: link,
+                    going: { [weak link] in link?.doorSent = true }) { [weak link] failure in
                 if failure != nil { link?.callbackHost = nil }
             }
         }
@@ -113,8 +118,9 @@ extension ClaudeCodeHub {
         }
     }
 
-    /// Runs `call` on `link`'s own queue, and hands on what came of it: nil
-    /// when the clock took it. The clock's status says it too.
+    /// Runs `call` in the line of `link`'s device, and hands on what came
+    /// of it: nil when the clock took it. The clock's status says it too.
+    /// `going` is told when the call does go out.
     ///
     /// A clock out of reach costs one try per event, not 2.5 s per call:
     /// the calls queued behind the one that found nobody fail at once,
@@ -122,14 +128,16 @@ extension ClaudeCodeHub {
     /// Nothing comes back from a run stopped since, or a link let go.
     private func attempt(_ call: @escaping @Sendable (UlanziClient) async throws -> Void,
                          on link: ClaudeCodeClockLink,
+                         going: (@MainActor () -> Void)? = nil,
                          then outcome: @escaping @MainActor (UlanziClient.Failure?) -> Void) {
         let run = self.run
         let event = events
-        link.chain { [weak self, weak link] in
+        chain(at: link.address) { [weak self, weak link] in
             guard let self, let link, holds(link, in: run) else { return }
             if let outOfReach = link.outOfReach, event <= outOfReach.through {
                 return outcome(.unreachable(outOfReach.reason))
             }
+            going?()
             let failure: UlanziClient.Failure?
             do {
                 try await call(link.client)
@@ -143,6 +151,16 @@ extension ClaudeCodeHub {
             }
             link.update(ClockStatus(failure))
             outcome(failure)
+        }
+    }
+
+    /// Runs `work` once every call queued before it for the device at
+    /// `address` is done, whichever link queued them.
+    private func chain(at address: URL, _ work: @escaping @MainActor () async -> Void) {
+        let previous = lines[address]
+        lines[address] = Task { @MainActor in
+            await previous?.value
+            await work()
         }
     }
 

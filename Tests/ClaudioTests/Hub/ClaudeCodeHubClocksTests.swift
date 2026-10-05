@@ -431,6 +431,76 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         XCTAssertFalse(deskDevice.requests.contains { $0.body == #"{"buttonCallback":""}"# })
     }
 
+    // MARK: - One line per device
+
+    /// The doors a device was told to post its buttons to, in order: the
+    /// empty one is its button given back.
+    private func doors(toldTo device: FakeUlanzi) -> [String] {
+        device.requests.filter { $0.path == "/api/v1/system" }.compactMap { request in
+            let object = try? JSONSerialization.jsonObject(with: Data(request.body.utf8)) as? [String: String]
+            return object?["buttonCallback"]
+        }
+    }
+
+    /// The desk leaves the flags while a call to it is still on its way,
+    /// held at the device, then comes back: its button given back waits
+    /// behind that call, and the door told again waits behind it.
+    private func deskComesBackMidCall(leaving: [UlanziClock], back: [UlanziClock]) async throws -> String {
+        await listening([desk, lounge])
+        let door = "http://192.168.1.50:51234/ulanzi/button/\(try token())"
+        deskDevice.holdAnswers()
+        decision()
+        await deskDevice.waitUntilReceived(1)
+
+        hub.apply(leaving)
+        hub.apply(back)
+        deskDevice.releaseAnswers()
+        await settle()
+        return door
+    }
+
+    /// Unticked then ticked again mid-call: the button given back lands
+    /// before the door, never after, and the desk's middle button still
+    /// reaches Claudio, at the next event as well.
+    func testFlagsTickedAgainMidCallKeepTheDoor() async throws {
+        var quiet = desk
+        quiet.alerts = false
+
+        let door = try await deskComesBackMidCall(leaving: [quiet, lounge], back: [desk, lounge])
+
+        XCTAssertEqual(doors(toldTo: deskDevice), ["", door])
+        XCTAssertEqual(deskDevice.buttonCallback, door)
+        decision()
+        await settle()
+        XCTAssertEqual(deskDevice.buttonCallback, door)
+    }
+
+    /// Moved elsewhere then back mid-call: the same. The address it went
+    /// through for a moment was never told the door, its turn not come
+    /// yet, and is told nothing at all.
+    func testAClockMovedAwayAndBackMidCallKeepsTheDoor() async throws {
+        var away = desk
+        away.address = elsewhere
+
+        let door = try await deskComesBackMidCall(leaving: [away, lounge], back: [desk, lounge])
+
+        XCTAssertEqual(doors(toldTo: deskDevice), ["", door])
+        XCTAssertEqual(deskDevice.buttonCallback, door)
+        await hub.lines[elsewhere]?.value
+        XCTAssertEqual(device(elsewhere).calls, [])
+    }
+
+    /// Removed then added again mid-call, a new clock at the same address:
+    /// the same.
+    func testAClockRemovedAndAddedAgainMidCallKeepsTheDoor() async throws {
+        let again = UlanziClock(name: "Bureau", address: desk.address)
+
+        let door = try await deskComesBackMidCall(leaving: [lounge], back: [again, lounge])
+
+        XCTAssertEqual(doors(toldTo: deskDevice), ["", door])
+        XCTAssertEqual(deskDevice.buttonCallback, door)
+    }
+
     // MARK: - Each clock's own status
 
     /// Each clock says where it stands, on its own: waiting until it first

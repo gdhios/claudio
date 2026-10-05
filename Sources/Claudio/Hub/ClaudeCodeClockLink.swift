@@ -1,9 +1,10 @@
 import Foundation
 
-/// One clock the Claude Code hub speaks to: its client, its own queue of
-/// calls, the Mac's address it was last told to post its buttons to,
-/// whether it is out of reach, and where it stands for Settings. A clock
-/// that moves gets a new link: nothing of the old address carries over.
+/// One clock the Claude Code hub speaks to: its client, the Mac's address
+/// it was last told to post its buttons to, whether it is out of reach,
+/// and where it stands for Settings. Its calls wait in its device's line,
+/// which the hub keeps by address. A clock that moves gets a new link:
+/// nothing of the old address carries over.
 @MainActor
 final class ClaudeCodeClockLink {
     let id: UUID
@@ -14,13 +15,14 @@ final class ClaudeCodeClockLink {
     /// still to set: from the moment the listener is ready, and again after
     /// a setting that failed.
     var callbackHost: String?
+    /// A button callback went out to the device from this link, answered or
+    /// not: only then is the button given back when the clock leaves. One
+    /// still waiting its turn when the clock leaves never goes.
+    var doorSent = false
     /// Found out of reach, and the hub's last event then: every call of
     /// that event or an earlier one, still queued, fails at once, and the
     /// next event tries the clock again.
     var outOfReach: (through: Int, reason: String)?
-
-    /// The last call queued for the clock. Each waits for the one before.
-    private(set) var sending: Task<Void, Never>?
 
     private(set) var status: ClaudeCodeHub.ClockStatus = .pending
     var onStatusChange: ((ClaudeCodeHub.ClockStatus) -> Void)?
@@ -36,14 +38,5 @@ final class ClaudeCodeClockLink {
         guard status != self.status else { return }
         self.status = status
         onStatusChange?(status)
-    }
-
-    /// Runs `work` once every call queued before it is done.
-    func chain(_ work: @escaping @MainActor () async -> Void) {
-        let previous = sending
-        sending = Task { @MainActor in
-            await previous?.value
-            await work()
-        }
     }
 }
