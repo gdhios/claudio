@@ -62,9 +62,9 @@ final class StatusMenuRowsTests: XCTestCase {
             "Palette d'actions…",
             "—",
             "# Texte sélectionné",
-            "Corriger la sélection",
+            "Corriger",
             "Structurer en prompt",
-            "Structurer en prompt expert",
+            "Prompt expert",
             "Traduire en français",
             "Traduire en anglais",
             "Ton professionnel",
@@ -215,23 +215,32 @@ final class StatusMenuRowsTests: XCTestCase {
 
     // MARK: - Titles
 
-    /// "Lapacompris: explain simply" would stretch the menu: there, and only
-    /// there, Lapacompris goes by its name alone.
-    func testOnlyLapacomprisIsShortenedForTheMenu() {
-        for action in ClaudioAction.allCases where action != .simplify {
-            XCTAssertEqual(action.shortMenuTitle, action.menuTitle)
-        }
-        XCTAssertEqual(ClaudioAction.simplify.shortMenuTitle, "Lapacompris")
+    /// Under "Selected text" the actions go by the short titles of the
+    /// drawing Guillaume validated: the section already says what they act
+    /// on. Only the menu: everywhere else keeps its full title.
+    func testTheMenuUsesTheShortTitlesOfTheValidatedDrawing() {
+        XCTAssertEqual(ClaudioAction.allCases.map(\.shortMenuTitle), [
+            "Corriger", "Structurer en prompt", "Prompt expert", "Traduire en français",
+            "Traduire en anglais", "Ton professionnel", "Résumer", "Lapacompris",
+        ])
+        XCTAssertEqual(ClaudioAction.correct.menuTitle, "Corriger la sélection")
         XCTAssertEqual(ClaudioAction.simplify.menuTitle, "Lapacompris : expliquer simplement")
+
+        useLanguage(.english)
+        XCTAssertEqual(ClaudioAction.allCases.map(\.shortMenuTitle), [
+            "Fix", "Turn into a prompt", "Expert prompt", "Translate to French",
+            "Translate to English", "Professional tone", "Summarize", "Lapacompris",
+        ])
+        XCTAssertEqual(ClaudioAction.correct.menuTitle, "Fix the selection")
     }
 
     /// The menu is named again in the interface language at every opening.
     func testTheMenuSpeaksEnglishToo() {
         useLanguage(.english)
         let english = outline(rows(update: .init(version: "1.14")))
-        for title in ["Update 1.14 available…", "# Selected text", "# Music", "# History", "Recent",
-                      "Recent dictations", "Dictation history…", "Leave Claudio a tip", "Settings…",
-                      "About Claudio", "Quit Claudio"] {
+        for title in ["Update 1.14 available…", "# Selected text", "Fix", "Expert prompt", "# Music",
+                      "# History", "Recent", "Recent dictations", "Dictation history…", "Leave Claudio a tip",
+                      "Settings…", "About Claudio", "Quit Claudio"] {
             XCTAssertTrue(english.contains(title), title)
         }
     }

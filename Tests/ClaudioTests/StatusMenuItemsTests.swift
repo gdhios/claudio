@@ -67,7 +67,7 @@ final class StatusMenuItemsTests: XCTestCase {
     func testItemsShowTheirShortcuts() {
         let menu = NSMenu()
         makeItems().fill(menu, with: rows())
-        let correct = menuItem("Corriger la sélection", in: menu)
+        let correct = menuItem("Corriger", in: menu)
         let shortcut = KeyboardShortcuts.getShortcut(for: .correctSelection)
         XCTAssertNotNil(shortcut)
         XCTAssertEqual(correct?.keyEquivalent, shortcut?.nsMenuItemKeyEquivalent)
