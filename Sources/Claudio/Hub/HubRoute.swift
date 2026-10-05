@@ -21,13 +21,17 @@ enum HubRoute: Equatable {
         return nil
     }
 
-    /// What the hub answers `request`, and the route it hands on: 404 for no
-    /// route, 400 for a route whose body is no JSON object, which goes no
-    /// further, 200 otherwise.
-    static func answer(_ request: HubRequest, token: String) -> (status: Int, route: HubRoute?) {
+    /// What the hub answers `request`, and the route it hands on. 404 for no
+    /// route, and for a hook event from anywhere but this Mac: the relay
+    /// posts from the loopback, and the token can be read off the clock by
+    /// anyone on the network. 400 for a route whose body is no JSON object,
+    /// which goes no further. 200 otherwise.
+    static func answer(_ request: HubRequest, token: String,
+                       fromLoopback: Bool) -> (status: Int, route: HubRoute?) {
         guard let route = match(method: request.method, path: request.path, token: token, body: request.body) else {
             return (404, nil)
         }
+        if case .hookEvent = route, !fromLoopback { return (404, nil) }
         guard (try? JSONSerialization.jsonObject(with: request.body)) is [String: Any] else { return (400, nil) }
         return (200, route)
     }

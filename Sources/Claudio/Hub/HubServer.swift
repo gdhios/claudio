@@ -8,7 +8,8 @@ import Network
 ///
 /// Transport only, which is why no test opens one, as with `BridgeServer`:
 /// the request is a value (`HubRequest`), and so is the one decision made
-/// here, what to answer and what to hand on (`HubRoute.answer`).
+/// here, what to answer and what to hand on (`HubRoute.answer`), which takes
+/// hook events from this Mac alone (`HubPeer`).
 @MainActor
 final class HubServer {
     /// A request bigger than this is nobody's. A Stop brings the turn's last
@@ -87,7 +88,7 @@ final class HubServer {
             connection.cancel()
             return
         }
-        let client = HubConnection(connection)
+        let client = HubConnection(connection, fromLoopback: HubPeer.isLoopback(connection.endpoint))
         connections.append(client)
         connection.stateUpdateHandler = { [weak self, weak client] state in
             Task { @MainActor in
@@ -126,7 +127,7 @@ final class HubServer {
         guard client.buffer.count <= Self.maximumRequestSize else { return answer(413, to: client) }
         switch HubRequest.read(client.buffer) {
         case .complete(let request):
-            let (status, route) = HubRoute.answer(request, token: token)
+            let (status, route) = HubRoute.answer(request, token: token, fromLoopback: client.fromLoopback)
             // Answered before the hub does anything: neither the relay nor
             // the clock waits for the work.
             answer(status, to: client)
@@ -158,6 +159,8 @@ final class HubServer {
 @MainActor
 private final class HubConnection {
     let connection: NWConnection
+    /// From this Mac: the only place a hook event may come from.
+    let fromLoopback: Bool
     var buffer = Data()
     /// The answer is on its way: nothing more is read.
     var answered = false
@@ -165,8 +168,9 @@ private final class HubConnection {
     /// whose answer never went out.
     var timer: Task<Void, Never>?
 
-    init(_ connection: NWConnection) {
+    init(_ connection: NWConnection, fromLoopback: Bool) {
         self.connection = connection
+        self.fromLoopback = fromLoopback
     }
 
     func close() {

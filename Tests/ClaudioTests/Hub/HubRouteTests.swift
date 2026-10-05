@@ -3,8 +3,9 @@ import XCTest
 
 /// The two ways into the hub, both ending in the launch's token, and the
 /// answer to everything else: 404, a wrong token included, so that nothing
-/// says a path exists. A route whose body is no JSON object is answered 400
-/// and goes no further.
+/// says a path exists. A hook event comes from this Mac or not at all: the
+/// token can be read off the clock by anyone on the network. A route whose
+/// body is no JSON object is answered 400 and goes no further.
 final class HubRouteTests: XCTestCase {
 
     private let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -57,13 +58,40 @@ final class HubRouteTests: XCTestCase {
 
     // MARK: - Answering
 
-    private func answer(_ method: String, _ path: String, body: String) -> (status: Int, route: HubRoute?) {
-        HubRoute.answer(HubRequest(method: method, path: path, body: Data(body.utf8)), token: token)
+    private func answer(_ method: String, _ path: String, body: String,
+                        fromLoopback: Bool = true) -> (status: Int, route: HubRoute?) {
+        HubRoute.answer(HubRequest(method: method, path: path, body: Data(body.utf8)), token: token,
+                        fromLoopback: fromLoopback)
     }
 
     /// A route with a JSON object goes on, answered 200.
     func testARouteWithAnObjectIsAnswered200() {
         let reply = answer("POST", "/ulanzi/button/\(token)", body: #"{"button":"middle","state":true}"#)
+
+        XCTAssertEqual(reply.status, 200)
+        XCTAssertEqual(reply.route, .button(Data(#"{"button":"middle","state":true}"#.utf8)))
+    }
+
+    /// A hook event from the network is no route, like a wrong token: only
+    /// the relay on this Mac posts them.
+    func testAHookEventFromTheNetworkIsAnswered404() {
+        let reply = answer("POST", "/claude-code/\(token)", body: #"{"hook_event_name":"Stop"}"#,
+                           fromLoopback: false)
+
+        XCTAssertEqual(reply.status, 404)
+        XCTAssertNil(reply.route)
+    }
+
+    /// From the network, a hook event is refused before its body is read:
+    /// nothing says the route exists.
+    func testAHookEventFromTheNetworkIsRefusedWhateverItsBody() {
+        XCTAssertEqual(answer("POST", "/claude-code/\(token)", body: "{not json", fromLoopback: false).status, 404)
+    }
+
+    /// The clock's buttons come from the network, and are let in.
+    func testAButtonFromTheNetworkIsLetIn() {
+        let reply = answer("POST", "/ulanzi/button/\(token)", body: #"{"button":"middle","state":true}"#,
+                           fromLoopback: false)
 
         XCTAssertEqual(reply.status, 200)
         XCTAssertEqual(reply.route, .button(Data(#"{"button":"middle","state":true}"#.utf8)))
