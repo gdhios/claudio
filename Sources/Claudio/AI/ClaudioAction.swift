@@ -50,6 +50,15 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
+    /// Label in the menu bar's menu, under "Selected text": the menu title,
+    /// except Lapacompris, whose explanation would stretch the whole menu.
+    var shortMenuTitle: String {
+        switch self {
+        case .simplify: "Lapacompris"
+        default: menuTitle
+        }
+    }
+
     /// Label in the palette: shorter than the menu one, which would wrap to
     /// a new line in a list ("Lapacompris: explain simply").
     var paletteTitle: String {
