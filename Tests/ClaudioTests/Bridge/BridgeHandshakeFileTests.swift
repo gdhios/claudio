@@ -38,6 +38,20 @@ final class BridgeHandshakeFileTests: XCTestCase {
         XCTAssertEqual(file.url, directory.appendingPathComponent("streamdeck-bridge.json"))
     }
 
+    /// The Claude Code hub publishes its own way in, beside the plugin's, in
+    /// the same folder and under its own name: the Stream Deck's file is
+    /// neither renamed nor touched.
+    func testAnotherNameIsAnotherFileInTheSameFolder() throws {
+        let hub = BridgeHandshakeFile(directory: directory, name: "claude-code-hub.json")
+        try hub.write(port: 51236, token: "hub", pid: 7)
+
+        XCTAssertEqual(hub.url, directory.appendingPathComponent("claude-code-hub.json"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: hub.url.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.url.path))
+        hub.remove()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: hub.url.path))
+    }
+
     /// Claudio's own folder, which may not exist yet on a fresh install.
     func testTheDefaultIsClaudiosApplicationSupportFolder() {
         XCTAssertTrue(

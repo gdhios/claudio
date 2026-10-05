@@ -8,13 +8,24 @@ import Security
 ///
 /// Which makes the file's permissions the whole of the security: 0600, so
 /// only the account running Claudio can read the token that drives it.
+///
+/// The Claude Code hub publishes its own door the same way, under its own
+/// name: the same four keys, read by its hook relay.
 struct BridgeHandshakeFile {
+    /// The Stream Deck plugin's file.
+    static let streamDeckName = "streamdeck-bridge.json"
+
     /// Claudio's own Application Support folder, which may not exist yet.
     /// Injectable so the tests write to a temporary one.
     let directory: URL
+    /// The name is a contract: whoever reads the file looks it up by path,
+    /// having no way to ask where it is.
+    let name: String
 
-    init(directory: URL = BridgeHandshakeFile.defaultDirectory) {
+    init(directory: URL = BridgeHandshakeFile.defaultDirectory,
+         name: String = BridgeHandshakeFile.streamDeckName) {
         self.directory = directory
+        self.name = name
     }
 
     static var defaultDirectory: URL {
@@ -22,9 +33,7 @@ struct BridgeHandshakeFile {
             .appendingPathComponent("Library/Application Support/Claudio")
     }
 
-    /// The name is a contract: the plugin looks this file up by path, having
-    /// no way to ask where it is.
-    var url: URL { directory.appendingPathComponent("streamdeck-bridge.json") }
+    var url: URL { directory.appendingPathComponent(name) }
 
     /// 32 random bytes in hex. Lowercase, so both sides compare the same
     /// string, and long enough that the socket is protected by the file's
