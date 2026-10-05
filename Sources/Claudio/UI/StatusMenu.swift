@@ -54,6 +54,21 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     // MARK: - Opening
 
+    /// While the main menu is open, the global shortcuts step aside: the
+    /// library would otherwise take a shortcut typed over the menu for
+    /// itself and fire the action under the still-open menu, where the
+    /// selection capture finds nothing. Left to the menu, the keystroke
+    /// runs the row it is shown on, after the menu closes, like a click.
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === self.menu else { return }
+        KeyboardShortcuts.isEnabled = false
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === self.menu else { return }
+        KeyboardShortcuts.isEnabled = true
+    }
+
     /// The main menu is made again from its rows, in the current language,
     /// with the histories and the status lines as they stand. A submenu is
     /// repopulated from its history.
