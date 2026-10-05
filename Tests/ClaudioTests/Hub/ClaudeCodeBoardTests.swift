@@ -16,6 +16,7 @@ final class ClaudeCodeBoardTests: XCTestCase {
     private let sessionC = "c0ffee00-aaaa-4bbb-8ccc-000000000003"
     private let alertA = "cc-5f0c2a9e"
     private let alertB = "cc-77d1e3f0"
+    private let alertC = "cc-c0ffee00"
 
     private let orange = UlanziIndicator(color: "#FF851B", blinkMs: 0, fadeMs: 2000)
     private let red = UlanziIndicator(color: "#FF2D2D", blinkMs: 600, fadeMs: 0)
@@ -45,6 +46,19 @@ final class ClaudeCodeBoardTests: XCTestCase {
     @discardableResult
     private func handle(_ event: ClaudeCodeEvent, at time: Date? = nil) -> [UlanziCommand] {
         board.handle(event, now: time ?? t0)
+    }
+
+    /// What the hub tells the board once the clock has answered: every
+    /// dismissal among `commands` landed, but those of the names in
+    /// `failing`, which the clock never heard of.
+    private func deliver(_ commands: [UlanziCommand], failing: Set<String> = []) {
+        for case .dismiss(let name) in commands {
+            if failing.contains(name) {
+                board.dismissFailed(name: name)
+            } else {
+                board.dismissLanded(name: name)
+            }
+        }
     }
 
     // MARK: - Stop, flag by flag
@@ -260,6 +274,89 @@ final class ClaudeCodeBoardTests: XCTestCase {
         let press = board.middleButtonPressed(now: t0)
         XCTAssertEqual(press.commands, [])
         XCTAssertNil(press.sessionID)
+    }
+
+    // MARK: - A dismissal the clock never heard of
+
+    /// The clock was out of reach when A answered: it still shows A's alert,
+    /// so A goes back at the head of the queue, and the next press takes it
+    /// for real, its own dismissal failing or not.
+    func testAFailedDismissalPutsTheAlertBackAtTheHead() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(stop("🟥", sessionB)))
+
+        deliver(handle(event(.promptSubmitted, sessionA)), failing: [alertA])
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB])
+
+        let press = board.middleButtonPressed(now: t0)
+        XCTAssertEqual(press.sessionID, sessionA)
+        XCTAssertEqual(press.commands, [.dismiss(name: alertA)])
+        deliver(press.commands, failing: [alertA])
+        XCTAssertEqual(board.alerts.map(\.name), [alertB])
+    }
+
+    /// Between two others, it goes back between the same two.
+    func testAnAlertPutBackKeepsItsPlace() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(stop("🟧", sessionB)))
+        deliver(handle(stop("🟧", sessionC)))
+
+        deliver(handle(event(.sessionEnded, sessionB)), failing: [alertB])
+
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB, alertC])
+    }
+
+    /// A dismissal the clock took is done for good.
+    func testALandedDismissalIsDone() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(event(.promptSubmitted, sessionA)))
+        board.dismissFailed(name: alertA)
+
+        XCTAssertEqual(board.alerts, [])
+    }
+
+    /// Held again since under the same name, the clock replaced the old
+    /// alert with the new one: nothing goes back.
+    func testANameHeldAgainIsNotPutBack() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(stop("🟧", sessionB)))
+        let dismissal = handle(event(.promptSubmitted, sessionA))
+        handle(event(.notification(type: "permission_prompt"), sessionA))
+
+        deliver(dismissal, failing: [alertA])
+
+        XCTAssertEqual(board.alerts.map(\.name), [alertB, alertA])
+    }
+
+    /// Two dismissals of one name on their way: the last one decides. Both
+    /// failing, the alert the clock still shows goes back; the second one
+    /// landing, it is gone.
+    func testTheLastOfTwoDismissalsOfANameDecides() {
+        for secondLands in [false, true] {
+            board = ClaudeCodeBoard()
+            deliver(handle(stop("🟧", sessionA)))
+            let prompt = handle(event(.promptSubmitted, sessionA))
+            let stop = handle(stop("🟩", sessionA))
+
+            deliver(prompt, failing: [alertA])
+            XCTAssertEqual(board.alerts, [], "second lands: \(secondLands)")
+            deliver(stop, failing: secondLands ? [] : [alertA])
+            XCTAssertEqual(board.alerts.map(\.name), secondLands ? [] : [alertA], "second lands: \(secondLands)")
+        }
+    }
+
+    /// A press while a dismissal of the same name is on its way: the press
+    /// has the last word, and nothing comes back.
+    func testAPressAfterAFailedDismissalPutsNothingBack() {
+        deliver(handle(stop("🟧", sessionA)))
+        let prompt = handle(event(.promptSubmitted, sessionA))
+        handle(event(.notification(type: "permission_prompt"), sessionA))
+        let press = board.middleButtonPressed(now: t0)
+
+        deliver(prompt, failing: [alertA])
+        deliver(press.commands, failing: [alertA])
+
+        XCTAssertEqual(board.alerts, [])
     }
 
     // MARK: - Names

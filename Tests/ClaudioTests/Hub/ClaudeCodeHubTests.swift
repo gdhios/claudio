@@ -13,6 +13,8 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     private let port: UInt16 = 51234
     private let session = "5f0c2a9e-aaaa-4bbb-8ccc-000000000001"
     private let alert = "cc-5f0c2a9e"
+    private let otherSession = "77d1e3f0-aaaa-4bbb-8ccc-000000000002"
+    private let otherAlert = "cc-77d1e3f0"
     private var device = FakeUlanzi()
     private var folder: URL!
     private var localAddress: String? = "192.168.1.50"
@@ -84,17 +86,17 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         hub.receive(.hookEvent(Data(json.utf8)))
     }
 
-    private func stop(_ message: String) {
-        hook(#"{"hook_event_name":"Stop","session_id":"\#(session)","cwd":"/Users/g/BAGUETTE","last_assistant_message":"\#(message)"}"#)
+    private func stop(_ message: String, session: String? = nil) {
+        hook(#"{"hook_event_name":"Stop","session_id":"\#(session ?? self.session)","cwd":"/Users/g/BAGUETTE","last_assistant_message":"\#(message)"}"#)
     }
 
     private func button(_ name: String, down: Bool) {
         hub.receive(.button(Data(#"{"button":"\#(name)","state":\#(down),"uid":"awtrix_1a2b3c"}"#.utf8)))
     }
 
-    private func writeSession(app: String) throws {
-        let json = #"{"pid":4242,"sessionId":"\#(session)","hostSessionId":"\#(app)","entrypoint":"claude-desktop","updatedAt":1801000000000}"#
-        try Data(json.utf8).write(to: folder.appendingPathComponent("sessions/4242.json"))
+    private func writeSession(_ id: String? = nil, app: String, pid: Int = 4242) throws {
+        let json = #"{"pid":\#(pid),"sessionId":"\#(id ?? session)","hostSessionId":"\#(app)","entrypoint":"claude-desktop","updatedAt":1791206181815}"#
+        try Data(json.utf8).write(to: folder.appendingPathComponent("sessions/\(pid).json"))
     }
 
     // MARK: - Coming on
@@ -167,6 +169,35 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_0d6e")!])
         // Not one failure on the way, the two dismissals of nothing included.
         XCTAssertEqual(statuses, [.listening(port: 51234)])
+    }
+
+    /// The clock out of reach when A is answered: its alert stays on the
+    /// clock, ahead of B's, so it stays at the head of the queue, and the
+    /// press that follows opens A's conversation, not B's.
+    func testAFailedDismissalKeepsThePressOnTheAlertOnScreen() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        try writeSession(otherSession, app: "local_b", pid: 4343)
+        stop("🟧 DÉCISION")
+        stop("🟧 DÉCISION", session: otherSession)
+        await settle()
+
+        device.isUnplugged = true
+        hook(#"{"hook_event_name":"UserPromptSubmit","session_id":"\#(session)","prompt":"go"}"#)
+        await settle()
+        device.isUnplugged = false
+        XCTAssertEqual(device.heldNotifications, [alert, otherAlert])
+
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!])
+
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+        XCTAssertEqual(opened.last, URL(string: "claude://claude.ai/epitaxy/local_b")!)
+        XCTAssertEqual(device.heldNotifications, [])
     }
 
     /// The left and right buttons, and a press with nothing held, open

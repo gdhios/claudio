@@ -172,7 +172,9 @@ final class ClaudeCodeHub {
 
     /// Queues `call` behind every call before it. One that fails is said in
     /// the status, and the next goes all the same; a callback or an
-    /// indicator that failed goes again with the next event.
+    /// indicator that failed goes again with the next event. Every
+    /// dismissal's answer goes back to the board, which keeps its queue in
+    /// step with what the clock shows.
     private func enqueue(_ call: Call) {
         guard let client else { return }
         let run = self.run
@@ -185,14 +187,16 @@ final class ClaudeCodeHub {
                 case .command(let command): try await client.perform(command)
                 case .buttonCallback(let url): try await client.setButtonCallback(url)
                 }
-                guard self.run == run, let port else { return }
-                status = .listening(port: port)
+                guard self.run == run else { return }
+                if case .command(.dismiss(let name)) = call { board.dismissLanded(name: name) }
+                if let port { status = .listening(port: port) }
             } catch {
                 guard self.run == run else { return }
                 switch call {
                 case .buttonCallback: callbackPending = true
                 case .command(.indicator): board.indicatorFailed()
-                case .command: break
+                case .command(.dismiss(let name)): board.dismissFailed(name: name)
+                case .command(.notify): break
                 }
                 status = .failed(error.localizedDescription)
             }
