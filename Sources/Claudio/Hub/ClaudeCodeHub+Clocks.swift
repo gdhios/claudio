@@ -37,8 +37,9 @@ extension ClaudeCodeHub {
 
     /// Brings the links in line with `clocks`, the clocks with the flags: a
     /// clock gone or moved is let go, and one new or moved gets a link of
-    /// its own, its button callback still to set. Every other goes on as it
-    /// is, its queue and its callback with it.
+    /// its own, its button callback still to set, and is shown the
+    /// indicator. Every other goes on as it is, its callback and its status
+    /// with it.
     func relink(to clocks: [UlanziClock]) {
         let kept = links.filter { link in
             clocks.contains { $0.id == link.id && $0.address == link.address }
