@@ -10,6 +10,11 @@ import XCTest
 /// there. Every request is written down. No socket is opened: `transport` is
 /// what the client gets in place of URLSession.
 ///
+/// The Claude Code hub's calls too: it keeps the held notifications by name,
+/// in the order they came (one posted again under its name goes to the
+/// back), answers 404 to the dismissal of one it doesn't hold, and keeps the
+/// indicator and the button callback as last set.
+///
 /// No time passes here either: a request a test needs in flight is held at
 /// the device until the test lets it through. The wall clock only bounds a
 /// wait for requests that never come, so that it fails instead of hanging.
@@ -52,6 +57,9 @@ final class FakeUlanzi: @unchecked Sendable {
     private var lastArrivalID = 0
     private var atOnce = 0
     private var mostAtOnce = 0
+    private var heldNames: [String] = []
+    private var lit: String?
+    private var callback: String?
 
     init(script: String? = nil) {
         installed = script
@@ -72,6 +80,15 @@ final class FakeUlanzi: @unchecked Sendable {
 
     /// The most requests the device was ever handling at the same time.
     var mostRequestsAtOnce: Int { lock.withLock { mostAtOnce } }
+
+    /// The held notifications, by name, in the order the screen shows them.
+    var heldNotifications: [String] { lock.withLock { heldNames } }
+
+    /// The body indicator 1 was last lit with, `nil` while it is off.
+    var indicator: String? { lock.withLock { lit } }
+
+    /// Where the device posts its button presses, `nil` until it is told.
+    var buttonCallback: String? { lock.withLock { callback } }
 
     /// Returns once the device has received `count` requests since the last
     /// `clearRequests()`, answered or not. Past two seconds they never will,
@@ -131,6 +148,15 @@ final class FakeUlanzi: @unchecked Sendable {
 
     func forget(_ call: String) {
         lock.withLock { overrides[call] = nil }
+    }
+
+    /// The firmware's own dismissal of the notification on screen, the
+    /// oldest held, as it does at a press of the middle button before
+    /// reporting it.
+    func dismissOnScreen() {
+        lock.withLock {
+            if !heldNames.isEmpty { heldNames.removeFirst() }
+        }
     }
 
     /// Forgets the requests received so far, and nothing else.
@@ -204,6 +230,14 @@ final class FakeUlanzi: @unchecked Sendable {
     private func respond(to request: Request) -> (Int, String) {
         let call = "\(request.method) \(request.path)"
         if let override = overrides[call] { return override }
+        if request.method == "DELETE", request.path.hasPrefix(Self.notificationsPath) {
+            let name = String(request.path.dropFirst(Self.notificationsPath.count))
+            guard let index = heldNames.firstIndex(of: name) else {
+                return (404, Self.refusal("notFound", "notification not found"))
+            }
+            heldNames.remove(at: index)
+            return (200, Self.done)
+        }
         switch call {
         case "GET /api/v1/apps/script/Claudio":
             guard let installed else { return (404, Self.refusal("notFound", "script not found")) }
@@ -228,11 +262,38 @@ final class FakeUlanzi: @unchecked Sendable {
             guard name == "Claudio", installed != nil else {
                 return (404, Self.refusal("notFound", "app not found"))
             }
-            return (200, #"{"ok":true}"#)
+            return (200, Self.done)
+        case "POST /api/v1/notifications":
+            guard let object = Self.object(request.body), object["text"] is String else {
+                return (422, Self.refusal("invalidBody", "text is required"))
+            }
+            if let name = object["name"] as? String {
+                heldNames.removeAll { $0 == name }
+                if object["hold"] as? Bool == true { heldNames.append(name) }
+            }
+            return (200, Self.done)
+        case "PUT /api/v1/indicators/1":
+            guard let object = Self.object(request.body), Set(object.keys) == ["color", "blinkMs", "fadeMs"] else {
+                return (422, Self.refusal("invalidBody", "expected color, blinkMs and fadeMs"))
+            }
+            lit = request.body
+            return (200, Self.done)
+        case "DELETE /api/v1/indicators/1":
+            lit = nil
+            return (200, Self.done)
+        case "PUT /api/v1/system":
+            guard let object = Self.object(request.body), let url = object["buttonCallback"] as? String else {
+                return (422, Self.refusal("invalidBody", "unknown setting"))
+            }
+            callback = url
+            return (200, Self.done)
         default:
             return (404, Self.refusal("notFound", "no such route"))
         }
     }
+
+    private static let notificationsPath = "/api/v1/notifications/"
+    private static let done = #"{"ok":true}"#
 
     private static func object(_ body: String) -> [String: Any]? {
         (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any]

@@ -1,9 +1,10 @@
 import Foundation
 
-/// The four calls Claudio makes to an Ulanzi under AWTRIX NG 1.1.2: read the
-/// face script installed, install it, set its gaze, summon the face. Nothing
-/// else: the clock animates the face itself, and the bridge decides when to
-/// call.
+/// The four calls Claudio makes to an Ulanzi under AWTRIX NG 1.1.2 for his
+/// face: read the face script installed, install it, set its gaze, summon
+/// the face. Nothing else: the clock animates the face itself, and the
+/// bridge decides when to call. The Claude Code hub's own calls are in
+/// `UlanziClient+Hub.swift`, on the same transport.
 ///
 /// The transport is injected, URLSession by default: a test hands it a fake
 /// device and no socket is opened. A clock on the local network answers in a
@@ -80,9 +81,10 @@ struct UlanziClient: Sendable {
     // MARK: - Transport
 
     /// Every failure to get an answer is the same one for whoever reads it:
-    /// the device is out of reach.
-    private func send(_ method: String, _ path: String,
-                      body: Data? = nil, type: String? = nil) async throws -> (data: Data, status: Int) {
+    /// the device is out of reach. Internal, like the two helpers below, for
+    /// the hub's calls in their own file.
+    func send(_ method: String, _ path: String,
+              body: Data? = nil, type: String? = nil) async throws -> (data: Data, status: Int) {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
         request.timeoutInterval = Self.timeout
@@ -103,7 +105,7 @@ struct UlanziClient: Sendable {
     /// a 2xx is the script's: the firmware takes a script it can't run, and
     /// says so there, at install and at the restart every config change
     /// triggers; it is an object, never a string.
-    private func expectSuccess(_ answer: (data: Data, status: Int)) throws {
+    func expectSuccess(_ answer: (data: Data, status: Int)) throws {
         let object = Self.object(answer.data)
         guard (200..<300).contains(answer.status) else {
             throw Failure.rejected(status: answer.status, message: Self.message(in: answer.data))
@@ -116,9 +118,10 @@ struct UlanziClient: Sendable {
         }
     }
 
-    /// Sorted keys: the same body for the same call, every time.
-    private static func json(_ object: [String: Any]) throws -> Data {
-        try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    /// Sorted keys: the same body for the same call, every time. Slashes as
+    /// they are: a URL in a body reads as one.
+    static func json(_ object: [String: Any]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes])
     }
 
     private static func object(_ data: Data) -> [String: Any]? {
