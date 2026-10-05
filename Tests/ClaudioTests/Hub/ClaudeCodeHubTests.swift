@@ -448,6 +448,24 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertFalse(device.calls.contains("PUT /api/v1/system"), "\(device.calls)")
     }
 
+    /// The Mac on another address, the clock is told at the next hook
+    /// event, and only then: the same address again sends nothing.
+    func testANewLocalAddressSetsTheButtonCallbackAgain() async throws {
+        await listening()
+        XCTAssertEqual(device.buttonCallback, "http://192.168.1.50:51234/ulanzi/button/\(try token())")
+
+        localAddress = "192.168.1.77"
+        stop("🟩 FINI")
+        await settle()
+        XCTAssertEqual(device.calls.last, "PUT /api/v1/system")
+        XCTAssertEqual(device.buttonCallback, "http://192.168.1.77:51234/ulanzi/button/\(try token())")
+
+        device.clearRequests()
+        stop("🟩 FINI")
+        await settle()
+        XCTAssertFalse(device.calls.contains("PUT /api/v1/system"), "\(device.calls)")
+    }
+
     /// Off every network, there is no address to give the clock: the rest
     /// works, and the callback is set once there is one.
     func testWithoutALocalAddressTheRestWorks() async throws {

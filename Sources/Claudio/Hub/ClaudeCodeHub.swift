@@ -40,10 +40,10 @@ final class ClaudeCodeHub {
     private var board = ClaudeCodeBoard()
     /// The board as last written, so as not to write it again unchanged.
     private var savedBoard: ClaudeCodeBoard.Snapshot?
-    /// The button callback is still to be set on the clock: from the moment
-    /// the listener is ready until a setting lands. A failure sets it back,
-    /// and the next hook event tries again.
-    private var callbackPending = false
+    /// The Mac's address in the button callback last sent to the clock. nil
+    /// while one is still to set: from the moment the listener is ready,
+    /// and again after a setting that failed.
+    private var callbackHost: String?
     /// Bumped by every start and stop: a call still on its way from an
     /// earlier run writes nothing over the current one.
     private var run = 0
@@ -123,7 +123,7 @@ final class ClaudeCodeHub {
         port = nil
         board = ClaudeCodeBoard()
         savedBoard = nil
-        callbackPending = false
+        callbackHost = nil
         outOfReach = nil
         status = .off
     }
@@ -148,9 +148,9 @@ final class ClaudeCodeHub {
         }
         self.port = port
         status = .listening(port: port)
-        callbackPending = true
+        callbackHost = nil
         events += 1
-        setButtonCallbackIfPending()
+        setButtonCallbackIfNeeded()
     }
 
     /// A route the server let in, and has answered already.
@@ -163,7 +163,7 @@ final class ClaudeCodeHub {
             if let event = ClaudeCodeEvent(body) {
                 board.handle(event, now: now()).forEach { enqueue(.command($0)) }
             }
-            setButtonCallbackIfPending()
+            setButtonCallbackIfNeeded()
         case .button(let body):
             guard UlanziButtonReport.isMiddlePress(body) else { return }
             let press = board.middleButtonPressed(now: now())
@@ -193,12 +193,13 @@ final class ClaudeCodeHub {
     }
 
     /// The Mac's address, the port and the token, for the clock to post its
-    /// buttons to. Without an address, nothing yet: it is looked for again
-    /// at the next event.
-    private func setButtonCallbackIfPending() {
-        guard callbackPending, let port, let token, let host = localAddress(),
+    /// buttons to: sent while still to set, and again once the Mac's
+    /// address has changed, a press going nowhere otherwise. Without an
+    /// address, nothing yet: it is looked for again at the next hook event.
+    private func setButtonCallbackIfNeeded() {
+        guard let port, let token, let host = localAddress(), host != callbackHost,
               let url = URL(string: "http://\(host):\(port)/ulanzi/button/\(token)") else { return }
-        callbackPending = false
+        callbackHost = host
         enqueue(.buttonCallback(url))
     }
 
@@ -253,7 +254,7 @@ final class ClaudeCodeHub {
     /// the indicator: the new one goes at once.
     private func failed(_ call: Call, reason: String) {
         switch call {
-        case .buttonCallback: callbackPending = true
+        case .buttonCallback: callbackHost = nil
         case .command(.indicator): board.indicatorFailed()
         case .command(.dismiss(let name)): board.dismissFailed(name: name)
         case .command(.notify(let notification)):
