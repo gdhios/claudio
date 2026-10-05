@@ -3,7 +3,8 @@ import SwiftUI
 
 /// UI preview mode for development: `Claudio --preview <mode>`, every mode
 /// `Scripts/test.sh` renders, plus `panel-long`, `panel-free-filled`,
-/// `palette-libre`, `settings-about` and `barre-de-menus`.
+/// `palette-libre`, `settings-about`, `barre-de-menus` (the menu open) and
+/// `mascotte` (the menu bar icon's gazes).
 /// `--size small|normal|large|extraLarge` forces the panel's text size.
 /// `--shot file.png` writes the window to a PNG and quits; without it, the
 /// region to capture is printed (top-left, for `screencapture -R`).
@@ -36,7 +37,9 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             // enough for the shot to find it.
             ClipboardToast.shared.show(mode == "toast-copied" ? .copied : .pasted, for: .seconds(60))
         } else if mode == "barre-de-menus" {
-            showMenuBarPreview()
+            StatusMenuPreview.show()
+        } else if mode == "mascotte" {
+            showMascotPreview()
         } else if mode.hasPrefix("panel-listening") || mode.hasPrefix("panel-dictation") {
             showDictationPreview()
         } else if mode.hasPrefix("listening") {
@@ -272,9 +275,10 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
         show(ResultPanel.make(session: session, textSize: textSize))
     }
 
-    /// Claudio in the menu bar, at his real size then enlarged, on a light
-    /// background and on a dark one: that's where readability gets judged.
-    private func showMenuBarPreview() {
+    /// `mascotte`: Claudio in the menu bar, at his real size then enlarged,
+    /// on a light background and on a dark one: that's where readability
+    /// gets judged.
+    private func showMascotPreview() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 232),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.title = "Regards"
