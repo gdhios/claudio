@@ -2,7 +2,8 @@ import Foundation
 
 /// The bridge as one thing to switch on and off. It holds the socket, the
 /// handshake file and the publisher, and hands the frames it receives to the
-/// dispatcher — so the app only ever calls `start()`, `stop()` and `attach`.
+/// dispatcher, so the app only ever calls `start()`, `stop()`, `attach` and
+/// the two relays it feeds from the coordinators' hooks.
 ///
 /// Wiring, and nothing else: every piece it holds is proved on its own, and
 /// what this file adds — the order they start in — is proved by running the
@@ -25,8 +26,8 @@ final class StreamDeckBridge {
 
     private var server: BridgeServer?
     private var publisher: BridgeStatePublisher?
-    /// The two coordinators, whose hooks stay in place between a stop and
-    /// the next start. Weak: the app owns them, and outlives the bridge.
+    /// The two coordinators, read each time the bridge comes on. Weak: the
+    /// app owns them, and outlives the bridge.
     private weak var correction: CorrectionCoordinator?
     private weak var dictation: DictationCoordinator?
 
@@ -131,19 +132,25 @@ final class StreamDeckBridge {
 
     // MARK: - What it watches
 
-    /// Hooks the two coordinators up for good: the hooks stay in place
-    /// across a stop and the next start, and say nothing while the bridge is
-    /// off, since there is no publisher to tell.
+    /// Keeps the two coordinators, to read what is under way whenever the
+    /// bridge comes on. Their hooks are the app's: each takes one observer,
+    /// and the app tells this bridge and the Ulanzi's from the same one.
     func attach(correction: CorrectionCoordinator, dictation: DictationCoordinator) {
         self.correction = correction
         self.dictation = dictation
-        correction.onSessionChange = { [weak self] session in
-            self?.publisher?.correctionSessionChanged(session)
-        }
-        dictation.onSessionChange = { [weak self] session in
-            self?.publisher?.dictationSessionChanged(session)
-        }
         adoptCurrentSessions()
+    }
+
+    /// A correction started or ended, relayed by the app from the
+    /// coordinator's hook. Nothing is said while the bridge is off: there is
+    /// no publisher to tell.
+    func correctionSessionChanged(_ session: CorrectionSession?) {
+        publisher?.correctionSessionChanged(session)
+    }
+
+    /// A dictation started or ended, relayed the same way.
+    func dictationSessionChanged(_ session: DictationSession?) {
+        publisher?.dictationSessionChanged(session)
     }
 
     /// The hooks only report changes, so a bridge switched on while

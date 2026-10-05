@@ -52,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nextScreen: { WindowMover.moveToNextScreen() },
         openSettings: { [weak self] in self?.settingsController.show(initialSection: .streamDeck) }
     ))
+    /// Claudio's face on an Ulanzi clock. Only ever started when Settings
+    /// holds its address: a Mac without one never calls anything.
+    private let ulanzi = UlanziBridge()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
@@ -84,13 +87,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeySetup.installFreeAction(coordinator: spokenInstruction)
         HotkeySetup.installDictation(coordinator: dictation)
         HotkeySetup.installListening(coordinator: listening)
-        // The Stream Deck keys, which are shortcuts by another road. Hooked
-        // up whether or not the bridge runs, so Settings can switch it on
-        // later without anything else to arrange; the plugin sitting in its
+        // The Stream Deck keys, which are shortcuts by another road, and the
+        // Ulanzi's face both follow the two sessions. Each coordinator takes
+        // one observer: the hooks are set here, once, and tell both bridges.
+        // Set whether or not either runs, so Settings can switch one on
+        // later without anything else to arrange. The plugin sitting in its
         // folder is what opens the socket on a fresh launch, through the
-        // first look the tab's wiring takes.
+        // first look the tab's wiring takes; a stored address is what starts
+        // the Ulanzi's.
+        coordinator.onSessionChange = { [weak self] session in
+            self?.streamDeck.correctionSessionChanged(session)
+            self?.ulanzi.correctionSessionChanged(session)
+        }
+        dictation.onSessionChange = { [weak self] session in
+            self?.streamDeck.dictationSessionChanged(session)
+            self?.ulanzi.dictationSessionChanged(session)
+        }
         streamDeck.attach(correction: coordinator, dictation: dictation)
         wireStreamDeckSettings()
+        wireUlanziSettings()
 
         UpdateChecker.shared.onUpdateFound = { [weak self] feed in
             self?.statusMenu?.showUpdate(feed)
@@ -112,6 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // And the handshake file goes with the app: one left behind points
         // the plugin at a port nobody answers.
         streamDeck.stop()
+        // The clock's face too, if it may be up: the app waits for the
+        // clock to answer, a second at most.
+        ulanzi.prepareToQuit(within: 1)
     }
 
     /// The `claudio://` links: how the plugin, and the download page, send
@@ -181,6 +199,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             streamDeck.stop()
         }
         return installed
+    }
+
+    // MARK: - The Ulanzi tab
+
+    /// Settings' Ulanzi tab, hooked to the real bridge: it shows what the
+    /// bridge reports, and hands it a new address or a test. A stored
+    /// address starts the bridge at launch.
+    private func wireUlanziSettings() {
+        let model = UlanziStatusModel.shared
+        ulanzi.onStatusChange = { status in model.status = status }
+        model.applyAddress = { [weak self] address in self?.applyUlanziAddress(address) }
+        model.test = { [weak self] in self?.ulanzi.test() }
+        let address = AppSettings.ulanziAddress()
+        model.address = address?.absoluteString ?? ""
+        if let address { ulanzi.start(address: address) }
+    }
+
+    /// A new address, applied for real: written down, then the bridge starts
+    /// over on it, the face on the old one put away first. No address
+    /// switches it off.
+    private func applyUlanziAddress(_ address: URL?) {
+        AppSettings.setUlanziAddress(address)
+        ulanzi.stop()
+        if let address { ulanzi.start(address: address) }
     }
 
     // MARK: - The status menu

@@ -140,6 +140,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 	<key>NSHumanReadableCopyright</key><string>© Guillaume Dhios</string>
 	<key>NSMicrophoneUsageDescription</key><string>Claudio écoute ton micro pour dicter du texte.</string>
 	<key>NSSpeechRecognitionUsageDescription</key><string>Claudio transcrit ta voix en texte, sur cet ordinateur.</string>
+	<key>NSLocalNetworkUsageDescription</key><string>Claudio montre sa tête sur un écran Ulanzi de ton réseau local.</string>
 </dict>
 </plist>
 PLIST

@@ -30,8 +30,9 @@ final class CorrectionCoordinator {
     /// leaves a dictation alone.
     var onOpen: (() -> Void)?
     /// Called when the correction under way changes, the end of one included.
-    /// What watches from outside — the Stream Deck bridge — can't poll for a
-    /// panel, and reads the session through this.
+    /// What watches from outside (the Stream Deck and Ulanzi bridges, which
+    /// the app tells from this one hook) can't poll for a panel, and reads
+    /// the session through this.
     ///
     /// A broadcast, and nothing more: it fires mid-mutation — before
     /// `streamTask` is assigned, before `onDismiss` runs — so the callback

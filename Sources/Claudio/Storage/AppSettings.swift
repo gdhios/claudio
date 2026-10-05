@@ -103,10 +103,44 @@ enum AppSettings {
         set { standard.set(newValue.absoluteString, forKey: ollamaBaseURLKey) }
     }
 
-    /// An address is only usable with an http(s) scheme and a host. The
-    /// scheme is implied: "192.168.1.20:11434" typed as-is would otherwise
-    /// read as a path, with no host.
+    /// The address typed in the Ollama tab, made callable, or nil.
     static func normalizedOllamaURL(_ text: String) -> URL? {
+        normalizedAddress(text)
+    }
+
+    // MARK: - Ulanzi clock
+
+    /// A missing key is the off switch: no address, no face on the clock.
+    static let ulanziAddressKey = "ulanziURL"
+
+    /// Where the Ulanzi answers, nil while no address is set: then nothing
+    /// about it is ever sent anywhere. A value nobody could call reads as
+    /// none, rather than as a request sent nowhere.
+    static func ulanziAddress(in defaults: UserDefaults = .standard) -> URL? {
+        defaults.string(forKey: ulanziAddressKey).flatMap(normalizedUlanziURL)
+    }
+
+    /// `nil` removes the key rather than storing an empty address.
+    static func setUlanziAddress(_ address: URL?, in defaults: UserDefaults = .standard) {
+        if let address {
+            defaults.set(address.absoluteString, forKey: ulanziAddressKey)
+        } else {
+            defaults.removeObject(forKey: ulanziAddressKey)
+        }
+    }
+
+    /// The address typed in the Ulanzi tab, made callable, or nil.
+    static func normalizedUlanziURL(_ text: String) -> URL? {
+        normalizedAddress(text)
+    }
+
+    // MARK: - Addresses typed by hand
+
+    /// One rule for every address typed in Settings. It is only usable with
+    /// an http(s) scheme and a host. The scheme is implied:
+    /// "192.168.1.20:11434" typed as-is would otherwise read as a path, with
+    /// no host.
+    private static func normalizedAddress(_ text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let candidate = trimmed.contains("://") ? trimmed : "http://\(trimmed)"

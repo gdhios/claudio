@@ -54,8 +54,9 @@ final class DictationCoordinator {
     private var lockTimer: Task<Void, Never>?
 
     /// Called when the dictation under way changes, the end of one included.
-    /// What watches from outside — the Stream Deck bridge — can't poll for a
-    /// panel, and reads the session through this.
+    /// What watches from outside (the Stream Deck and Ulanzi bridges, which
+    /// the app tells from this one hook) can't poll for a panel, and reads
+    /// the session through this.
     ///
     /// A broadcast, and nothing more: it fires mid-mutation — before the panel
     /// is made, before the cycle starts — so the callback must never

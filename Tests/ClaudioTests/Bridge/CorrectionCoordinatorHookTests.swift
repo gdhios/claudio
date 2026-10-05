@@ -1,11 +1,12 @@
 import XCTest
 @testable import Claudio
 
-/// The hook the Stream Deck bridge watches a correction through. Only what a
-/// coordinator does with no session is played here; a whole correction, run
-/// on fakes, is `CorrectionCoordinatorTests`'s. The announcement of a real
-/// session is proved on the dictation side, whose hook is the same broadcast;
-/// here, `DictationCoordinatorTests` is the witness.
+/// The hook the bridges watch a correction through: the app sets it once and
+/// tells both, the Stream Deck's and the Ulanzi's. Only what a coordinator
+/// does with no session is played here; a whole correction, run on fakes, is
+/// `CorrectionCoordinatorTests`'s. The announcement of a real session is
+/// proved on the dictation side, whose hook is the same broadcast; here,
+/// `DictationCoordinatorTests` is the witness.
 @MainActor
 final class CorrectionCoordinatorHookTests: XCTestCase {
 

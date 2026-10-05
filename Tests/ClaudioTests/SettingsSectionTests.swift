@@ -22,4 +22,14 @@ final class SettingsSectionTests: XCTestCase {
         XCTAssertEqual(sections[dictation + 1], .music)
         XCTAssertEqual(SettingsSection.music.rawValue, "music")
     }
+
+    /// The Ulanzi tab sits right after the Stream Deck: the two devices
+    /// Claudio shows his face on, side by side. Its link name is its own.
+    func testTheUlanziTabSitsAfterTheStreamDeck() {
+        let sections = SettingsSection.allCases
+        let streamDeck = sections.firstIndex(of: .streamDeck)!
+        XCTAssertEqual(sections[streamDeck + 1], .ulanzi)
+        XCTAssertEqual(SettingsSection.ulanzi.rawValue, "ulanzi")
+        XCTAssertEqual(SettingsSection(linkName: "ulanzi"), .ulanzi)
+    }
 }
