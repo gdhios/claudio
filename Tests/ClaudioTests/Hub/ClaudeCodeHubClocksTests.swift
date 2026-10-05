@@ -372,6 +372,51 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"])
     }
 
+    /// A clock whose flags are unticked while an alert is held is cleared
+    /// of it, the indicator with it, before its button is given back; the
+    /// other keeps the alert, and the board still holds it: a press on the
+    /// other still finds it.
+    func testAClockUntickedIsClearedOfTheAlertsItShows() async throws {
+        await listening([desk, lounge])
+        try writeSession()
+        decision()
+        await settle()
+        devices.values.forEach { $0.clearRequests() }
+        var quiet = lounge
+        quiet.alerts = false
+
+        hub.apply([desk, quiet])
+        await loungeDevice.waitUntilReceived(3)
+        await settle()
+
+        XCTAssertEqual(loungeDevice.calls, ["DELETE /api/v1/notifications/cc-5f0c2a9e",
+                                            "DELETE /api/v1/indicators/1", "PUT /api/v1/system"])
+        XCTAssertEqual(loungeDevice.heldNotifications, [])
+        XCTAssertNil(loungeDevice.indicator)
+        XCTAssertEqual(deskDevice.calls, [])
+        XCTAssertEqual(deskDevice.heldNotifications, [alert])
+        XCTAssertEqual(hub.board.alerts.map(\.name), [alert])
+
+        press()
+        await settle()
+        XCTAssertEqual(deskDevice.heldNotifications, [])
+        XCTAssertEqual(opened, [conversation])
+    }
+
+    /// A clock leaving with nothing shown on it is told nothing but its
+    /// button back.
+    func testAClockUntickedWithNothingShownIsOnlyGivenItsButtonBack() async {
+        await listening([desk, lounge])
+        var quiet = lounge
+        quiet.alerts = false
+
+        hub.apply([desk, quiet])
+        await loungeDevice.waitUntilReceived(1)
+        await settle()
+
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"])
+    }
+
     /// A clock that moved is a new clock: the new address is told where to
     /// post its buttons and hears what follows, the old one nothing more.
     func testAClockThatMovedIsSpokenToWhereItIsNow() async throws {
@@ -391,7 +436,9 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
     }
 
     /// A clock let go while a hold to it is still on its way holds nothing
-    /// back: the board hears what the other made of it.
+    /// back: the board hears what the other made of it. The hold never
+    /// goes to the clock let go; it is cleared of what the board holds all
+    /// the same, which it may show from before, then given its button back.
     func testAClockLetGoMidCallHoldsNothingBack() async throws {
         await listening([desk, lounge])
         try writeSession()
@@ -407,9 +454,11 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         press()
         await settle()
         XCTAssertEqual(opened, [conversation])
-        await deskDevice.waitUntilReceived(2)
-        XCTAssertEqual(deskDevice.calls, ["DELETE /api/v1/notifications/\(alert)", "PUT /api/v1/system"],
-                       "nothing more for a clock let go, its button given back aside")
+        await deskDevice.waitUntilReceived(4)
+        XCTAssertEqual(deskDevice.calls, ["DELETE /api/v1/notifications/\(alert)",
+                                          "DELETE /api/v1/notifications/\(alert)", "DELETE /api/v1/indicators/1",
+                                          "PUT /api/v1/system"],
+                       "nothing more for a clock let go, cleared and its button given back aside")
     }
 
     /// One change of the list moves the desk and removes the lounge, whose

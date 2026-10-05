@@ -49,7 +49,23 @@ extension ClaudeCodeHub {
         links.filter { link in !kept.contains { $0 === link } }.forEach(catchUp)
         for link in dropped {
             forget(link)
-            if !links.contains(where: { $0.address == link.address }) { giveButtonBack(link) }
+            guard !links.contains(where: { $0.address == link.address }) else { continue }
+            wipe(link)
+            giveButtonBack(link)
+        }
+    }
+
+    /// A clock leaving is cleared of what the board put on it: each alert
+    /// held dismissed, the indicator switched off, before its button is
+    /// given back. The board hears nothing of it: the clocks that stay show
+    /// the same alerts still. Only a device no link serves any more, and
+    /// only what the board has on the clocks: a clock that leaves with
+    /// nothing shown is told nothing, nor is one never spoken to.
+    private func wipe(_ link: ClaudeCodeClockLink) {
+        guard link.spoken else { return }
+        let client = link.client
+        for command in board.wipeCommands {
+            chain(at: link.address) { try? await client.perform(command) }
         }
     }
 
@@ -154,6 +170,7 @@ extension ClaudeCodeHub {
             if let outOfReach = link.outOfReach, event <= outOfReach.through {
                 return outcome(.unreachable(outOfReach.reason))
             }
+            link.spoken = true
             going?()
             let failure: UlanziClient.Failure?
             do {

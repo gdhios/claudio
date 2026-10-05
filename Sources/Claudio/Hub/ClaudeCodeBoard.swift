@@ -124,6 +124,14 @@ struct ClaudeCodeBoard {
         hasSentIndicator ? .indicator(indicator) : nil
     }
 
+    /// What a clock leaving the others is sent, to show nothing of theirs:
+    /// a dismissal of each alert held, and the indicator off when one is
+    /// lit. Nothing of it comes back to the board, which goes on for the
+    /// clocks that stay.
+    var wipeCommands: [UlanziCommand] {
+        alerts.map { .dismiss(name: $0.name) } + (indicator == nil ? [] : [.indicator(nil)])
+    }
+
     // MARK: - Waits and alerts
 
     /// Waits, and holds its alert at the back of the queue.

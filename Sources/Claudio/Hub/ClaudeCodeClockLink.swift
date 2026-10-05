@@ -19,6 +19,10 @@ final class ClaudeCodeClockLink {
     /// not: only then is the button given back when the clock leaves. One
     /// still waiting its turn when the clock leaves never goes.
     var doorSent = false
+    /// A call went out to the device from this link, answered or not: only
+    /// then may it show something of the board's, to clear when it leaves.
+    /// A link let go before its first call was ever told nothing.
+    var spoken = false
     /// Found out of reach, and the hub's last event then: every call of
     /// that event or an earlier one, still queued, fails at once, and the
     /// next event tries the clock again.
