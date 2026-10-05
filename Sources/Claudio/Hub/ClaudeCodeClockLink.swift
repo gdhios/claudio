@@ -19,6 +19,11 @@ final class ClaudeCodeClockLink {
     /// not: only then is the button given back when the clock leaves. One
     /// still waiting its turn when the clock leaves never goes.
     var doorSent = false
+    /// Tries of the button callback a clock refused, since it last took one.
+    var callbackTries = 0
+    /// The next try of a refused callback, waiting its delay, for a test
+    /// to wait on.
+    var callbackRetry: Task<Void, Never>?
     /// A call went out to the device from this link, answered or not: only
     /// then may it show something of the board's, to clear when it leaves.
     /// A link let go before its first call was ever told nothing.

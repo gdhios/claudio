@@ -122,17 +122,44 @@ extension ClaudeCodeHub {
     /// its buttons to, the same for all: sent to a clock while still to
     /// set, and again once the Mac's address has changed, a press going
     /// nowhere otherwise. Without an address, nothing yet: it is looked for
-    /// again at the next hook event.
+    /// again at the next hook event. A clock that refused it, busy with the
+    /// face at launch as it may be, is tried again a few times, a few
+    /// seconds apart; past them, the next event tries once more.
     func setButtonCallbackIfNeeded() {
         guard let port, let token, let host = localAddress(),
               let url = URL(string: "http://\(host):\(port)/ulanzi/button/\(token)") else { return }
         for link in links where link.callbackHost != host {
             link.callbackHost = host
             attempt({ try await $0.setButtonCallback(url) }, on: link,
-                    going: { [weak link] in link?.doorSent = true }) { [weak link] failure in
-                if failure != nil { link?.callbackHost = nil }
+                    going: { [weak link] in link?.doorSent = true }) { [weak self, weak link] failure in
+                guard let link else { return }
+                if failure == nil {
+                    link.callbackTries = 0
+                } else {
+                    link.callbackHost = nil
+                    self?.retryButtonCallback(on: link)
+                }
             }
         }
+    }
+
+    /// Tries the callback on `link` again after a delay, unless the clock
+    /// has had its tries, or took one meanwhile, or is gone.
+    private func retryButtonCallback(on link: ClaudeCodeClockLink) {
+        guard link.callbackTries < Self.callbackRetries else { return }
+        link.callbackTries += 1
+        let run = self.run
+        link.callbackRetry = Task { @MainActor [weak self, weak link] in
+            try? await self?.sleep(Self.callbackRetryDelay)
+            guard let self, let link, holds(link, in: run), link.callbackHost == nil else { return }
+            events += 1
+            setButtonCallbackIfNeeded()
+        }
+    }
+
+    /// The tries of refused callbacks still waiting, for a test to wait on.
+    var retryingCallbacks: [Task<Void, Never>] {
+        links.compactMap(\.callbackRetry)
     }
 
     // MARK: - Sending

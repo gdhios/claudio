@@ -23,6 +23,7 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
     private var statuses: [ClaudeCodeHub.Status] = []
     private var clockStatuses: [(id: UUID, status: ClaudeCodeHub.ClockStatus)] = []
     private var listened = 0
+    private var slept: [Duration] = []
     private var hub: ClaudeCodeHub!
 
     override func setUp() async throws {
@@ -49,7 +50,8 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
             now: { Date(timeIntervalSince1970: 1_800_000_000) },
             handshake: BridgeHandshakeFile(directory: support, name: ClaudeCodeHub.handshakeName),
             boardFile: ClaudeCodeBoardFile(directory: support),
-            listen: { [unowned self] _ in listened += 1 })
+            listen: { [unowned self] _ in listened += 1 },
+            sleep: { [unowned self] in slept.append($0) })
         hub.onStatusChange = { [unowned self] in statuses.append($0) }
         hub.onClockStatusChange = { [unowned self] in clockStatuses.append(($0, $1)) }
         return hub
@@ -73,11 +75,13 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         return try XCTUnwrap(object?["token"] as? String)
     }
 
-    /// Everything queued for every clock, calls queued meanwhile included.
+    /// Everything queued for every clock, calls queued meanwhile included,
+    /// and the tries of refused callbacks with what they queue.
     private func settle() async {
         var tails = hub.sending
         while !tails.isEmpty {
             for tail in tails { await tail.value }
+            for retry in hub.retryingCallbacks { await retry.value }
             let now = hub.sending
             if now == tails { break }
             tails = now
@@ -558,6 +562,40 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         XCTAssertEqual(loungeDevice.buttonCallback, "")
         XCTAssertEqual(deskDevice.buttonCallback, "")
         XCTAssertEqual(device(elsewhere).buttonCallback, door)
+    }
+
+    /// A clock that refused the door at launch, busy with the face, is
+    /// tried again after a delay and takes it; the other, which took it
+    /// first time, is left alone.
+    func testADoorAClockRefusedIsTriedAgain() async throws {
+        loungeDevice.answer("PUT /api/v1/system", status: 503, body: FakeUlanzi.refusal("serviceBusy", "busy"))
+        hub.apply([desk, lounge])
+        hub.listenerReady(port: port)
+        await hub.lines[lounge.address]?.value
+        XCTAssertNil(loungeDevice.buttonCallback)
+        loungeDevice.forget("PUT /api/v1/system")
+        await settle()
+
+        XCTAssertEqual(slept, [ClaudeCodeHub.callbackRetryDelay])
+        XCTAssertEqual(loungeDevice.buttonCallback, "http://192.168.1.50:51234/ulanzi/button/\(try token())")
+        XCTAssertEqual(deskDevice.calls, ["PUT /api/v1/system"])
+        XCTAssertEqual(hub.clockStatus(of: lounge.id), .ready)
+    }
+
+    /// A clock that keeps refusing is tried a few times, then left to the
+    /// next event, which tries once more.
+    func testADoorRefusedForGoodWaitsForTheNextEvent() async {
+        loungeDevice.answer("PUT /api/v1/system", status: 503, body: FakeUlanzi.refusal("serviceBusy", "busy"))
+        hub.apply([desk, lounge])
+        hub.listenerReady(port: port)
+        await settle()
+
+        XCTAssertEqual(slept.count, ClaudeCodeHub.callbackRetries)
+        XCTAssertEqual(loungeDevice.calls.count, 1 + ClaudeCodeHub.callbackRetries)
+
+        hook(#"{"hook_event_name":"UserPromptSubmit","session_id":"99999999-aaaa-4bbb-8ccc-000000000002","prompt":"go"}"#)
+        await settle()
+        XCTAssertEqual(loungeDevice.calls.filter { $0 == "PUT /api/v1/system" }.count, 2 + ClaudeCodeHub.callbackRetries)
     }
 
     /// Nothing was ever set on it, nothing is taken back: a callback

@@ -36,6 +36,15 @@ final class ClaudeCodeHub {
     private let handshake: BridgeHandshakeFile
     private let boardFile: ClaudeCodeBoardFile
     private let listen: (HubServer) throws -> Void
+    /// Waits before a button callback is tried again. Injected: the tests
+    /// don't wait.
+    let sleep: @MainActor (Duration) async throws -> Void
+    /// How long a button callback a clock refused waits before its next
+    /// try: a clock busy installing the face answers the next one.
+    nonisolated static let callbackRetryDelay: Duration = .seconds(5)
+    /// How many times a refused callback is tried again, after the first,
+    /// before the next event takes over.
+    nonisolated static let callbackRetries = 3
 
     private var server: HubServer?
     private(set) var token: String?
@@ -63,7 +72,7 @@ final class ClaudeCodeHub {
     /// Every hook event and every report of a button, numbered, and the
     /// listener's readiness too: each call carries the number of the one
     /// that brought it.
-    private(set) var events = 0
+    var events = 0
 
     private(set) var status: Status = .off {
         didSet {
@@ -82,8 +91,10 @@ final class ClaudeCodeHub {
          now: @escaping () -> Date = { Date() },
          handshake: BridgeHandshakeFile = BridgeHandshakeFile(name: ClaudeCodeHub.handshakeName),
          boardFile: ClaudeCodeBoardFile = ClaudeCodeBoardFile(),
-         listen: @escaping @MainActor (HubServer) throws -> Void = { try $0.start() }) {
+         listen: @escaping @MainActor (HubServer) throws -> Void = { try $0.start() },
+         sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.makeClient = makeClient
+        self.sleep = sleep
         self.localAddress = localAddress
         self.sessionsDirectory = sessionsDirectory
         self.openURL = openURL
