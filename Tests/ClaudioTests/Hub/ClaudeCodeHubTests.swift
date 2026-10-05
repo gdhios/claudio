@@ -3,9 +3,10 @@ import XCTest
 
 /// The hub wired to its pieces. The routes come in through the entry the
 /// server calls, the listener's readiness too: the server is never started
-/// and no socket is opened. The device is `FakeUlanzi`; the sessions and
-/// Application Support folders are temporary; the Mac's address, the links
-/// opened and the time are the test's.
+/// and no socket is opened. The device is `FakeUlanzi`, which outlives a
+/// restart as the clock does; the sessions and Application Support folders
+/// are temporary; the Mac's address, the links opened and the time are the
+/// test's.
 @MainActor
 final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
 
@@ -22,6 +23,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     private var statuses: [ClaudeCodeHub.Status] = []
     private var listened = 0
     private var listenFailure: Error?
+    private var time = Date(timeIntervalSince1970: 1_800_000_000)
     private var hub: ClaudeCodeHub!
 
     override func setUp() async throws {
@@ -29,19 +31,26 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
             .appendingPathComponent("ClaudioTests.hub.\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("sessions"),
                                                 withIntermediateDirectories: true)
-        hub = ClaudeCodeHub(
+        hub = makeHub()
+    }
+
+    /// A hub on the test's folders and device, as Claudio starts one.
+    private func makeHub() -> ClaudeCodeHub {
+        let support = folder.appendingPathComponent("Claudio")
+        let hub = ClaudeCodeHub(
             makeClient: { [unowned self] in UlanziClient(baseURL: $0, transport: device.transport) },
             localAddress: { [unowned self] in localAddress },
             sessionsDirectory: folder.appendingPathComponent("sessions"),
             openURL: { [unowned self] in opened.append($0) },
-            now: { Date(timeIntervalSince1970: 1_800_000_000) },
-            handshake: BridgeHandshakeFile(directory: folder.appendingPathComponent("Claudio"),
-                                           name: ClaudeCodeHub.handshakeName),
+            now: { [unowned self] in time },
+            handshake: BridgeHandshakeFile(directory: support, name: ClaudeCodeHub.handshakeName),
+            boardFile: ClaudeCodeBoardFile(directory: support),
             listen: { [unowned self] _ in
                 listened += 1
                 if let listenFailure { throw listenFailure }
             })
         hub.onStatusChange = { [unowned self] in statuses.append($0) }
+        return hub
     }
 
     override func tearDown() async throws {
@@ -53,6 +62,10 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
 
     private var handshakeURL: URL {
         folder.appendingPathComponent("Claudio").appendingPathComponent("claude-code-hub.json")
+    }
+
+    private var boardURL: URL {
+        folder.appendingPathComponent("Claudio").appendingPathComponent("claude-code-board.json")
     }
 
     /// The handshake file as the relay reads it.
@@ -80,6 +93,15 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         hub.listenerReady(port: port)
         await settle()
         device.clearRequests()
+    }
+
+    /// Claudio quitting and starting again: the hub stopped as at quit, and
+    /// a new one on the same folders and the same clock, listening.
+    private func restart() async {
+        await settle()
+        hub.stop()
+        hub = makeHub()
+        await listening()
     }
 
     private func hook(_ json: String) {
@@ -369,12 +391,10 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
 
     // MARK: - Going off
 
-    /// Stopping takes the door away and forgets the alerts: a press after a
-    /// new start finds nothing held.
-    func testStoppingForgetsEverything() async {
+    /// Stopping takes the door away, and an event that comes while stopped
+    /// goes nowhere: a press after a new start finds nothing held.
+    func testStoppingTakesTheDoorAway() async {
         await listening()
-        stop("🟧 DÉCISION")
-        await settle()
 
         hub.stop()
         XCTAssertEqual(hub.status, .off)
@@ -386,6 +406,86 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         await settle()
         XCTAssertEqual(device.calls, [])
         XCTAssertEqual(opened, [])
+    }
+
+    // MARK: - Outliving Claudio
+
+    /// Claudio quits with A's decision on the clock, and starts again: the
+    /// clock still shows A's alert, ahead of B's that comes after. The first
+    /// press opens A, the second B.
+    func testTheHeldAlertsOutliveARestart() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        try writeSession(otherSession, app: "local_b", pid: 4343)
+        stop("🟧 DÉCISION")
+
+        await restart()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: boardURL.path))
+        stop("🟧 DÉCISION", session: otherSession)
+        await settle()
+        XCTAssertEqual(device.heldNotifications, [alert, otherAlert])
+
+        for _ in 0..<2 {
+            device.dismissOnScreen()
+            button("middle", down: true)
+            await settle()
+        }
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!,
+                                URL(string: "claude://claude.ai/epitaxy/local_b")!])
+    }
+
+    /// And who waits: after a restart, a FINI from another session leaves
+    /// the indicator orange, A still waiting.
+    func testTheWaitsOutliveARestart() async {
+        await listening()
+        stop("🟧 DÉCISION")
+
+        await restart()
+        stop("🟩 FINI", session: otherSession)
+        await settle()
+
+        XCTAssertEqual(device.calls.last, "PUT /api/v1/indicators/1")
+        XCTAssertEqual(device.indicator, ##"{"blinkMs":0,"color":"#FF851B","fadeMs":2000}"##)
+    }
+
+    /// A wait twelve hours old by the restart is forgotten, and the
+    /// indicator goes out. Its alert, still on the clock, is there for the
+    /// press.
+    func testAWaitPastTwelveHoursDoesNotOutliveARestart() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        stop("🟧 DÉCISION")
+
+        time += 12 * 3600
+        await restart()
+        stop("🟩 FINI", session: otherSession)
+        await settle()
+        XCTAssertNil(device.indicator)
+
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!])
+    }
+
+    /// A board file that can't be read is no board: the hub starts with
+    /// nothing held, works, and writes a good file at the first change.
+    func testAnUnreadableBoardFileIsIgnored() async throws {
+        try FileManager.default.createDirectory(at: boardURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data(#"{"v":1,"held":[{"#.utf8).write(to: boardURL)
+        await listening()
+        try writeSession(app: "local_a")
+
+        stop("🟧 DÉCISION")
+        await settle()
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!])
+        XCTAssertEqual(ClaudeCodeBoardFile(directory: boardURL.deletingLastPathComponent()).load(),
+                       ClaudeCodeBoard.Snapshot())
     }
 
     /// A new start is a new token: the old one opens nothing more.

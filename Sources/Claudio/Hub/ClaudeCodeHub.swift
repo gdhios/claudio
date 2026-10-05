@@ -7,9 +7,11 @@ import AppKit
 /// Claude app.
 ///
 /// It holds the server, the handshake file, the board and the client, and
-/// sends to the clock one call at a time, in order. What it reaches outside
-/// is injected: the device, the Mac's address, the sessions folder, how a
-/// link opens, the time, and the listening itself, which a test skips.
+/// sends to the clock one call at a time, in order. The board outlives
+/// Claudio in a file of its own, as the clock outlives it. What the hub
+/// reaches outside is injected: the device, the Mac's address, the sessions
+/// folder, how a link opens, the time, the two files, and the listening
+/// itself, which a test skips.
 @MainActor
 final class ClaudeCodeHub {
     /// For Settings, which shows none of it yet.
@@ -28,6 +30,7 @@ final class ClaudeCodeHub {
     private let openURL: (URL) -> Void
     private let now: () -> Date
     private let handshake: BridgeHandshakeFile
+    private let boardFile: ClaudeCodeBoardFile
     private let listen: (HubServer) throws -> Void
 
     private var server: HubServer?
@@ -35,6 +38,8 @@ final class ClaudeCodeHub {
     private var token: String?
     private var port: UInt16?
     private var board = ClaudeCodeBoard()
+    /// The board as last written, so as not to write it again unchanged.
+    private var savedBoard: ClaudeCodeBoard.Snapshot?
     /// The button callback is still to be set on the clock: from the moment
     /// the listener is ready until a setting lands. A failure sets it back,
     /// and the next hook event tries again.
@@ -60,6 +65,7 @@ final class ClaudeCodeHub {
          openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
          now: @escaping () -> Date = { Date() },
          handshake: BridgeHandshakeFile = BridgeHandshakeFile(name: ClaudeCodeHub.handshakeName),
+         boardFile: ClaudeCodeBoardFile = ClaudeCodeBoardFile(),
          listen: @escaping @MainActor (HubServer) throws -> Void = { try $0.start() }) {
         self.makeClient = makeClient
         self.localAddress = localAddress
@@ -67,16 +73,20 @@ final class ClaudeCodeHub {
         self.openURL = openURL
         self.now = now
         self.handshake = handshake
+        self.boardFile = boardFile
         self.listen = listen
     }
 
     // MARK: - Switching on and off
 
     /// Listens for the relay and the clock, on the clock at `address`. The
-    /// way in is published once the listener is ready.
+    /// board is taken back as the last run left it, since the clock kept its
+    /// alerts meanwhile. The way in is published once the listener is ready.
     func start(address: URL) {
         if client != nil { stop() }
         run += 1
+        board = ClaudeCodeBoard(restoring: boardFile.load() ?? ClaudeCodeBoard.Snapshot(), now: now())
+        savedBoard = board.snapshot
         let token = BridgeHandshakeFile.makeToken()
         let server = HubServer(token: token, onRoute: { [weak self] in self?.receive($0) })
         server.onReady = { [weak self] in self?.listenerReady(port: $0) }
@@ -91,9 +101,10 @@ final class ClaudeCodeHub {
         }
     }
 
-    /// Stops listening, takes the way in away and forgets everything. The
-    /// button callback stays on the clock: a press posted to a port nobody
-    /// listens on does nothing, and the next start sets it again.
+    /// Stops listening, takes the way in away and forgets the run. The board
+    /// file stays, the clock keeping its alerts; so does the button callback
+    /// on the clock: a press posted to a port nobody listens on does
+    /// nothing, and the next start sets it again.
     func stop() {
         run += 1
         server?.stop()
@@ -103,6 +114,7 @@ final class ClaudeCodeHub {
         token = nil
         port = nil
         board = ClaudeCodeBoard()
+        savedBoard = nil
         callbackPending = false
         status = .off
     }
@@ -134,6 +146,7 @@ final class ClaudeCodeHub {
     /// A route the server let in, and has answered already.
     func receive(_ route: HubRoute) {
         guard client != nil else { return }
+        defer { saveBoard() }
         switch route {
         case .hookEvent(let body):
             if let event = ClaudeCodeEvent(body) {
@@ -151,6 +164,14 @@ final class ClaudeCodeHub {
                 openURL(link)
             }
         }
+    }
+
+    /// Writes the board down when it changed. One that can't be written is
+    /// tried again at the next change.
+    private func saveBoard() {
+        let snapshot = board.snapshot
+        guard snapshot != savedBoard, (try? boardFile.save(snapshot)) != nil else { return }
+        savedBoard = snapshot
     }
 
     // MARK: - Sending
@@ -204,6 +225,7 @@ final class ClaudeCodeHub {
             if let name = notification.name { board.notifyLanded(name: name) }
         case .command(.indicator), .buttonCallback: break
         }
+        saveBoard()
         if let port { status = .listening(port: port) }
     }
 
@@ -218,6 +240,7 @@ final class ClaudeCodeHub {
             guard let name = notification.name else { break }
             board.notifyFailed(name: name, now: now()).forEach { enqueue(.command($0)) }
         }
+        saveBoard()
         status = .failed(reason)
     }
 }

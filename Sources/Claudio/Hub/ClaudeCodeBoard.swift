@@ -16,7 +16,7 @@ import Foundation
 /// on screen. A session whose alert never made it waits no more, and the
 /// indicator follows.
 struct ClaudeCodeBoard {
-    enum Level: Hashable { case orange, red }
+    enum Level: String, Hashable, Codable { case orange, red }
 
     struct Wait: Equatable {
         let level: Level
@@ -142,5 +142,26 @@ struct ClaudeCodeBoard {
         hasSentIndicator = true
         indicator = wanted
         return [.indicator(wanted)]
+    }
+}
+
+// MARK: - Outliving Claudio
+
+extension ClaudeCodeBoard {
+    /// The board as `snapshot` left it, less the waits twelve hours old at
+    /// `now`: nothing on its way, and the first indicator sent whatever it
+    /// is.
+    init(restoring snapshot: Snapshot, now: Date) {
+        self.init()
+        queue = HeldQueue(confirmed: snapshot.held)
+        for wait in snapshot.waits where now.timeIntervalSince(wait.since) < Self.expiry {
+            waits[wait.sessionID] = Wait(level: wait.level, since: wait.since)
+        }
+    }
+
+    /// What outlives Claudio, as it stands.
+    var snapshot: Snapshot {
+        let waiting = waits.map { Snapshot.Waiting(sessionID: $0.key, level: $0.value.level, since: $0.value.since) }
+        return Snapshot(held: queue.confirmed, waits: waiting.sorted { $0.sessionID < $1.sessionID })
     }
 }

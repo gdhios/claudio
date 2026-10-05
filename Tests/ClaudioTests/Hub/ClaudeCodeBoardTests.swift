@@ -465,6 +465,56 @@ final class ClaudeCodeBoardTests: XCTestCase {
         XCTAssertEqual(board.alerts, [])
     }
 
+    // MARK: - Outliving Claudio
+
+    /// What outlives Claudio: the alerts the clock said it holds, in their
+    /// places, and who waits since when. A hold still on its way is not in
+    /// it, no answer coming for it after a restart; its wait is.
+    func testASnapshotKeepsWhatTheClockHoldsAndWhoWaits() {
+        deliver(handle(stop("🟧", sessionA), at: t0))
+        deliver(handle(stop("🟥", sessionB), at: t0 + 60))
+        handle(event(.notification(type: "permission_prompt"), sessionC))
+
+        XCTAssertEqual(board.snapshot.held, [
+            ClaudeCodeBoard.Snapshot.Held(name: alertA, sessionID: sessionA, order: 0),
+            ClaudeCodeBoard.Snapshot.Held(name: alertB, sessionID: sessionB, order: 1),
+        ])
+        XCTAssertEqual(board.snapshot.waits, [
+            ClaudeCodeBoard.Snapshot.Waiting(sessionID: sessionA, level: .orange, since: t0),
+            ClaudeCodeBoard.Snapshot.Waiting(sessionID: sessionB, level: .red, since: t0 + 60),
+            ClaudeCodeBoard.Snapshot.Waiting(sessionID: sessionC, level: .orange, since: t0),
+        ])
+    }
+
+    /// Restored, the board takes up where it stopped: the same alerts in the
+    /// same order, the same waits, the indicator sent whatever it is, and an
+    /// alert posted again going to the back.
+    func testARestoredBoardTakesUpWhereItStopped() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(stop("🟥", sessionB)))
+
+        board = ClaudeCodeBoard(restoring: board.snapshot, now: t0)
+
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB])
+        XCTAssertEqual(board.waits[sessionB]?.level, .red)
+        XCTAssertEqual(handle(stop("🟩", sessionC)).last, .indicator(red))
+        handle(event(.notification(type: "permission_prompt"), sessionA))
+        XCTAssertEqual(board.alerts.map(\.name), [alertB, alertA])
+    }
+
+    /// A wait twelve hours old by the restart is forgotten; its alert, still
+    /// on the clock, is not.
+    func testARestoredBoardForgetsTheWaitsPastTwelveHours() {
+        deliver(handle(stop("🟧", sessionA), at: t0))
+        deliver(handle(stop("🟧", sessionB), at: t0 + 60))
+
+        board = ClaudeCodeBoard(restoring: board.snapshot, now: t0 + 12 * 3600)
+
+        XCTAssertNil(board.waits[sessionA])
+        XCTAssertNotNil(board.waits[sessionB])
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB])
+    }
+
     // MARK: - Names
 
     /// The project is the folder's last name, twelve characters at most, in

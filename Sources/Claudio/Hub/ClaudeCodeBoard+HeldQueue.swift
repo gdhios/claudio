@@ -37,6 +37,13 @@ extension ClaudeCodeBoard {
 
         var alerts: [Alert] { entries.map(\.alert) }
 
+        /// The alerts the clock said it holds, in their places: what
+        /// outlives Claudio, the calls on their way left out.
+        var confirmed: [Snapshot.Held] {
+            slots.values.compactMap(\.landed).sorted { $0.order < $1.order }
+                .map { Snapshot.Held(name: $0.alert.name, sessionID: $0.alert.sessionID, order: $0.order) }
+        }
+
         /// What the clock shows under `name` once every call has landed.
         func alert(named name: String) -> Alert? {
             slots[name]?.expected?.alert
@@ -90,5 +97,19 @@ extension ClaudeCodeBoard {
         private mutating func keep(_ slot: Slot, as name: String) {
             slots[name] = slot.landed == nil && slot.onTheirWay.isEmpty ? nil : slot
         }
+    }
+}
+
+extension ClaudeCodeBoard.HeldQueue {
+    /// The queue as the clock held it when Claudio last heard from it,
+    /// nothing on its way. A new hold goes behind them all.
+    init(confirmed held: [ClaudeCodeBoard.Snapshot.Held]) {
+        self.init()
+        for alert in held {
+            let entry = Entry(alert: ClaudeCodeBoard.Alert(name: alert.name, sessionID: alert.sessionID),
+                              order: alert.order)
+            slots[alert.name] = Slot(landed: entry)
+        }
+        posted = (held.map(\.order).max() ?? -1) + 1
     }
 }
