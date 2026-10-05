@@ -116,6 +116,11 @@ for bundle in .build/release/*.bundle; do
     [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
 
+# The Claude Code hook relay. Settings' "Install the hook" copies it out to
+# Application Support, a path that doesn't move with the app, and points
+# Claude Code at that copy.
+cp "Hooks/claudio-claude-code.py" "$APP/Contents/Resources/claudio-claude-code.py"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
