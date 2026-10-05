@@ -55,6 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Claudio's face on an Ulanzi clock. Only ever started when Settings
     /// holds its address: a Mac without one never calls anything.
     private let ulanzi = UlanziBridge()
+    /// The Claude Code sessions on the same clock: their flags, the alerts
+    /// held while they wait, and the middle button back to the
+    /// conversation. Started and stopped with the face, on its address.
+    private let hub = ClaudeCodeHub()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
@@ -124,9 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         dictation.dismiss()
         spokenInstruction.cancel()
-        // And the handshake file goes with the app: one left behind points
-        // the plugin at a port nobody answers.
+        // And the handshake files go with the app: one left behind points
+        // the plugin, or the Claude Code relay, at a port nobody answers.
         streamDeck.stop()
+        hub.stop()
         // The clock's face too, if it may be up: the app waits for the
         // clock to answer, a second at most.
         ulanzi.prepareToQuit(within: 1)
@@ -205,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Settings' Ulanzi tab, hooked to the real bridge: it shows what the
     /// bridge reports, and hands it a new address or a test. A stored
-    /// address starts the bridge at launch.
+    /// address starts the bridge at launch, and the Claude Code hub with it.
     private func wireUlanziSettings() {
         let model = UlanziStatusModel.shared
         ulanzi.onStatusChange = { status in model.status = status }
@@ -213,16 +218,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.test = { [weak self] in self?.ulanzi.test() }
         let address = AppSettings.ulanziAddress()
         model.address = address?.absoluteString ?? ""
-        if let address { ulanzi.start(address: address) }
+        if let address {
+            ulanzi.start(address: address)
+            hub.start(address: address)
+        }
     }
 
-    /// A new address, applied for real: written down, then the bridge starts
-    /// over on it, the face on the old one put away first. No address
-    /// switches it off.
+    /// A new address, applied for real: written down, then the bridge and
+    /// the hub start over on it, the face on the old one put away first. No
+    /// address switches both off.
     private func applyUlanziAddress(_ address: URL?) {
         AppSettings.setUlanziAddress(address)
         ulanzi.stop()
-        if let address { ulanzi.start(address: address) }
+        hub.stop()
+        if let address {
+            ulanzi.start(address: address)
+            hub.start(address: address)
+        }
     }
 
     // MARK: - The status menu
