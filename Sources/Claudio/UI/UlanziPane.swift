@@ -20,7 +20,7 @@ struct UlanziPane: View {
                                 row: model.clocks.first { $0.id == draft.id },
                                 unreadable: model.unreadable.contains(draft.id),
                                 isFirst: draft.id == drafts.first?.id,
-                                submit: submit,
+                                submit: { submit(draft.id) },
                                 test: { test(draft.id) },
                                 remove: { remove(draft.id) })
             }
@@ -67,20 +67,22 @@ struct UlanziPane: View {
 
     // MARK: - What the cards ask
 
-    /// Every card kept as typed, then shown as kept: an address made
-    /// callable, or the clock's own back in place of one nobody could call.
-    private func submit() {
-        model.submit(drafts)
-        drafts = model.redrafted(drafts)
+    /// Each card asks for itself alone: the clock it shows is kept as
+    /// typed, then shown as kept, an address made callable or the clock's
+    /// own back in place of one nobody could call. Every other card stays
+    /// as typed, neither applied nor lost.
+    private func submit(_ id: UUID) {
+        model.submit(id, in: drafts)
+        drafts = model.redrafted(drafts, after: id)
     }
 
     private func test(_ id: UUID) {
         model.testTyped(id, in: drafts)
-        drafts = model.redrafted(drafts)
+        drafts = model.redrafted(drafts, after: id)
     }
 
     private func remove(_ id: UUID) {
         drafts.removeAll { $0.id == id }
-        submit()
+        model.remove(id)
     }
 }

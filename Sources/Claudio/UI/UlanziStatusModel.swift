@@ -41,7 +41,7 @@ final class UlanziStatusModel: ObservableObject {
     /// What went wrong the last time the hook was installed or removed, nil
     /// when it went well.
     @Published var hookFailure: String?
-    /// The cards whose address could not be read at the last submit.
+    /// The cards whose address could not be read, each when last submitted.
     @Published private(set) var unreadable: Set<UUID> = []
 
     /// Called with the list submitted, when it changed. The app stores it
@@ -81,53 +81,67 @@ final class UlanziStatusModel: ObservableObject {
                    address: "", face: true, alerts: true)
     }
 
-    /// The cards, submitted. A card whose address reads is a clock, kept
-    /// the way it will be called; one whose address doesn't keeps its
-    /// clock's, and a new one is no clock yet. Those are said in
-    /// `unreadable`, and with `false`; a new card left blank is only not
-    /// finished. A blank name is the clock's own, or the first free. The
-    /// list is applied only when it changed: a bridge started over installs
-    /// and puts the face away for nothing.
+    /// One card submitted, on its own: its clock becomes the card as
+    /// typed, and every other clock stays as kept, whatever its card shows
+    /// meanwhile. An address that reads is kept the way it will be called;
+    /// one that doesn't leaves the clock its own, and a new card no clock
+    /// yet, which `unreadable` and `false` say. A new card left blank is
+    /// only not finished. A blank name is the clock's own, or the first
+    /// free. The list is applied only when it changed: a bridge started
+    /// over installs and puts the face away for nothing.
     @discardableResult
-    func submit(_ drafts: [ClockDraft]) -> Bool {
-        var list: [UlanziClock] = []
-        var refused: Set<UUID> = []
-        for draft in drafts {
-            let kept = clocks.first { $0.id == draft.id }?.clock
-            let typed = AppSettings.normalizedUlanziURL(draft.address)
-            if typed == nil, kept != nil || !draft.address.isBlank { refused.insert(draft.id) }
-            guard let address = typed ?? kept?.address else { continue }
-            let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            list.append(UlanziClock(id: draft.id,
-                                    name: name.isEmpty ? kept?.name ?? Self.freeName(list, drafts) : name,
-                                    address: address, face: draft.face, alerts: draft.alerts))
+    func submit(_ id: UUID, in drafts: [ClockDraft]) -> Bool {
+        guard let draft = drafts.first(where: { $0.id == id }) else { return true }
+        let kept = clocks.first { $0.id == id }?.clock
+        let typed = AppSettings.normalizedUlanziURL(draft.address)
+        let readable = typed != nil || (kept == nil && draft.address.isBlank)
+        if readable { unreadable.remove(id) } else { unreadable.insert(id) }
+        guard let address = typed ?? kept?.address else { return readable }
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clock = UlanziClock(id: id, name: name.isEmpty ? kept?.name ?? freeName(drafts) : name,
+                                address: address, face: draft.face, alerts: draft.alerts)
+        var list = clocks.map(\.clock)
+        if let index = list.firstIndex(where: { $0.id == id }) {
+            list[index] = clock
+        } else {
+            list.append(clock)
         }
-        unreadable = refused
-        if list != clocks.map(\.clock) {
-            show(list)
-            applyClocks?(list)
+        apply(list)
+        return readable
+    }
+
+    /// A card removed: its clock goes, every other stays as kept.
+    func remove(_ id: UUID) {
+        unreadable.remove(id)
+        apply(clocks.map(\.clock).filter { $0.id != id })
+    }
+
+    private func apply(_ list: [UlanziClock]) {
+        guard list != clocks.map(\.clock) else { return }
+        show(list)
+        applyClocks?(list)
+    }
+
+    private func freeName(_ drafts: [ClockDraft]) -> String {
+        UlanziClock.defaultName(notIn: Set(clocks.map(\.clock.name) + drafts.map(\.name)))
+    }
+
+    /// The cards after `id`'s was submitted: that one shows its clock as
+    /// kept, if it is one; every other stays as typed.
+    func redrafted(_ drafts: [ClockDraft], after id: UUID) -> [ClockDraft] {
+        drafts.map { draft in
+            guard draft.id == id, let row = clocks.first(where: { $0.id == id }) else { return draft }
+            return ClockDraft(clock: row.clock)
         }
-        return refused.isEmpty
     }
 
-    private static func freeName(_ clocks: [UlanziClock], _ drafts: [ClockDraft]) -> String {
-        UlanziClock.defaultName(notIn: Set(clocks.map(\.name) + drafts.map(\.name)))
-    }
-
-    /// The cards after a submit: a clock's card shows it as kept, a card
-    /// that is no clock yet stays as typed.
-    func redrafted(_ drafts: [ClockDraft]) -> [ClockDraft] {
-        drafts.map { draft in clocks.first { $0.id == draft.id }.map { ClockDraft(clock: $0.clock) } ?? draft }
-    }
-
-    /// A card's Test button: the cards are kept first, then that clock
+    /// A card's Test button: that card is kept first, then its clock
     /// smiles, if it has the face. An address nobody could call tries
     /// nothing, and says so with `false`: the old one smiling would say the
     /// typo works.
     @discardableResult
     func testTyped(_ id: UUID, in drafts: [ClockDraft]) -> Bool {
-        submit(drafts)
-        guard !unreadable.contains(id) else { return false }
+        guard submit(id, in: drafts) else { return false }
         if clocks.first(where: { $0.id == id })?.clock.face == true { test?(id) }
         return true
     }

@@ -2,9 +2,10 @@ import XCTest
 @testable import Claudio
 
 /// What the Ulanzi tab shows, and what its cards and buttons mean. Each
-/// card is a clock as typed: its address read like Ollama's, a bare host
-/// getting its scheme, one nobody could call leaving the clock's kept
-/// address alone; the list applied only when it changed. The model stores
+/// card is a clock as typed, submitted on its own: its address read like
+/// Ollama's, a bare host getting its scheme, one nobody could call leaving
+/// the clock's kept address alone; the other cards neither applied nor
+/// touched; the list applied only when it changed. The model stores
 /// nothing and calls nothing itself (the app applies the list, runs the
 /// test and the hook), so these tests touch no preference, no device and no
 /// file.
@@ -67,7 +68,7 @@ final class UlanziStatusModelTests: XCTestCase {
         XCTAssertEqual(model.newDraft(among: [first]).name, "Ulanzi 2")
     }
 
-    // MARK: - Submitting the cards
+    // MARK: - Submitting a card
 
     /// A new card with a bare IP becomes a clock, called with its scheme,
     /// and the list is applied once.
@@ -76,7 +77,7 @@ final class UlanziStatusModelTests: XCTestCase {
         var card = model.newDraft(among: model.drafts)
         card.address = " 192.168.1.30 "
 
-        XCTAssertTrue(model.submit(model.drafts + [card]))
+        XCTAssertTrue(model.submit(card.id, in: model.drafts + [card]))
 
         let added = try XCTUnwrap(model.clocks.last?.clock)
         XCTAssertEqual(added.id, card.id)
@@ -93,8 +94,8 @@ final class UlanziStatusModelTests: XCTestCase {
         var cards = model.drafts
         cards[0].address = "192.168.1.22"
 
-        XCTAssertTrue(model.submit(cards))
-        XCTAssertTrue(model.submit(model.drafts))
+        XCTAssertTrue(model.submit(desk.id, in: cards))
+        XCTAssertTrue(model.submit(lounge.id, in: model.drafts))
 
         XCTAssertTrue(applied.isEmpty)
     }
@@ -107,14 +108,14 @@ final class UlanziStatusModelTests: XCTestCase {
         cards[0].address = "ftp://192.168.1.22"
         cards[0].name = "Bureau du haut"
 
-        XCTAssertFalse(model.submit(cards))
+        XCTAssertFalse(model.submit(desk.id, in: cards))
 
         XCTAssertEqual(model.clocks.first?.clock.address, desk.address)
         XCTAssertEqual(model.clocks.first?.clock.name, "Bureau du haut")
         XCTAssertEqual(model.unreadable, [desk.id])
-        XCTAssertEqual(model.redrafted(cards).first?.address, "http://192.168.1.22")
+        XCTAssertEqual(model.redrafted(cards, after: desk.id).first?.address, "http://192.168.1.22")
 
-        XCTAssertTrue(model.submit(model.drafts))
+        XCTAssertTrue(model.submit(desk.id, in: model.drafts))
         XCTAssertEqual(model.unreadable, [])
     }
 
@@ -127,19 +128,22 @@ final class UlanziStatusModelTests: XCTestCase {
         var typo = model.newDraft(among: model.drafts + [blank])
         typo.address = "http://"
 
-        XCTAssertFalse(model.submit(model.drafts + [blank, typo]))
+        let cards = model.drafts + [blank, typo]
+
+        XCTAssertTrue(model.submit(blank.id, in: cards))
+        XCTAssertFalse(model.submit(typo.id, in: cards))
 
         XCTAssertEqual(model.clocks.map(\.clock), [desk])
         XCTAssertEqual(model.unreadable, [typo.id])
         XCTAssertTrue(applied.isEmpty)
-        XCTAssertEqual(model.redrafted(model.drafts + [blank, typo]).last, typo)
+        XCTAssertEqual(model.redrafted(cards, after: typo.id), cards)
     }
 
     /// A card removed takes its clock with it.
     func testRemovingACardRemovesItsClock() {
         let model = wiredModel([desk, lounge])
 
-        model.submit(model.drafts.filter { $0.id != desk.id })
+        model.remove(desk.id)
 
         XCTAssertEqual(applied, [[lounge]])
         XCTAssertEqual(model.clocks.map(\.clock), [lounge])
@@ -154,14 +158,14 @@ final class UlanziStatusModelTests: XCTestCase {
         var cards = model.drafts
         cards[0].alerts = false
 
-        model.submit(cards)
+        model.submit(desk.id, in: cards)
 
         XCTAssertEqual(applied.last?.first?.alerts, false)
         XCTAssertNil(model.clocks.first?.alertsStatus)
         XCTAssertEqual(model.clocks.first?.faceStatus, .ready, "the face is not touched")
 
         cards[0].face = false
-        model.submit(cards)
+        model.submit(desk.id, in: cards)
         XCTAssertEqual(model.clocks.first?.faceStatus, .off)
     }
 
@@ -175,7 +179,8 @@ final class UlanziStatusModelTests: XCTestCase {
         card.name = ""
         card.address = "192.168.1.30"
 
-        model.submit(cards + [card])
+        model.submit(desk.id, in: cards + [card])
+        model.submit(card.id, in: cards + [card])
 
         XCTAssertEqual(model.clocks.map(\.clock.name), ["Bureau", "Ulanzi"])
     }
@@ -186,7 +191,7 @@ final class UlanziStatusModelTests: XCTestCase {
         var card = model.newDraft(among: model.drafts)
         card.address = "192.168.1.22"
 
-        XCTAssertTrue(model.submit(model.drafts + [card]))
+        XCTAssertTrue(model.submit(card.id, in: model.drafts + [card]))
 
         XCTAssertEqual(model.clocks.map(\.clock.address), [desk.address, desk.address])
     }
@@ -199,16 +204,63 @@ final class UlanziStatusModelTests: XCTestCase {
         var cards = model.drafts
         cards[0].address = "192.168.1.40"
 
-        model.submit(cards)
+        model.submit(desk.id, in: cards)
 
         XCTAssertEqual(model.clocks.first?.faceStatus, .off)
         XCTAssertEqual(model.clocks.first?.alertsStatus, .pending)
     }
 
+    // MARK: - One card at a time
+
+    /// Ticking a role on the lounge's card applies the lounge alone: the
+    /// address half typed on the desk's card is neither applied, nor said
+    /// to be wrong, nor lost to the card shown as kept.
+    func testSubmittingACardLeavesTheOthersAsTyped() {
+        let model = wiredModel([desk, lounge])
+        var cards = model.drafts
+        cards[0].address = "192.168.1."
+        cards[1].alerts = true
+
+        XCTAssertTrue(model.submit(lounge.id, in: cards))
+
+        var flagged = lounge
+        flagged.alerts = true
+        XCTAssertEqual(applied, [[desk, flagged]])
+        XCTAssertEqual(model.unreadable, [])
+        XCTAssertEqual(model.redrafted(cards, after: lounge.id).first?.address, "192.168.1.")
+    }
+
+    /// Removing the lounge's card keeps the desk as kept, whatever its card
+    /// shows meanwhile.
+    func testRemovingACardLeavesTheOthersAsKept() {
+        let model = wiredModel([desk, lounge])
+        var cards = model.drafts
+        cards[0].address = "192.168.1.99"
+
+        model.remove(lounge.id)
+
+        XCTAssertEqual(applied, [[desk]])
+        XCTAssertEqual(cards[0].address, "192.168.1.99")
+    }
+
+    /// Testing the desk applies nothing of the lounge's card, typed or not.
+    func testTestingACardLeavesTheOthersAsTyped() {
+        let model = wiredModel([desk, lounge])
+        var cards = model.drafts
+        cards[1].address = "192.168.1.99"
+        cards[1].name = "Salon du bas"
+
+        XCTAssertTrue(model.testTyped(desk.id, in: cards))
+
+        XCTAssertTrue(applied.isEmpty)
+        XCTAssertEqual(tested, [desk.id])
+        XCTAssertEqual(model.clocks.map(\.clock), [desk, lounge])
+    }
+
     // MARK: - The Test button
 
-    /// The cards are kept first, then the clock smiles.
-    func testTestingKeepsTheCardsThenTries() {
+    /// Its card is kept first, then the clock smiles.
+    func testTestingKeepsItsCardThenTries() {
         let model = wiredModel([desk])
         var cards = model.drafts
         cards[0].address = "192.168.1.30"
@@ -249,7 +301,7 @@ final class UlanziStatusModelTests: XCTestCase {
         var card = model.newDraft(among: [])
         card.address = "192.168.1.30"
 
-        XCTAssertTrue(model.submit([card]))
+        XCTAssertTrue(model.submit(card.id, in: [card]))
         XCTAssertTrue(model.testTyped(card.id, in: model.drafts))
         XCTAssertEqual(model.clocks.first?.clock.address, URL(string: "http://192.168.1.30"))
     }
