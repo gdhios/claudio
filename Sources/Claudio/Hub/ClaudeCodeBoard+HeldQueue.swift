@@ -41,7 +41,8 @@ extension ClaudeCodeBoard {
         /// outlives Claudio, the calls on their way left out.
         var confirmed: [Snapshot.Held] {
             slots.values.compactMap(\.landed).sorted { $0.order < $1.order }
-                .map { Snapshot.Held(name: $0.alert.name, sessionID: $0.alert.sessionID, order: $0.order) }
+                .map { Snapshot.Held(name: $0.alert.name, sessionID: $0.alert.sessionID, order: $0.order,
+                                     notification: $0.alert.notification) }
         }
 
         /// What the clock shows under `name` once every call has landed.
@@ -106,7 +107,8 @@ extension ClaudeCodeBoard.HeldQueue {
     init(confirmed held: [ClaudeCodeBoard.Snapshot.Held]) {
         self.init()
         for alert in held {
-            let entry = Entry(alert: ClaudeCodeBoard.Alert(name: alert.name, sessionID: alert.sessionID),
+            let entry = Entry(alert: ClaudeCodeBoard.Alert(name: alert.name, sessionID: alert.sessionID,
+                                                           notification: alert.notification),
                               order: alert.order)
             slots[alert.name] = Slot(landed: entry)
         }

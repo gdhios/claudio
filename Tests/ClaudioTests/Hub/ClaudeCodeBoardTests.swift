@@ -107,7 +107,7 @@ final class ClaudeCodeBoardTests: XCTestCase {
                                        hold: true, wakeup: true, soundRtttl: "dec:d=16,o=5,b=140:g,p,g,8c6")),
             .indicator(orange),
         ])
-        XCTAssertEqual(board.alerts, [ClaudeCodeBoard.Alert(name: alertA, sessionID: sessionA)])
+        XCTAssertEqual(board.alerts.map(\.sessionID), [sessionA])
     }
 
     /// 🟥: BLOCAGE held and blinking, and the indicator blinks red.
@@ -119,7 +119,7 @@ final class ClaudeCodeBoardTests: XCTestCase {
                                        soundRtttl: "blk:d=16,o=5,b=140:g,f#,f,8e")),
             .indicator(red),
         ])
-        XCTAssertEqual(board.alerts, [ClaudeCodeBoard.Alert(name: alertA, sessionID: sessionA)])
+        XCTAssertEqual(board.alerts.map(\.sessionID), [sessionA])
     }
 
     /// A short answer without a flag: the project's name winks in grey, in
@@ -159,7 +159,7 @@ final class ClaudeCodeBoardTests: XCTestCase {
                                            hold: true, wakeup: true, soundRtttl: "att:d=16,o=5,b=140:e,p,e,p,8a")),
                 .indicator(orange),
             ], type)
-            XCTAssertEqual(board.alerts, [ClaudeCodeBoard.Alert(name: alertA, sessionID: sessionA)], type)
+            XCTAssertEqual(board.alerts.map(\.sessionID), [sessionA], type)
         }
     }
 
@@ -235,6 +235,29 @@ final class ClaudeCodeBoardTests: XCTestCase {
         XCTAssertNil(board.catchUpIndicator)
     }
 
+    /// A clock that joins the others is shown the alerts they hold, each
+    /// hold again in its place and without its jingle, the dismissed ones
+    /// left out. After a restart, the holds come back with the board.
+    func testAClockJoiningIsShownTheAlertsHeld() throws {
+        XCTAssertEqual(board.catchUpAlerts, [])
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(event(.notification(type: "permission_prompt"), sessionB)))
+
+        XCTAssertEqual(board.catchUpAlerts, [
+            .notify(UlanziNotification(name: alertA, text: "BAGUETTE DÉCISION", textColor: "#FF851B",
+                                       hold: true, wakeup: true)),
+            .notify(UlanziNotification(name: alertB, text: "BAGUETTE ?", textColor: "#FF851B",
+                                       hold: true, wakeup: true)),
+        ])
+
+        deliver(handle(event(.promptSubmitted, sessionA)))
+        let restored = ClaudeCodeBoard(restoring: board.snapshot, now: t0)
+        XCTAssertEqual(restored.catchUpAlerts, [
+            .notify(UlanziNotification(name: alertB, text: "BAGUETTE ?", textColor: "#FF851B",
+                                       hold: true, wakeup: true)),
+        ])
+    }
+
     /// A session killed without a SessionEnd doesn't keep the indicator on:
     /// past 12 h its wait is forgotten. Its alert stays in the queue, as it
     /// stays on the clock until a press takes it away.
@@ -246,7 +269,7 @@ final class ClaudeCodeBoardTests: XCTestCase {
                        .notify(UlanziNotification(text: "BAGUETTE FINI", textColor: "#2ECC40", durationMs: 6000,
                                                   soundRtttl: "fini:d=16,o=5,b=140:c,d,e,f,g,a,b,c6")))
         XCTAssertEqual(handle(stop("🟩", sessionB), at: t0 + twelveHours).last, .indicator(nil))
-        XCTAssertEqual(board.alerts, [ClaudeCodeBoard.Alert(name: alertA, sessionID: sessionA)])
+        XCTAssertEqual(board.alerts.map(\.sessionID), [sessionA])
     }
 
     /// A wait asked again starts its twelve hours again.
@@ -491,10 +514,10 @@ final class ClaudeCodeBoardTests: XCTestCase {
         deliver(handle(stop("🟥", sessionB), at: t0 + 60))
         handle(event(.notification(type: "permission_prompt"), sessionC))
 
-        XCTAssertEqual(board.snapshot.held, [
-            ClaudeCodeBoard.Snapshot.Held(name: alertA, sessionID: sessionA, order: 0),
-            ClaudeCodeBoard.Snapshot.Held(name: alertB, sessionID: sessionB, order: 1),
-        ])
+        XCTAssertEqual(board.snapshot.held.map { ($0.name, $0.sessionID, $0.order) }.map { "\($0) \($1) \($2)" },
+                       ["\(alertA) \(sessionA) 0", "\(alertB) \(sessionB) 1"])
+        XCTAssertEqual(board.snapshot.held.map(\.notification?.text), ["BAGUETTE DÉCISION", "BAGUETTE BLOCAGE"],
+                       "each hold outlives Claudio with its alert")
         XCTAssertEqual(board.snapshot.waits, [
             ClaudeCodeBoard.Snapshot.Waiting(sessionID: sessionA, level: .orange, since: t0),
             ClaudeCodeBoard.Snapshot.Waiting(sessionID: sessionB, level: .red, since: t0 + 60),

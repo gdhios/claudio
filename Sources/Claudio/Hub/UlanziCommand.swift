@@ -11,7 +11,7 @@ enum UlanziCommand: Equatable {
 
 /// A notification as AWTRIX NG takes it on `POST /api/v1/notifications`.
 /// Only the keys set are sent.
-struct UlanziNotification: Equatable {
+struct UlanziNotification: Equatable, Codable {
     /// Names a held notification, so it can be dismissed. A new one under a
     /// name already held replaces it.
     var name: String? = nil

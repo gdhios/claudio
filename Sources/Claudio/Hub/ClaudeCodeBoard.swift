@@ -27,6 +27,10 @@ struct ClaudeCodeBoard {
     struct Alert: Equatable {
         let name: String
         let sessionID: String
+        /// The hold that put it on the clocks, for a clock joining later to
+        /// be shown it too. nil for an alert restored from a board written
+        /// before holds were kept.
+        var notification: UlanziNotification? = nil
     }
 
     /// Past this, a wait is a session killed without a SessionEnd: it no
@@ -55,14 +59,14 @@ struct ClaudeCodeBoard {
         case .stop:
             let dismissal = release(id)
             let flag = ClaudeCodeFlag.in(event.lastAssistantMessage)
-            if let level = flag?.waitLevel { wait(id, level, now: now) }
             let notification = Self.notification(for: flag, project: project, name: name)
+            if let level = flag?.waitLevel { wait(id, level, holding: notification, now: now) }
             return [dismissal, .notify(notification)] + refreshIndicator(now: now)
         case .notification(let type) where Self.waitingTypes.contains(type):
-            wait(id, .orange, now: now)
-            return [.notify(UlanziNotification(name: name, text: "\(project) ?", textColor: Self.waitingColor,
-                                               hold: true, wakeup: true, soundRtttl: Melody.waiting))]
-                + refreshIndicator(now: now)
+            let notification = UlanziNotification(name: name, text: "\(project) ?", textColor: Self.waitingColor,
+                                                  hold: true, wakeup: true, soundRtttl: Melody.waiting)
+            wait(id, .orange, holding: notification, now: now)
+            return [.notify(notification)] + refreshIndicator(now: now)
         case .promptSubmitted, .sessionEnded:
             return [release(id)] + refreshIndicator(now: now)
         case .notification, .other:
@@ -124,6 +128,18 @@ struct ClaudeCodeBoard {
         hasSentIndicator ? .indicator(indicator) : nil
     }
 
+    /// What a clock joining the others is sent, to show the alerts they
+    /// hold: each hold again, in its place, without its jingle, which
+    /// sounded when the session first waited. An alert whose hold is
+    /// unknown, from a board written before holds were kept, can't follow.
+    var catchUpAlerts: [UlanziCommand] {
+        alerts.compactMap { alert in
+            guard var notification = alert.notification else { return nil }
+            notification.soundRtttl = nil
+            return .notify(notification)
+        }
+    }
+
     /// What a clock leaving the others is sent, to show nothing of theirs:
     /// a dismissal of each alert held, and the indicator off when one is
     /// lit. Nothing of it comes back to the board, which goes on for the
@@ -134,10 +150,10 @@ struct ClaudeCodeBoard {
 
     // MARK: - Waits and alerts
 
-    /// Waits, and holds its alert at the back of the queue.
-    private mutating func wait(_ id: String, _ level: Level, now: Date) {
+    /// Waits, and holds its alert, `notification`, at the back of the queue.
+    private mutating func wait(_ id: String, _ level: Level, holding notification: UlanziNotification, now: Date) {
         waits[id] = Wait(level: level, since: now)
-        queue.hold(Alert(name: Self.alertName(for: id), sessionID: id))
+        queue.hold(Alert(name: Self.alertName(for: id), sessionID: id, notification: notification))
     }
 
     /// Lets the session go: no more wait, and its alert dismissed.

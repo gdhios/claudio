@@ -12,6 +12,9 @@ extension ClaudeCodeBoard {
             let sessionID: String
             /// Its place: the clock shows the lowest first.
             let order: Int
+            /// The hold that put it there, for a clock joining later. nil in
+            /// a board written before holds were kept.
+            var notification: UlanziNotification? = nil
         }
 
         struct Waiting: Codable, Equatable {

@@ -6,8 +6,8 @@ import Foundation
 /// of it once all have answered: a hold, or a dismissal, one clock took is
 /// taken; one they all missed is missed. An indicator one of them missed
 /// goes again with the next event, changed or not. A clock that joins while
-/// the hub runs is shown the indicator at once; the alerts the others hold
-/// can't follow it, the board keeping their names and not their texts.
+/// the hub runs is shown the alerts the others hold and the indicator at
+/// once, the board keeping each hold with its name.
 extension ClaudeCodeHub {
     /// Where one clock stands, for Settings.
     enum ClockStatus: Equatable {
@@ -82,9 +82,15 @@ extension ClaudeCodeHub {
     }
 
     /// A clock joining while the hub runs, or back from elsewhere, is
-    /// shown the indicator the others were sent, at once: the next event
-    /// may be long in coming while a session waits.
+    /// shown what the others show, at once: the alerts they hold, each
+    /// without its jingle, then the indicator they were sent. The next
+    /// event may be long in coming while a session waits. The board hears
+    /// nothing of the alerts: it holds them already, and a clock that
+    /// misses one shows it at the next press or event like any other.
     private func catchUp(_ link: ClaudeCodeClockLink) {
+        for command in board.catchUpAlerts {
+            attempt({ try await $0.perform(command) }, on: link) { _ in }
+        }
         guard let indicator = board.catchUpIndicator else { return }
         send(indicator, to: [link])
     }

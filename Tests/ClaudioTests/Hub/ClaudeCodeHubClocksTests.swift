@@ -290,8 +290,8 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
     /// A clock added while a session is blocked shows the red indicator at
     /// once, as the other does, rather than at the next event, which may be
     /// long in coming while the session waits; so does a clock that moved.
-    /// The alert held on the other can't follow: the board keeps its name,
-    /// not its text.
+    /// The alert of a blocked session is held on the other, so it follows
+    /// too.
     func testAClockJoiningWhileASessionWaitsIsShownTheIndicator() async throws {
         await listening([desk])
         blocked()
@@ -301,8 +301,8 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         hub.apply([desk, lounge])
         await settle()
         XCTAssertEqual(loungeDevice.indicator, red)
-        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/indicators/1", "PUT /api/v1/system"])
-        XCTAssertEqual(loungeDevice.heldNotifications, [])
+        XCTAssertEqual(loungeDevice.calls, ["POST /api/v1/notifications", "PUT /api/v1/indicators/1", "PUT /api/v1/system"])
+        XCTAssertEqual(loungeDevice.heldNotifications, [alert])
 
         var moved = lounge
         moved.address = elsewhere
@@ -400,6 +400,39 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         press()
         await settle()
         XCTAssertEqual(deskDevice.heldNotifications, [])
+        XCTAssertEqual(opened, [conversation])
+    }
+
+    /// Ticked again, the clock is shown the alert the other holds, without
+    /// its jingle, and the indicator, before the door; a press on it then
+    /// clears the alert on both and opens the session.
+    func testAClockTickedAgainIsShownTheAlertsHeld() async throws {
+        await listening([desk, lounge])
+        try writeSession()
+        decision()
+        await settle()
+        var quiet = lounge
+        quiet.alerts = false
+        hub.apply([desk, quiet])
+        await settle()
+        await hub.lines[lounge.address]?.value
+        devices.values.forEach { $0.clearRequests() }
+
+        hub.apply([desk, lounge])
+        await settle()
+
+        XCTAssertEqual(loungeDevice.calls, ["POST /api/v1/notifications", "PUT /api/v1/indicators/1", "PUT /api/v1/system"])
+        XCTAssertEqual(loungeDevice.heldNotifications, [alert])
+        XCTAssertNotNil(loungeDevice.indicator)
+        let hold = try XCTUnwrap(loungeDevice.requests.first?.body)
+        XCTAssertTrue(hold.contains("BAGUETTE DÉCISION"), hold)
+        XCTAssertFalse(hold.contains("rtttl"), "no jingle for a hold shown again: \(hold)")
+        XCTAssertEqual(deskDevice.calls, [])
+
+        press()
+        await settle()
+        XCTAssertEqual(deskDevice.heldNotifications, [])
+        XCTAssertEqual(loungeDevice.heldNotifications, [])
         XCTAssertEqual(opened, [conversation])
     }
 
