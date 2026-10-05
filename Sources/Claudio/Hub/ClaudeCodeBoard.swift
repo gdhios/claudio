@@ -115,6 +115,15 @@ struct ClaudeCodeBoard {
         hasSentIndicator = false
     }
 
+    /// What a clock joining the others is sent, to show what they show:
+    /// the indicator last sent, off included. nil before the first went,
+    /// or after one failed: the next one then goes to every clock, the one
+    /// joining too. The alerts they hold can't follow: the board keeps
+    /// their names, not their texts.
+    var catchUpIndicator: UlanziCommand? {
+        hasSentIndicator ? .indicator(indicator) : nil
+    }
+
     // MARK: - Waits and alerts
 
     /// Waits, and holds its alert at the back of the queue.

@@ -219,6 +219,22 @@ final class ClaudeCodeBoardTests: XCTestCase {
         XCTAssertEqual(handle(event(.notification(type: "permission_prompt"), sessionB)).count, 1)
     }
 
+    /// A clock that joins the others is shown the indicator they were sent
+    /// last, off included. Nothing before the first one went, or after one
+    /// failed: the next change goes to every clock then, the one joining
+    /// too.
+    func testAClockJoiningIsShownTheIndicatorLastSent() {
+        XCTAssertNil(board.catchUpIndicator)
+        handle(stop("🟧", sessionA))
+        XCTAssertEqual(board.catchUpIndicator, .indicator(orange))
+        handle(event(.promptSubmitted, sessionA))
+        XCTAssertEqual(board.catchUpIndicator, .indicator(nil))
+
+        board.indicatorFailed()
+
+        XCTAssertNil(board.catchUpIndicator)
+    }
+
     /// A session killed without a SessionEnd doesn't keep the indicator on:
     /// past 12 h its wait is forgotten. Its alert stays in the queue, as it
     /// stays on the clock until a press takes it away.

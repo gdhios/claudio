@@ -1,11 +1,13 @@
 import Foundation
 
 /// The clocks the hub speaks to, one link each. Every command of the board
-/// goes to every clock, each on its own queue, side by side: a clock out of
-/// reach holds no other back. The board hears what they made of it once
-/// all have answered: a hold, or a dismissal, one clock took is taken; one
-/// they all missed is missed. An indicator one of them missed goes again
-/// with the next event, changed or not.
+/// goes to every clock, each in its own device's line, side by side: a
+/// clock out of reach holds no other back. The board hears what they made
+/// of it once all have answered: a hold, or a dismissal, one clock took is
+/// taken; one they all missed is missed. An indicator one of them missed
+/// goes again with the next event, changed or not. A clock that joins while
+/// the hub runs is shown the indicator at once; the alerts the others hold
+/// can't follow it, the board keeping their names and not their texts.
 extension ClaudeCodeHub {
     /// Where one clock stands, for Settings.
     enum ClockStatus: Equatable {
@@ -43,6 +45,7 @@ extension ClaudeCodeHub {
         }
         let dropped = links.filter { link in !kept.contains { $0 === link } }
         links = clocks.map { clock in kept.first { $0.id == clock.id } ?? makeLink(for: clock) }
+        links.filter { link in !kept.contains { $0 === link } }.forEach(catchUp)
         for link in dropped {
             forget(link)
             if !links.contains(where: { $0.address == link.address }) { giveButtonBack(link) }
@@ -59,6 +62,14 @@ extension ClaudeCodeHub {
         guard link.doorSent else { return }
         let client = link.client
         chain(at: link.address) { try? await client.clearButtonCallback() }
+    }
+
+    /// A clock joining while the hub runs, or back from elsewhere, is
+    /// shown the indicator the others were sent, at once: the next event
+    /// may be long in coming while a session waits.
+    private func catchUp(_ link: ClaudeCodeClockLink) {
+        guard let indicator = board.catchUpIndicator else { return }
+        send(indicator, to: [link])
     }
 
     private func makeLink(for clock: UlanziClock) -> ClaudeCodeClockLink {
@@ -107,9 +118,14 @@ extension ClaudeCodeHub {
     /// before. What they made of it goes to the board once all have
     /// answered.
     func enqueue(_ command: UlanziCommand) {
-        guard !links.isEmpty else { return }
-        let number = deliveries.send(command, to: links.map(ObjectIdentifier.init))
-        for link in links {
+        send(command, to: links)
+    }
+
+    /// Sends `command` to `recipients` only, the same way.
+    private func send(_ command: UlanziCommand, to recipients: [ClaudeCodeClockLink]) {
+        guard !recipients.isEmpty else { return }
+        let number = deliveries.send(command, to: recipients.map(ObjectIdentifier.init))
+        for link in recipients {
             let recipient = ObjectIdentifier(link)
             attempt({ try await $0.perform(command) }, on: link) { [weak self] failure in
                 guard let self else { return }

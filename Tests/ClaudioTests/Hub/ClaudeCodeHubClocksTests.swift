@@ -283,6 +283,64 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         XCTAssertEqual(statuses, [.listening(port: port)])
     }
 
+    private func blocked() {
+        hook(#"{"hook_event_name":"Stop","session_id":"\#(session)","cwd":"/Users/g/BAGUETTE","last_assistant_message":"🟥 BLOCAGE"}"#)
+    }
+
+    /// A clock added while a session is blocked shows the red indicator at
+    /// once, as the other does, rather than at the next event, which may be
+    /// long in coming while the session waits; so does a clock that moved.
+    /// The alert held on the other can't follow: the board keeps its name,
+    /// not its text.
+    func testAClockJoiningWhileASessionWaitsIsShownTheIndicator() async throws {
+        await listening([desk])
+        blocked()
+        await settle()
+        let red = try XCTUnwrap(deskDevice.indicator)
+
+        hub.apply([desk, lounge])
+        await settle()
+        XCTAssertEqual(loungeDevice.indicator, red)
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/indicators/1", "PUT /api/v1/system"])
+        XCTAssertEqual(loungeDevice.heldNotifications, [])
+
+        var moved = lounge
+        moved.address = elsewhere
+        hub.apply([desk, moved])
+        await settle()
+        XCTAssertEqual(device(elsewhere).indicator, red)
+    }
+
+    /// The indicator a joining clock missed goes again with the next event,
+    /// to every clock, though it did not change.
+    func testAnIndicatorAJoiningClockMissedGoesAgain() async {
+        await listening([desk])
+        blocked()
+        await settle()
+        loungeDevice.answer("PUT /api/v1/indicators/1", status: 503, body: FakeUlanzi.refusal("serviceBusy", "busy"))
+
+        hub.apply([desk, lounge])
+        await settle()
+        loungeDevice.forget("PUT /api/v1/indicators/1")
+        deskDevice.clearRequests()
+        hook(#"{"hook_event_name":"UserPromptSubmit","session_id":"99999999-aaaa-4bbb-8ccc-000000000002","prompt":"go"}"#)
+        await settle()
+
+        XCTAssertNotNil(loungeDevice.indicator)
+        XCTAssertTrue(deskDevice.calls.contains("PUT /api/v1/indicators/1"), "\(deskDevice.calls)")
+    }
+
+    /// A clock added before any indicator went is only told the door: the
+    /// first indicator goes to every clock with the next event.
+    func testAClockJoiningBeforeAnyIndicatorIsOnlyToldTheDoor() async {
+        await listening([desk])
+
+        hub.apply([desk, lounge])
+        await settle()
+
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"])
+    }
+
     /// The last clock with the flags gone: the door goes, and the hub is
     /// off.
     func testNoClockWithTheFlagsTakesTheDoorAway() async {
