@@ -13,6 +13,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case music
     case streamDeck
     case ulanzi
+    case tip
     case prompts
     case about
 
@@ -39,6 +40,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: loc("Musique", en: "Music")
         case .streamDeck: loc("Stream Deck", en: "Stream Deck")
         case .ulanzi: loc("Ulanzi", en: "Ulanzi")
+        case .tip: loc("Pourboire", en: "Tip")
         case .prompts: loc("Prompts", en: "Prompts")
         case .about: loc("À propos", en: "About")
         }
@@ -55,6 +57,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: ListeningSession.symbolName
         case .streamDeck: "rectangle.grid.3x2.fill"
         case .ulanzi: "lightbulb.led.fill"
+        case .tip: "cup.and.saucer.fill"
         case .prompts: "text.quote"
         case .about: "info"
         }
@@ -71,6 +74,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: ListeningSession.tint
         case .streamDeck: .teal
         case .ulanzi: .yellow
+        case .tip: .brown
         case .prompts: .orange
         case .about: .blue
         }
@@ -135,6 +139,7 @@ struct SettingsView: View {
         case .music: MusicPane().navigationTitle(SettingsSection.music.title)
         case .streamDeck: StreamDeckPane().navigationTitle(SettingsSection.streamDeck.title)
         case .ulanzi: UlanziPane().navigationTitle(SettingsSection.ulanzi.title)
+        case .tip: TipPane().navigationTitle(SettingsSection.tip.title)
         case .prompts: PromptsPane().navigationTitle(SettingsSection.prompts.title)
         case .about: AboutPane().navigationTitle(SettingsSection.about.title)
         }

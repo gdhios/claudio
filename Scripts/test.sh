@@ -92,8 +92,8 @@ preview_shot() {
 # opened on no selection), "What's playing?" (notes done, streaming over a
 # paused track, nothing playing, no key), every Settings tab (the Ulanzi
 # one with two clocks and with none), the pill a recent dictation leaves
-# (pasted, copied), and the menu bar icon's gazes.
-for mode in panel panel-streaming panel-long panel-error panel-noselection panel-free panel-free-filled panel-free-listening panel-free-unheard panel-free-noselection panel-free-answer-track panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre palette-libre palette-noselection listening listening-streaming listening-essay listening-nothing listening-nokey settings settings-prompts settings-models settings-music settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck settings-ulanzi settings-ulanzi-vide settings-about toast-pasted toast-copied barre-de-menus; do
+# (pasted, copied), the menu bar icon's gazes, and the menu under it, open.
+for mode in panel panel-streaming panel-long panel-error panel-noselection panel-free panel-free-filled panel-free-listening panel-free-unheard panel-free-noselection panel-free-answer-track panel-listening panel-listening-start panel-listening-locked panel-dictation-cleaning panel-dictation-error palette palette-filtre palette-libre palette-noselection listening listening-streaming listening-essay listening-nothing listening-nokey settings settings-prompts settings-models settings-music settings-ollama settings-shortcuts settings-shortcuts-lone-key settings-dictation settings-streamdeck settings-ulanzi settings-ulanzi-vide settings-tip settings-about toast-pasted toast-copied mascotte barre-de-menus; do
     preview_shot "$mode"
 done
 echo "✅ Critical screens build and render ($SHOTS/)."

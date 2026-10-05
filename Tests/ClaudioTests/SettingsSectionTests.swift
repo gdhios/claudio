@@ -32,4 +32,30 @@ final class SettingsSectionTests: XCTestCase {
         XCTAssertEqual(SettingsSection.ulanzi.rawValue, "ulanzi")
         XCTAssertEqual(SettingsSection(linkName: "ulanzi"), .ulanzi)
     }
+
+    /// The Tip tab sits between the devices and the prompts, and the menu,
+    /// the website and anyone else reach it as `claudio://settings/tip`.
+    func testTheTipTabSitsAfterUlanziAndOpensFromItsLink() {
+        let sections = SettingsSection.allCases
+        let ulanzi = sections.firstIndex(of: .ulanzi)!
+        XCTAssertEqual(sections[ulanzi + 1], .tip)
+        XCTAssertEqual(sections[ulanzi + 2], .prompts)
+        XCTAssertEqual(SettingsSection.tip.rawValue, "tip")
+        XCTAssertEqual(ClaudioURL.parse(URL(string: "claudio://settings/tip")!), .settings(.tip))
+    }
+
+    /// Named in the interface language, with its own badge.
+    func testTheTipTabIsCalledTip() {
+        useLanguage(.french)
+        XCTAssertEqual(SettingsSection.tip.title, "Pourboire")
+        XCTAssertEqual(SettingsSection.tip.symbolName, "cup.and.saucer.fill")
+        useLanguage(.english)
+        XCTAssertEqual(SettingsSection.tip.title, "Tip")
+    }
+
+    /// The one address the tab hands out: a typo would send a tip to
+    /// somebody else, or nowhere.
+    func testTheTipGoesToGuillaumesBuyMeACoffeePage() {
+        XCTAssertEqual(Constants.tipURL.absoluteString, "https://buymeacoffee.com/gdhios")
+    }
 }

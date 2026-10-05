@@ -283,7 +283,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             whatsPlaying: { [weak self] in self?.listening.trigger() },
             recent: { [weak self] instruction in self?.coordinator.triggerRecent(instruction: instruction) },
             recentDictation: { [weak self] text in self?.pasteAgain(text) },
-            openSettings: { [weak self] in self?.settingsController.show() }
+            openSettings: { [weak self] in self?.settingsController.show() },
+            openSettingsSection: { [weak self] section in self?.settingsController.show(initialSection: section) }
         )
     }
 

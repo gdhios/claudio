@@ -36,6 +36,10 @@ enum Constants {
     static let updateFeedURL = URL(string: "https://claudio.okonoma.com/version.json")!
     static let updateCheckInterval: TimeInterval = 24 * 3600
 
+    /// Where Settings ▸ Tip sends whoever wants to buy Guillaume a coffee:
+    /// a page in the browser, nothing paid in the app.
+    static let tipURL = URL(string: "https://buymeacoffee.com/gdhios")!
+
     /// What a status menu row waits for the menu to close and the app in
     /// front to get the focus back.
     static let menuCloseDelay: Duration = .milliseconds(250)

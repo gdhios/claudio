@@ -50,6 +50,22 @@ enum ClaudioAction: String, CaseIterable, Sendable {
         }
     }
 
+    /// Label in the menu bar's menu, under "Selected text": the short titles
+    /// of the drawing Guillaume validated, since the section already says
+    /// what they act on. Everywhere else keeps `menuTitle`.
+    var shortMenuTitle: String {
+        switch self {
+        case .correct: loc("Corriger", en: "Fix")
+        case .makePrompt: loc("Structurer en prompt", en: "Turn into a prompt")
+        case .expertPrompt: loc("Prompt expert", en: "Expert prompt")
+        case .translateFR: loc("Traduire en français", en: "Translate to French")
+        case .translateEN: loc("Traduire en anglais", en: "Translate to English")
+        case .professionalTone: loc("Ton professionnel", en: "Professional tone")
+        case .summarize: loc("Résumer", en: "Summarize")
+        case .simplify: "Lapacompris"
+        }
+    }
+
     /// Label in the palette: shorter than the menu one, which would wrap to
     /// a new line in a list ("Lapacompris: explain simply").
     var paletteTitle: String {
