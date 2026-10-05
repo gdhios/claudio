@@ -15,8 +15,12 @@ final class UlanziFaceFleet {
         let bridge: any UlanziFaceBridging
     }
 
-    private let makeBridge: @MainActor (URL) -> any UlanziFaceBridging
+    private let makeBridge: @MainActor (URL, [Task<Void, Never>]) -> any UlanziFaceBridging
     private var members: [UUID: Member] = [:]
+    /// What the bridges stopped still had on their way, by address, until
+    /// a bridge starts there, which waits for it: the face ticked again, or
+    /// the clock back where it was, never has its face put away behind it.
+    private var leaving: [URL: [Task<Void, Never>]] = [:]
     /// The sessions under way, held weakly as each bridge holds them, for a
     /// bridge that starts mid-dictation.
     private weak var correction: CorrectionSession?
@@ -25,15 +29,17 @@ final class UlanziFaceFleet {
     /// A bridge's status moved: the clock's id, and where it stands.
     var onStatusChange: ((UUID, UlanziBridge.Status) -> Void)?
 
-    /// `makeBridge` hands back a bridge already started on the address.
-    init(makeBridge: @escaping @MainActor (URL) -> any UlanziFaceBridging = UlanziFaceFleet.startedBridge) {
+    /// `makeBridge` hands back a bridge already started on the address,
+    /// which calls it only once the tasks it is given are done.
+    init(makeBridge: @escaping @MainActor (URL, [Task<Void, Never>]) -> any UlanziFaceBridging
+            = UlanziFaceFleet.startedBridge) {
         self.makeBridge = makeBridge
     }
 
     /// The real one: a `UlanziBridge`, started.
-    static func startedBridge(on address: URL) -> any UlanziFaceBridging {
+    static func startedBridge(on address: URL, after earlier: [Task<Void, Never>]) -> any UlanziFaceBridging {
         let bridge = UlanziBridge()
-        bridge.start(address: address)
+        bridge.start(address: address, after: earlier)
         return bridge
     }
 
@@ -48,17 +54,20 @@ final class UlanziFaceFleet {
             members[id] = nil
             member.bridge.stop()
             member.bridge.onStatusChange = nil
+            if let tail = member.bridge.sending { leaving[member.address, default: []].append(tail) }
         }
-        for clock in wanted where members[clock.id] == nil {
-            start(clock)
-        }
+        let starting = wanted.filter { members[$0.id] == nil }
+        starting.forEach(start)
+        // Handed over: a bridge stopped there later carries the wait along.
+        starting.forEach { leaving[$0.address] = nil }
     }
 
-    /// A bridge for `clock`, told of the sessions under way, and its status
-    /// said at once: it started before anyone listened.
+    /// A bridge for `clock`, after what was left on its way there, told of
+    /// the sessions under way, and its status said at once: it started
+    /// before anyone listened.
     private func start(_ clock: UlanziClock) {
         let id = clock.id
-        let bridge = makeBridge(clock.address)
+        let bridge = makeBridge(clock.address, leaving[clock.address] ?? [])
         members[id] = Member(address: clock.address, bridge: bridge)
         bridge.onStatusChange = { [weak self] status in self?.onStatusChange?(id, status) }
         bridge.correctionSessionChanged(correction)

@@ -26,8 +26,8 @@ final class UlanziFaceFleetTests: XCTestCase {
 
     /// A fleet that makes its bridges here, and says every status.
     private func makeFleet() -> UlanziFaceFleet {
-        let fleet = UlanziFaceFleet(makeBridge: { [unowned self] address in
-            let bridge = FakeFaceBridge(address: address)
+        let fleet = UlanziFaceFleet(makeBridge: { [unowned self] address, after in
+            let bridge = FakeFaceBridge(address: address, after: after)
             made.append(bridge)
             return bridge
         })
@@ -102,6 +102,30 @@ final class UlanziFaceFleetTests: XCTestCase {
         XCTAssertEqual(try bridge(on: desk.address).stops, 1)
         XCTAssertEqual(try bridge(on: lounge.address).stops, 0)
         XCTAssertEqual(fleet.status(of: desk.id), .off)
+    }
+
+    /// The face unticked then ticked again, or the clock back at an
+    /// address it left: the bridge that starts there is handed what the
+    /// one stopped there still had on its way, its off, to wait for. A
+    /// bridge elsewhere waits for nothing, and the next one at that
+    /// address for nothing more.
+    func testABridgeStartingWhereAnotherStoppedWaitsForIt() throws {
+        fleet.apply([desk, lounge])
+        let off = Task<Void, Never> {}
+        try bridge(on: desk.address).sending = off
+        var faceless = desk
+        faceless.face = false
+
+        fleet.apply([faceless, lounge])
+        fleet.apply([desk, lounge])
+
+        XCTAssertEqual(try bridge(on: desk.address).after, [off])
+        XCTAssertEqual(try bridge(on: lounge.address).after, [])
+
+        var moved = lounge
+        moved.address = URL(string: "http://192.168.1.42")!
+        fleet.apply([desk, moved])
+        XCTAssertEqual(made.last?.after, [])
     }
 
     /// A clock without the face never gets a bridge; ticking it later

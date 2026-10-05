@@ -94,12 +94,18 @@ final class UlanziBridge {
     // MARK: - Switching on and off
 
     /// Installs the face if the clock doesn't have it, puts it away (a face
-    /// left up by a crash goes at launch), then follows Claudio.
-    func start(address: URL) {
+    /// left up by a crash goes at launch), then follows Claudio. Nothing
+    /// goes to the clock before `earlier` is done: what a bridge stopped on
+    /// the same clock still had on its way, its off above all, which would
+    /// otherwise put away the face this one puts up.
+    func start(address: URL, after earlier: [Task<Void, Never>] = []) {
         if client != nil { stop() }
         run += 1
         client = makeClient(address)
         status = .installing
+        if !earlier.isEmpty {
+            chain { for task in earlier { await task.value } }
+        }
         enqueue(Self.off)
 
         let publisher = BridgeStatePublisher(send: { [weak self] outbound in

@@ -7,6 +7,9 @@ import Foundation
 protocol UlanziFaceBridging: AnyObject {
     var status: UlanziBridge.Status { get }
     var onStatusChange: ((UlanziBridge.Status) -> Void)? { get set }
+    /// The last call queued for the clock: a bridge that starts on the same
+    /// clock after this one stopped waits for it.
+    var sending: Task<Void, Never>? { get }
     func correctionSessionChanged(_ session: CorrectionSession?)
     func dictationSessionChanged(_ session: DictationSession?)
     /// Claudio smiles on the clock for a moment.

@@ -419,6 +419,27 @@ final class UlanziBridgeTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.calls, [])
     }
 
+    /// A bridge that follows another on the same clock, the face unticked
+    /// and ticked again, sends nothing until the other's last call, its
+    /// off, is done: the face it puts up is never put away behind its back.
+    func testABridgeFollowingAnotherWaitsForItsLastCall() async {
+        await startedOnAReadyDevice()
+        device.holdAnswers()
+        bridge.stop()
+        await device.waitUntilReceived(1)
+        let next = UlanziBridge(client: { [unowned self] in UlanziClient(baseURL: $0, transport: device.transport) },
+                                sleep: { [clock] in try await clock.sleep(for: $0) })
+
+        next.start(address: address, after: [bridge.sending].compactMap { $0 })
+        await drain()
+        XCTAssertEqual(device.calls, [gaze], "nothing from the next bridge while the off is on its way")
+
+        device.releaseAnswers()
+        await next.sending?.value
+        XCTAssertEqual(device.calls, [gaze, read, gaze])
+        XCTAssertEqual(next.status, .ready)
+    }
+
     /// A bridge never started has nothing to stop, nobody to call, and
     /// nothing to put away before the app quits.
     func testABridgeNeverStartedIsOffAndSilent() async {

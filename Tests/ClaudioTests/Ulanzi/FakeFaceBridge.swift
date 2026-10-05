@@ -7,8 +7,13 @@ import Foundation
 @MainActor
 final class FakeFaceBridge: UlanziFaceBridging {
     let address: URL
+    /// What it was told to wait for before calling its clock: what bridges
+    /// stopped there still had on their way.
+    let after: [Task<Void, Never>]
     private(set) var status: UlanziBridge.Status
     var onStatusChange: ((UlanziBridge.Status) -> Void)?
+    /// Its last call, as the test sets it.
+    var sending: Task<Void, Never>?
 
     private(set) var corrections: [CorrectionSession?] = []
     private(set) var dictations: [DictationSession?] = []
@@ -19,8 +24,9 @@ final class FakeFaceBridge: UlanziFaceBridging {
     /// face can't be up, and there is nothing to send.
     var putAway: UlanziBridge.PutAway?
 
-    init(address: URL, status: UlanziBridge.Status = .installing) {
+    init(address: URL, after: [Task<Void, Never>] = [], status: UlanziBridge.Status = .installing) {
         self.address = address
+        self.after = after
         self.status = status
     }
 
