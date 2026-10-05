@@ -11,8 +11,10 @@ import Network
 /// here, what to answer and what to hand on (`HubRoute.answer`).
 @MainActor
 final class HubServer {
-    /// A request bigger than this is nobody's: an event is a few kilobytes.
-    static let maximumRequestSize = 65_536
+    /// A request bigger than this is nobody's. A Stop brings the turn's last
+    /// message whole, which can be long: a mebibyte is far past any, and
+    /// holding a bigger buffer is better than losing the alert.
+    static let maximumRequestSize = 1_048_576
     /// How long a connection has to send its whole request.
     static let receiveTimeout: Duration = .seconds(2)
     /// How many connections are held at once. The relay sends one request
