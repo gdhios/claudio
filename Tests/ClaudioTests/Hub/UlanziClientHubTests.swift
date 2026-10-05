@@ -118,6 +118,17 @@ final class UlanziClientHubTests: XCTestCase {
         XCTAssertEqual(device.buttonCallback, url.absoluteString)
     }
 
+    /// An empty address is the firmware's off: the device posts its buttons
+    /// nowhere from then on.
+    func testClearingTheButtonCallbackSendsAnEmptyAddress() async throws {
+        try await client.setButtonCallback(URL(string: "http://192.168.1.50:51234/ulanzi/button/abc")!)
+        try await client.clearButtonCallback()
+
+        XCTAssertEqual(device.calls, ["PUT /api/v1/system", "PUT /api/v1/system"])
+        XCTAssertEqual(device.requests.last?.body, #"{"buttonCallback":""}"#)
+        XCTAssertEqual(device.buttonCallback, "")
+    }
+
     // MARK: - Commands, and the road there
 
     /// Each command the board decides is the call it names.

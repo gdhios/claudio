@@ -41,7 +41,20 @@ extension ClaudeCodeHub {
         }
         let dropped = links.filter { link in !kept.contains { $0 === link } }
         links = clocks.map { clock in kept.first { $0.id == clock.id } ?? makeLink(for: clock) }
-        dropped.forEach(forget)
+        for link in dropped {
+            forget(link)
+            if !links.contains(where: { $0.address == link.address }) { giveButtonBack(link) }
+        }
+    }
+
+    /// A clock leaving while the door stays open is told to post its
+    /// buttons nowhere, after whatever was still queued for it, which goes
+    /// nowhere now: its middle button is its own again, not a press on the
+    /// alerts of the clocks that stay. Only a clock Claudio told the door.
+    private func giveButtonBack(_ link: ClaudeCodeClockLink) {
+        guard link.callbackHost != nil else { return }
+        let client = link.client
+        link.chain { try? await client.clearButtonCallback() }
     }
 
     private func makeLink(for clock: UlanziClock) -> ClaudeCodeClockLink {

@@ -1,8 +1,8 @@
 import Foundation
 
-/// The four calls the Claude Code hub makes to the clock: a notification,
-/// its dismissal, the indicator, and the address the device reports its
-/// buttons to. Same transport, same delays and same reading of the answers
+/// The calls the Claude Code hub makes to the clock: a notification, its
+/// dismissal, the indicator, and the address the device reports its
+/// buttons to, or none. Same transport, same delays and same reading of the answers
 /// as the face's calls.
 extension UlanziClient {
     /// Shows `notification`, its keys set and no others.
@@ -33,7 +33,17 @@ extension UlanziClient {
 
     /// Where the device posts its button presses and releases from now on.
     func setButtonCallback(_ url: URL) async throws {
-        let body = try Self.json(["buttonCallback": url.absoluteString])
+        try await setButtonCallback(address: url.absoluteString)
+    }
+
+    /// The device posts its buttons nowhere from now on: an empty address
+    /// is the firmware's off.
+    func clearButtonCallback() async throws {
+        try await setButtonCallback(address: "")
+    }
+
+    private func setButtonCallback(address: String) async throws {
+        let body = try Self.json(["buttonCallback": address])
         try await expectSuccess(send("PUT", "api/v1/system", body: body, type: "application/json"))
     }
 

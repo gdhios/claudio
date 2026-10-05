@@ -298,8 +298,8 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: handshakeURL.path))
     }
 
-    /// A clock whose flags are unticked hears nothing more; the other goes
-    /// on.
+    /// A clock whose flags are unticked hears nothing more of them, its
+    /// button given back aside; the other goes on.
     func testAClockUntickedHearsNothingMore() async {
         await listening([desk, lounge])
         var quiet = lounge
@@ -308,9 +308,10 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
 
         decision()
         await settle()
+        await loungeDevice.waitUntilReceived(1)
 
         XCTAssertEqual(deskDevice.calls, decisionCalls)
-        XCTAssertEqual(loungeDevice.calls, [])
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"])
     }
 
     /// A clock that moved is a new clock: the new address is told where to
@@ -324,8 +325,10 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         decision()
         await settle()
 
+        await loungeDevice.waitUntilReceived(1)
+
         XCTAssertEqual(device(elsewhere).calls, ["PUT /api/v1/system"] + decisionCalls)
-        XCTAssertEqual(loungeDevice.calls, [])
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"], "its button given back, nothing more")
         XCTAssertEqual(hub.clockStatus(of: lounge.id), .ready)
     }
 
@@ -346,7 +349,86 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
         press()
         await settle()
         XCTAssertEqual(opened, [conversation])
-        XCTAssertEqual(deskDevice.requests.count, 1, "nothing more for a clock let go")
+        await deskDevice.waitUntilReceived(2)
+        XCTAssertEqual(deskDevice.calls, ["DELETE /api/v1/notifications/\(alert)", "PUT /api/v1/system"],
+                       "nothing more for a clock let go, its button given back aside")
+    }
+
+    // MARK: - The middle button given back
+
+    /// A clock leaving the flags while the door stays open is told to post
+    /// its buttons nowhere: its middle button is its own again, not a
+    /// press on the other clock's alerts. The other keeps its door.
+    func testAClockLeavingTheFlagsGetsItsButtonBack() async throws {
+        await listening([desk, lounge])
+        let door = "http://192.168.1.50:51234/ulanzi/button/\(try token())"
+        var quiet = lounge
+        quiet.alerts = false
+
+        hub.apply([desk, quiet])
+        await loungeDevice.waitUntilReceived(1)
+
+        XCTAssertEqual(loungeDevice.calls, ["PUT /api/v1/system"])
+        XCTAssertEqual(loungeDevice.buttonCallback, "")
+        XCTAssertEqual(deskDevice.calls, [])
+        XCTAssertEqual(deskDevice.buttonCallback, door)
+    }
+
+    /// A clock removed, or moved, gets its button back at the address it
+    /// had, and the one that moved is told the door where it is now.
+    func testAClockRemovedOrMovedGetsItsButtonBack() async throws {
+        await listening([desk, lounge])
+        let door = "http://192.168.1.50:51234/ulanzi/button/\(try token())"
+        var moved = desk
+        moved.address = elsewhere
+
+        hub.apply([moved])
+        await loungeDevice.waitUntilReceived(1)
+        await deskDevice.waitUntilReceived(1)
+        await settle()
+
+        XCTAssertEqual(loungeDevice.buttonCallback, "")
+        XCTAssertEqual(deskDevice.buttonCallback, "")
+        XCTAssertEqual(device(elsewhere).buttonCallback, door)
+    }
+
+    /// Nothing was ever set on it, nothing is taken back: a callback
+    /// someone else set stays.
+    func testAClockNeverToldTheDoorIsLeftAlone() async {
+        hub.apply([desk, lounge])
+        hub.apply([desk])
+        hub.listenerReady(port: port)
+        await settle()
+
+        XCTAssertEqual(loungeDevice.calls, [])
+    }
+
+    /// The last clock leaving the flags closes the door: a press posted to
+    /// it goes nowhere, and nothing is sent on the way out.
+    func testClosingTheDoorLeavesTheButtonsAsTheyAre() async throws {
+        await listening([desk])
+
+        hub.apply([])
+        hub.apply([lounge])
+        await settle()
+
+        XCTAssertEqual(deskDevice.calls, [])
+    }
+
+    /// Two entries at one address, one leaving the flags: the device still
+    /// serves the other, and keeps its door.
+    func testADeviceStillServedKeepsItsDoor() async throws {
+        let twin = UlanziClock(name: "Bureau bis", address: desk.address)
+        await listening([desk, twin])
+        var quiet = twin
+        quiet.alerts = false
+
+        hub.apply([desk, quiet])
+        decision()
+        await settle()
+
+        XCTAssertEqual(deskDevice.buttonCallback, "http://192.168.1.50:51234/ulanzi/button/\(try token())")
+        XCTAssertFalse(deskDevice.requests.contains { $0.body == #"{"buttonCallback":""}"# })
     }
 
     // MARK: - Each clock's own status
