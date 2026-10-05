@@ -28,7 +28,11 @@ struct UlanziClock: Codable, Equatable, Identifiable {
     /// The name a new clock gets: "Ulanzi", then "Ulanzi 2", "Ulanzi 3"…,
     /// the first that none of `clocks` bears.
     static func defaultName(among clocks: [UlanziClock]) -> String {
-        let taken = Set(clocks.map(\.name))
+        defaultName(notIn: Set(clocks.map(\.name)))
+    }
+
+    /// The same, against the names `taken`.
+    static func defaultName(notIn taken: Set<String>) -> String {
         guard taken.contains(firstName) else { return firstName }
         var number = 2
         while taken.contains("\(firstName) \(number)") { number += 1 }

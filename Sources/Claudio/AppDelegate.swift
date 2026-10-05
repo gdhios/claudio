@@ -52,13 +52,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nextScreen: { WindowMover.moveToNextScreen() },
         openSettings: { [weak self] in self?.settingsController.show(initialSection: .streamDeck) }
     ))
-    /// Claudio's face on an Ulanzi clock. Only ever started when Settings
-    /// holds its address: a Mac without one never calls anything.
-    private let ulanzi = UlanziBridge()
-    /// The Claude Code sessions on the same clock: their flags, the alerts
-    /// held while they wait, and the middle button back to the
-    /// conversation. Started and stopped with the face, on its address.
+    /// Claudio's face on every Ulanzi clock that has it ticked. Only ever
+    /// started for the clocks Settings holds: a Mac without one never calls
+    /// anything.
+    private let fleet = UlanziFaceFleet()
+    /// The Claude Code sessions on every clock that has the flags ticked:
+    /// their flags, the alerts held while they wait, and the middle button
+    /// back to the conversation. Listening only while one clock has them.
     private let hub = ClaudeCodeHub()
+    /// The relay this app ships, hooked into Claude Code from Settings.
+    private let hookInstaller = ClaudeCodeHookInstaller()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coordinator.openSettings = { [weak self] in self?.settingsController.show() }
@@ -92,20 +95,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeySetup.installDictation(coordinator: dictation)
         HotkeySetup.installListening(coordinator: listening)
         // The Stream Deck keys, which are shortcuts by another road, and the
-        // Ulanzi's face both follow the two sessions. Each coordinator takes
-        // one observer: the hooks are set here, once, and tell both bridges.
-        // Set whether or not either runs, so Settings can switch one on
-        // later without anything else to arrange. The plugin sitting in its
-        // folder is what opens the socket on a fresh launch, through the
-        // first look the tab's wiring takes; a stored address is what starts
-        // the Ulanzi's.
+        // Ulanzi faces both follow the two sessions. Each coordinator takes
+        // one observer: the hooks are set here, once, and tell the bridge
+        // and the fleet. Set whether or not either runs, so Settings can
+        // switch one on later without anything else to arrange. The plugin
+        // sitting in its folder is what opens the socket on a fresh launch,
+        // through the first look the tab's wiring takes; the clocks stored
+        // are what start the Ulanzi's.
         coordinator.onSessionChange = { [weak self] session in
             self?.streamDeck.correctionSessionChanged(session)
-            self?.ulanzi.correctionSessionChanged(session)
+            self?.fleet.correctionSessionChanged(session)
         }
         dictation.onSessionChange = { [weak self] session in
             self?.streamDeck.dictationSessionChanged(session)
-            self?.ulanzi.dictationSessionChanged(session)
+            self?.fleet.dictationSessionChanged(session)
         }
         streamDeck.attach(correction: coordinator, dictation: dictation)
         wireStreamDeckSettings()
@@ -132,9 +135,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the plugin, or the Claude Code relay, at a port nobody answers.
         streamDeck.stop()
         hub.stop()
-        // The clock's face too, if it may be up: the app waits for the
-        // clock to answer, a second at most.
-        ulanzi.prepareToQuit(within: 1)
+        // The clocks' faces too, if they may be up: the app waits for the
+        // clocks to answer, a second at most for them all.
+        fleet.prepareToQuit(within: 1)
     }
 
     /// The `claudio://` links: how the plugin, and the download page, send
@@ -167,9 +170,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A window that never closed shows a tab that never reappears: the
         // look for the plugin is taken again every time Settings comes up,
         // not only when the tab is built.
-        settingsController.selection.onShown = { [weak self] in self?.refreshStreamDeckSettings() }
+        settingsController.selection.onShown = { [weak self] in self?.settingsShown() }
         model.applyChoice = { [weak self] choice in self?.applyStreamDeckChoice(choice) }
         refreshStreamDeckSettings()
+    }
+
+    /// Settings coming up: what the tabs show of this Mac is read again,
+    /// the plugin's folder and Claude Code's settings, either of which may
+    /// have changed since.
+    private func settingsShown() {
+        refreshStreamDeckSettings()
+        refreshHookState()
     }
 
     /// What the tab reads every time it opens: the plugin may have been
@@ -208,33 +219,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - The Ulanzi tab
 
-    /// Settings' Ulanzi tab, hooked to the real bridge: it shows what the
-    /// bridge reports, and hands it a new address or a test. A stored
-    /// address starts the bridge at launch, and the Claude Code hub with it.
+    /// Settings' Ulanzi tab, hooked to the real fleet and hub: it shows
+    /// what they report, clock by clock, and hands them a new list or a
+    /// test, and the hook to install or remove. The clocks stored start
+    /// both at launch, the rows shown first so that every status lands on
+    /// one.
     private func wireUlanziSettings() {
         let model = UlanziStatusModel.shared
-        ulanzi.onStatusChange = { status in model.status = status }
-        model.applyAddress = { [weak self] address in self?.applyUlanziAddress(address) }
-        model.test = { [weak self] in self?.ulanzi.test() }
-        let address = AppSettings.ulanziAddress()
-        model.address = address?.absoluteString ?? ""
-        if let address {
-            ulanzi.start(address: address)
-            hub.apply([UlanziClock(name: UlanziClock.firstName, address: address)])
-        }
+        fleet.onStatusChange = { id, status in model.faceStatusChanged(status, of: id) }
+        hub.onStatusChange = { status in model.hub = status }
+        hub.onClockStatusChange = { id, status in model.alertsStatusChanged(status, of: id) }
+        model.applyClocks = { [weak self] clocks in self?.applyUlanziClocks(clocks) }
+        model.test = { [weak self] id in self?.fleet.test(id) }
+        model.installHook = { [weak self] in self?.changeHook { try $0.install() } }
+        model.removeHook = { [weak self] in self?.changeHook { try $0.remove() } }
+        let clocks = AppSettings.ulanziClocks()
+        model.show(clocks)
+        fleet.apply(clocks)
+        hub.apply(clocks)
+        refreshHookState()
     }
 
-    /// A new address, applied for real: written down, then the bridge and
-    /// the hub start over on it, the face on the old one put away first. No
-    /// address switches both off.
-    private func applyUlanziAddress(_ address: URL?) {
-        AppSettings.setUlanziAddress(address)
-        ulanzi.stop()
-        hub.stop()
-        if let address {
-            ulanzi.start(address: address)
-            hub.apply([UlanziClock(name: UlanziClock.firstName, address: address)])
+    /// A new list, applied for real: written down, then the faces and the
+    /// flags brought in line with it. Each starts only what came or moved,
+    /// and stops only what went.
+    private func applyUlanziClocks(_ clocks: [UlanziClock]) {
+        AppSettings.setUlanziClocks(clocks)
+        fleet.apply(clocks)
+        hub.apply(clocks)
+    }
+
+    /// Installs or removes the hook, then reads where it stands. What the
+    /// state can't say, a file that couldn't be written, is said apart.
+    private func changeHook(_ change: (ClaudeCodeHookInstaller) throws -> Void) {
+        let model = UlanziStatusModel.shared
+        do {
+            try change(hookInstaller)
+            model.hookFailure = nil
+        } catch is ClaudeCodeHookInstaller.Failure {
+            model.hookFailure = nil
+        } catch {
+            model.hookFailure = error.localizedDescription
         }
+        refreshHookState()
+    }
+
+    /// Claude Code's settings may have changed by hand since the last look.
+    private func refreshHookState() {
+        UlanziStatusModel.shared.hook = hookInstaller.state()
     }
 
     // MARK: - The status menu

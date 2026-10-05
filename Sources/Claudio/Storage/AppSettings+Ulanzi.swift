@@ -4,6 +4,8 @@ import Foundation
 /// is added, nothing about a clock is ever sent anywhere.
 extension AppSettings {
     static let ulanziClocksKey = "ulanziClocks"
+    /// The one address the first version kept, read once, to migrate.
+    static let ulanziAddressKey = "ulanziURL"
 
     /// The clocks, in the order Settings shows them. An entry that can't be
     /// read, its address above all, is left out, and the list is not

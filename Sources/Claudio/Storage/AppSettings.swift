@@ -108,28 +108,9 @@ enum AppSettings {
         normalizedAddress(text)
     }
 
-    // MARK: - Ulanzi clock
+    // MARK: - Ulanzi clocks (the list itself: AppSettings+Ulanzi.swift)
 
-    /// A missing key is the off switch: no address, no face on the clock.
-    static let ulanziAddressKey = "ulanziURL"
-
-    /// Where the Ulanzi answers, nil while no address is set: then nothing
-    /// about it is ever sent anywhere. A value nobody could call reads as
-    /// none, rather than as a request sent nowhere.
-    static func ulanziAddress(in defaults: UserDefaults = .standard) -> URL? {
-        defaults.string(forKey: ulanziAddressKey).flatMap(normalizedUlanziURL)
-    }
-
-    /// `nil` removes the key rather than storing an empty address.
-    static func setUlanziAddress(_ address: URL?, in defaults: UserDefaults = .standard) {
-        if let address {
-            defaults.set(address.absoluteString, forKey: ulanziAddressKey)
-        } else {
-            defaults.removeObject(forKey: ulanziAddressKey)
-        }
-    }
-
-    /// The address typed in the Ulanzi tab, made callable, or nil.
+    /// An address typed in the Ulanzi tab, made callable, or nil.
     static func normalizedUlanziURL(_ text: String) -> URL? {
         normalizedAddress(text)
     }

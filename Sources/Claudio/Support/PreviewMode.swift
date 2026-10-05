@@ -58,7 +58,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// `settings-<tab>`, the tab named as in a `claudio://settings/<tab>`
-    /// link. Three of them first set what this Mac would otherwise answer.
+    /// link, and `settings-ulanzi-vide`, the Ulanzi tab with no clock.
+    /// Three of them first set what this Mac would otherwise answer.
     /// The Models and Dictation tabs freeze their own lists behind
     /// `PreviewRun.isActive`: nothing is read from, or written to, this
     /// machine's preferences.
@@ -77,12 +78,11 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             StreamDeckStatusModel.shared.status = .waiting
             StreamDeckStatusModel.shared.pluginInstalled = false
         }
-        if tab == "ulanzi" {
-            // A frozen clock: an address set and the face installed. Nothing
-            // is read from this Mac's preferences and no device is called;
-            // with no app behind the model, the Test button does nothing.
-            UlanziStatusModel.shared.address = "http://192.168.1.22"
-            UlanziStatusModel.shared.status = .ready
+        if tab == "ulanzi" || tab == "ulanzi-vide" {
+            // Frozen clocks, two or none, the relay and the hook set by
+            // hand: the shot is the same on every machine.
+            PreviewUlanzi.fill(UlanziStatusModel.shared, empty: tab == "ulanzi-vide")
+            tab = "ulanzi"
         }
         let section = SettingsSection(linkName: tab) ?? .general
         settingsController.show(initialSection: section)
