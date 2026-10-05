@@ -10,9 +10,11 @@ import Foundation
 /// and a wait forgotten after 12 h. Only the indicator is sent less often:
 /// when it changes, or when the last one sent may not have landed.
 ///
-/// The queue follows the clock, not only the sessions: a dismissal the
-/// clock never heard of puts its alert back where it was, since the clock
-/// still shows it, and the head of the queue stays the alert on screen.
+/// The queue follows the clock, not only the sessions: a call the clock
+/// never heard of is crossed out, a dismissal's alert going back where it
+/// was and a hold's alert leaving, so the head of the queue stays the alert
+/// on screen. A session whose alert never made it waits no more, and the
+/// indicator follows.
 struct ClaudeCodeBoard {
     enum Level: Hashable { case orange, red }
 
@@ -34,28 +36,8 @@ struct ClaudeCodeBoard {
     static let waitingTypes: Set<String> = ["permission_prompt", "idle_prompt", "agent_needs_input",
                                             "elicitation_dialog", "elicitation_url_dialog"]
 
-    /// A held alert, and when it was posted, which is its place in the queue.
-    private struct Held {
-        let alert: Alert
-        let order: Int
-    }
-
-    /// A dismissal sent, its answer still to come.
-    private enum Dismissal {
-        /// A session let go: the alert it took off the queue, if any, which
-        /// goes back to its place if the clock never heard of it.
-        case release(took: Held?)
-        /// The middle button: the firmware took the alert off itself, and
-        /// nothing comes back.
-        case press
-    }
-
     private(set) var waits: [String: Wait] = [:]
-    private var held: [Held] = []
-    private var posted = 0
-    /// The dismissals on their way, by name, in the order they were sent:
-    /// the clock answers them in that order.
-    private var dismissals: [String: [Dismissal]] = [:]
+    private var queue = HeldQueue()
     /// The indicator last sent, and whether one was and landed: the first is
     /// always sent, and so is the one after a failure; any other only when
     /// it differs.
@@ -63,7 +45,7 @@ struct ClaudeCodeBoard {
     private var hasSentIndicator = false
 
     /// The held alerts, in the order the clock shows them.
-    var alerts: [Alert] { held.map(\.alert) }
+    var alerts: [Alert] { queue.alerts }
 
     mutating func handle(_ event: ClaudeCodeEvent, now: Date) -> [UlanziCommand] {
         let id = event.sessionID
@@ -91,10 +73,8 @@ struct ClaudeCodeBoard {
     /// The press takes the alert on screen away, the oldest held, and says
     /// whose session it was, to open it. Nothing held: nothing to do.
     mutating func middleButtonPressed(now: Date) -> (commands: [UlanziCommand], sessionID: String?) {
-        guard let head = held.first?.alert else { return ([], nil) }
+        guard let head = queue.press() else { return ([], nil) }
         waits[head.sessionID] = nil
-        held.removeFirst()
-        dismissals[head.name, default: []].append(.press)
         return ([.dismiss(name: head.name)] + refreshIndicator(now: now), head.sessionID)
     }
 
@@ -102,21 +82,31 @@ struct ClaudeCodeBoard {
 
     /// The clock took the dismissal of `name`.
     mutating func dismissLanded(name: String) {
-        _ = nextDismissal(of: name)
+        queue.landed(name)
     }
 
     /// The clock never heard of the dismissal of `name`, and still shows the
-    /// alert: it goes back to its place. Unless the name is held again since,
-    /// the clock having replaced the old alert with the new one, or a later
-    /// dismissal of the name is on its way, which then has the last word.
+    /// alert: it goes back to its place. Unless a call sent since under the
+    /// name, a hold or another dismissal, has the last word.
     mutating func dismissFailed(name: String) {
-        guard case .release(let took?) = nextDismissal(of: name) else { return }
-        if let later = dismissals[name]?.first {
-            if case .release(nil) = later { dismissals[name]?[0] = .release(took: took) }
-            return
-        }
-        guard !held.contains(where: { $0.alert.name == name }) else { return }
-        held.insert(took, at: held.firstIndex { $0.order > took.order } ?? held.endIndex)
+        _ = queue.failed(name)
+    }
+
+    /// The clock took the hold of `name`.
+    mutating func notifyLanded(name: String) {
+        queue.landed(name)
+    }
+
+    /// The clock never heard of the hold of `name`: its alert leaves the
+    /// queue, and the one it was to replace, still on the clock, comes back.
+    /// Unless a newer hold of the name is on its way, which wins. A session
+    /// left with nothing on the clock waits no more: what the indicator then
+    /// needs comes back, to send.
+    mutating func notifyFailed(name: String, now: Date) -> [UlanziCommand] {
+        guard let lost = queue.failed(name),
+              queue.alert(named: name)?.sessionID != lost.sessionID else { return [] }
+        waits[lost.sessionID] = nil
+        return refreshIndicator(now: now)
     }
 
     /// The clock may not show the indicator last sent: the next one goes,
@@ -127,32 +117,18 @@ struct ClaudeCodeBoard {
 
     // MARK: - Waits and alerts
 
-    /// Waits, and holds its alert at the back of the queue: the clock puts a
-    /// notification posted again under its name at the back too.
+    /// Waits, and holds its alert at the back of the queue.
     private mutating func wait(_ id: String, _ level: Level, now: Date) {
         waits[id] = Wait(level: level, since: now)
-        let name = Self.alertName(for: id)
-        held.removeAll { $0.alert.name == name }
-        held.append(Held(alert: Alert(name: name, sessionID: id), order: posted))
-        posted += 1
+        queue.hold(Alert(name: Self.alertName(for: id), sessionID: id))
     }
 
-    /// Lets the session go: no more wait, its alert off the queue, and the
-    /// dismissal to send, written down until the clock answers it.
+    /// Lets the session go: no more wait, and its alert dismissed.
     private mutating func release(_ id: String) -> UlanziCommand {
         waits[id] = nil
         let name = Self.alertName(for: id)
-        let took = held.first { $0.alert.name == name }
-        held.removeAll { $0.alert.name == name }
-        dismissals[name, default: []].append(.release(took: took))
+        queue.dismiss(name)
         return .dismiss(name: name)
-    }
-
-    private mutating func nextDismissal(of name: String) -> Dismissal? {
-        guard var pending = dismissals[name], !pending.isEmpty else { return nil }
-        let next = pending.removeFirst()
-        dismissals[name] = pending.isEmpty ? nil : pending
-        return next
     }
 
     /// Red while a session is blocked, orange while one waits, off after;

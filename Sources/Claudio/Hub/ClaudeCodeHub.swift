@@ -172,9 +172,9 @@ final class ClaudeCodeHub {
 
     /// Queues `call` behind every call before it. One that fails is said in
     /// the status, and the next goes all the same; a callback or an
-    /// indicator that failed goes again with the next event. Every
-    /// dismissal's answer goes back to the board, which keeps its queue in
-    /// step with what the clock shows.
+    /// indicator that failed goes again with the next event. The answer to
+    /// every dismissal and every hold goes back to the board, which keeps
+    /// its queue in step with what the clock shows.
     private func enqueue(_ call: Call) {
         guard let client else { return }
         let run = self.run
@@ -188,18 +188,36 @@ final class ClaudeCodeHub {
                 case .buttonCallback(let url): try await client.setButtonCallback(url)
                 }
                 guard self.run == run else { return }
-                if case .command(.dismiss(let name)) = call { board.dismissLanded(name: name) }
-                if let port { status = .listening(port: port) }
+                landed(call)
             } catch {
                 guard self.run == run else { return }
-                switch call {
-                case .buttonCallback: callbackPending = true
-                case .command(.indicator): board.indicatorFailed()
-                case .command(.dismiss(let name)): board.dismissFailed(name: name)
-                case .command(.notify): break
-                }
-                status = .failed(error.localizedDescription)
+                failed(call, reason: error.localizedDescription)
             }
         }
+    }
+
+    /// The clock took `call`.
+    private func landed(_ call: Call) {
+        switch call {
+        case .command(.dismiss(let name)): board.dismissLanded(name: name)
+        case .command(.notify(let notification)):
+            if let name = notification.name { board.notifyLanded(name: name) }
+        case .command(.indicator), .buttonCallback: break
+        }
+        if let port { status = .listening(port: port) }
+    }
+
+    /// The clock never heard of `call`. A hold that never made it may change
+    /// the indicator: the new one goes at once.
+    private func failed(_ call: Call, reason: String) {
+        switch call {
+        case .buttonCallback: callbackPending = true
+        case .command(.indicator): board.indicatorFailed()
+        case .command(.dismiss(let name)): board.dismissFailed(name: name)
+        case .command(.notify(let notification)):
+            guard let name = notification.name else { break }
+            board.notifyFailed(name: name, now: now()).forEach { enqueue(.command($0)) }
+        }
+        status = .failed(reason)
     }
 }

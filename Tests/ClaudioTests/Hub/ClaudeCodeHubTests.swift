@@ -200,6 +200,30 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.heldNotifications, [])
     }
 
+    /// The clock out of reach when A ends on 🟧: its alert never made it.
+    /// B's 🟧 lands after it, and the press opens B's conversation, not
+    /// A's, and puts the indicator out: A no longer counts as waiting.
+    func testAHoldTheClockNeverHeardOfIsNotWhatThePressOpens() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        try writeSession(otherSession, app: "local_b", pid: 4343)
+
+        device.isUnplugged = true
+        stop("🟧 DÉCISION")
+        await settle()
+        device.isUnplugged = false
+        stop("🟧 DÉCISION", session: otherSession)
+        await settle()
+        XCTAssertEqual(device.heldNotifications, [otherAlert])
+
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_b")!])
+        XCTAssertNil(device.indicator)
+    }
+
     /// The left and right buttons, and a press with nothing held, open
     /// nothing and send nothing.
     func testOtherPressesDoNothing() async {
@@ -251,7 +275,9 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.mostRequestsAtOnce, 1)
     }
 
-    /// A call that fails is said, and the next one goes all the same.
+    /// A call that fails is said, and the next one goes all the same. Here
+    /// the hold: the indicator lit after it goes out again at once, the
+    /// alert that never made it taking its wait along.
     func testAFailedCallDoesNotHoldTheNextBack() async {
         await listening()
         device.answer("POST /api/v1/notifications", status: 500, body: FakeUlanzi.refusal("internal", "no memory"))
@@ -259,7 +285,9 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         stop("🟧 DÉCISION")
         await settle()
 
-        XCTAssertEqual(device.calls.last, "PUT /api/v1/indicators/1")
+        XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "POST /api/v1/notifications",
+                                      "PUT /api/v1/indicators/1", "DELETE /api/v1/indicators/1"])
+        XCTAssertNil(device.indicator)
         XCTAssertTrue(statuses.contains(.failed("no memory")), "\(statuses)")
         XCTAssertEqual(hub.status, .listening(port: 51234))
     }

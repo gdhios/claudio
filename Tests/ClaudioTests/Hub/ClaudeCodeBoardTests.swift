@@ -49,16 +49,30 @@ final class ClaudeCodeBoardTests: XCTestCase {
     }
 
     /// What the hub tells the board once the clock has answered: every
-    /// dismissal among `commands` landed, but those of the names in
-    /// `failing`, which the clock never heard of.
-    private func deliver(_ commands: [UlanziCommand], failing: Set<String> = []) {
-        for case .dismiss(let name) in commands {
-            if failing.contains(name) {
+    /// dismissal and every hold among `commands` landed, but those of the
+    /// names in `failing`, which the clock never heard of. Returns what the
+    /// board then has to send.
+    @discardableResult
+    private func deliver(_ commands: [UlanziCommand], failing: Set<String> = []) -> [UlanziCommand] {
+        var then: [UlanziCommand] = []
+        for command in commands {
+            switch command {
+            case .dismiss(let name) where failing.contains(name):
                 board.dismissFailed(name: name)
-            } else {
+            case .dismiss(let name):
                 board.dismissLanded(name: name)
+            case .notify(let notification):
+                guard let name = notification.name else { continue }
+                if failing.contains(name) {
+                    then += board.notifyFailed(name: name, now: t0)
+                } else {
+                    board.notifyLanded(name: name)
+                }
+            case .indicator:
+                continue
             }
         }
+        return then
     }
 
     // MARK: - Stop, flag by flag
@@ -354,6 +368,98 @@ final class ClaudeCodeBoardTests: XCTestCase {
         let press = board.middleButtonPressed(now: t0)
 
         deliver(prompt, failing: [alertA])
+        deliver(press.commands, failing: [alertA])
+
+        XCTAssertEqual(board.alerts, [])
+    }
+
+    // MARK: - A hold the clock never heard of
+
+    /// The clock was out of reach when A ended on 🟧: its alert never made
+    /// it, so it leaves the queue, and A waits no more, the indicator going
+    /// out at once. B's 🟧 lands after it: the press takes B, and opens B.
+    func testAHoldThatFailedLeavesTheQueueAndTheWait() {
+        XCTAssertEqual(deliver(handle(stop("🟧", sessionA)), failing: [alertA]), [.indicator(nil)])
+        XCTAssertEqual(board.alerts, [])
+        XCTAssertNil(board.waits[sessionA])
+
+        deliver(handle(stop("🟧", sessionB)))
+        let press = board.middleButtonPressed(now: t0)
+
+        XCTAssertEqual(press.sessionID, sessionB)
+        XCTAssertEqual(press.commands, [.dismiss(name: alertB), .indicator(nil)])
+    }
+
+    /// A hold the clock took is there for good: an answer with nothing on
+    /// its way changes nothing.
+    func testALandedHoldStays() {
+        deliver(handle(stop("🟥", sessionA)))
+
+        XCTAssertEqual(board.notifyFailed(name: alertA, now: t0), [])
+        XCTAssertEqual(board.alerts.map(\.name), [alertA])
+        XCTAssertEqual(board.waits[sessionA]?.level, .red)
+    }
+
+    /// Held again since under the same name, the newer hold wins: the alert
+    /// stays, and so does the wait, the indicator unchanged.
+    func testANewerHoldOfTheSameNameWins() {
+        let decision = handle(stop("🟧", sessionA))
+        let question = handle(event(.notification(type: "permission_prompt"), sessionA))
+
+        XCTAssertEqual(deliver(decision, failing: [alertA]), [])
+        XCTAssertEqual(board.alerts.map(\.name), [alertA])
+        XCTAssertNotNil(board.waits[sessionA])
+        deliver(question)
+        XCTAssertEqual(board.middleButtonPressed(now: t0).sessionID, sessionA)
+    }
+
+    /// A hold under a name the clock shows already, and never heard of: the
+    /// clock still shows the alert it was to replace, where it was. It goes
+    /// back there, the session still waiting on it.
+    func testAHoldThatFailedGivesBackTheAlertItReplaced() {
+        deliver(handle(stop("🟧", sessionA)))
+        deliver(handle(stop("🟧", sessionB)))
+
+        XCTAssertEqual(deliver(handle(event(.notification(type: "idle_prompt"), sessionA)), failing: [alertA]), [])
+
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB])
+        XCTAssertNotNil(board.waits[sessionA])
+        XCTAssertEqual(board.middleButtonPressed(now: t0).sessionID, sessionA)
+    }
+
+    /// A Stop the clock never heard of, neither its dismissal nor its hold:
+    /// the session's question is still on screen, ahead of B's, and the
+    /// press opens A.
+    func testAStopThatNeverReachedTheClockKeepsTheEarlierAlert() {
+        deliver(handle(event(.notification(type: "permission_prompt"), sessionA)))
+        deliver(handle(stop("🟧", sessionB)))
+
+        deliver(handle(stop("🟧", sessionA)), failing: [alertA])
+
+        XCTAssertEqual(board.alerts.map(\.name), [alertA, alertB])
+        XCTAssertEqual(board.middleButtonPressed(now: t0).sessionID, sessionA)
+    }
+
+    /// An alert that never made it doesn't come back with a dismissal that
+    /// failed after it: there was nothing on the clock to dismiss.
+    func testAnAlertThatNeverMadeItDoesNotComeBack() {
+        let decision = handle(stop("🟧", sessionA))
+        let prompt = handle(event(.promptSubmitted, sessionA))
+
+        deliver(decision, failing: [alertA])
+        deliver(prompt, failing: [alertA])
+
+        XCTAssertEqual(board.alerts, [])
+    }
+
+    /// A press while the hold is still on its way: the firmware took the
+    /// alert off the screen, and the hold landing after brings nothing
+    /// back, the press's own dismissal failing or not.
+    func testAPressHasTheLastWordOverAHoldOnItsWay() {
+        let decision = handle(stop("🟧", sessionA))
+        let press = board.middleButtonPressed(now: t0)
+
+        deliver(decision)
         deliver(press.commands, failing: [alertA])
 
         XCTAssertEqual(board.alerts, [])
