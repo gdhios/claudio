@@ -26,7 +26,9 @@ final class ClaudeCodeSessionLinkTests: XCTestCase {
         try Data(json.utf8).write(to: directory.appendingPathComponent(name))
     }
 
-    private func session(_ engine: String, app: String?, updatedAt: String = "1801000000000",
+    /// A session file as Claude Code writes it, `updatedAt` in milliseconds
+    /// since 1970, as an integer.
+    private func session(_ engine: String, app: String?, updatedAt: String = "1791206181815",
                          entrypoint: String = "claude-desktop") -> String {
         let host = app.map { #","hostSessionId":"\#($0)""# } ?? ""
         return #"{"pid":4242,"sessionId":"\#(engine)"\#(host),"entrypoint":"\#(entrypoint)","updatedAt":\#(updatedAt)}"#
@@ -48,10 +50,19 @@ final class ClaudeCodeSessionLinkTests: XCTestCase {
     /// Two files for one session, a process restarted for instance: the one
     /// written last wins, whatever the folder's order.
     func testTheMostRecentOfTwoMatchesWins() throws {
-        try write("5000.json", session("engine-a", app: "local_new", updatedAt: "1801000005000"))
-        try write("4000.json", session("engine-a", app: "local_old", updatedAt: "1801000000000"))
+        try write("5000.json", session("engine-a", app: "local_new", updatedAt: "1791206186815"))
+        try write("4000.json", session("engine-a", app: "local_old", updatedAt: "1791206181815"))
 
         XCTAssertEqual(link("engine-a"), URL(string: "claude://claude.ai/epitaxy/local_new"))
+    }
+
+    /// Milliseconds are read as milliseconds: against a file dated in
+    /// seconds an hour later, the later one still wins.
+    func testUpdatedAtIsReadInMilliseconds() throws {
+        try write("1.json", session("engine-a", app: "local_ms", updatedAt: "1791206181815"))
+        try write("2.json", session("engine-a", app: "local_s", updatedAt: "1791209781"))
+
+        XCTAssertEqual(link("engine-a"), URL(string: "claude://claude.ai/epitaxy/local_s"))
     }
 
     /// A date written as text is compared as a date.

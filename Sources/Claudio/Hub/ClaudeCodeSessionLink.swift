@@ -46,8 +46,8 @@ enum ClaudeCodeSessionLink {
             updatedAt = Self.date(object["updatedAt"])
         }
 
-        /// `updatedAt` read as a date whichever way it is written: a number
-        /// of milliseconds or of seconds since 1970, or ISO 8601 text.
+        /// `updatedAt` read as a date. Claude Code writes milliseconds since
+        /// 1970, as an integer; seconds and ISO 8601 text are read too.
         /// Anything else is older than any date.
         private static func date(_ value: Any?) -> Date {
             if let number = value as? Double {
