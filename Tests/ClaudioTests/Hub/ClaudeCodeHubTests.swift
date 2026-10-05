@@ -1,16 +1,18 @@
 import XCTest
 @testable import Claudio
 
-/// The hub wired to its pieces. The routes come in through the entry the
-/// server calls, the listener's readiness too: the server is never started
-/// and no socket is opened. The device is `FakeUlanzi`, which outlives a
-/// restart as the clock does; the sessions and Application Support folders
-/// are temporary; the Mac's address, the links opened and the time are the
-/// test's.
+/// The hub wired to its pieces, on one clock. The routes come in through
+/// the entry the server calls, the listener's readiness too: the server is
+/// never started and no socket is opened. The device is `FakeUlanzi`, which
+/// outlives a restart as the clock does; the sessions and Application
+/// Support folders are temporary; the Mac's address, the links opened and
+/// the time are the test's. Several clocks have their own tests, in
+/// `ClaudeCodeHubClocksTests`.
 @MainActor
 final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
 
     private let address = URL(string: "http://192.168.1.22")!
+    private let clock = UlanziClock(name: "Ulanzi", address: URL(string: "http://192.168.1.22")!)
     private let port: UInt16 = 51234
     private let session = "5f0c2a9e-aaaa-4bbb-8ccc-000000000001"
     private let alert = "cc-5f0c2a9e"
@@ -21,6 +23,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     private var localAddress: String? = "192.168.1.50"
     private var opened: [URL] = []
     private var statuses: [ClaudeCodeHub.Status] = []
+    private var clockStatuses: [ClaudeCodeHub.ClockStatus] = []
     private var listened = 0
     private var servers: [HubServer] = []
     private var listenFailure: Error?
@@ -52,6 +55,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
                 if let listenFailure { throw listenFailure }
             })
         hub.onStatusChange = { [unowned self] in statuses.append($0) }
+        hub.onClockStatusChange = { [unowned self] in clockStatuses.append($1) }
         return hub
     }
 
@@ -83,15 +87,18 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// Everything the hub has queued for the device, calls queued meanwhile
     /// included.
     private func settle() async {
-        while let tail = hub.sending {
-            await tail.value
-            if hub.sending == tail { break }
+        var tails = hub.sending
+        while !tails.isEmpty {
+            for tail in tails { await tail.value }
+            let now = hub.sending
+            if now == tails { break }
+            tails = now
         }
     }
 
     /// Started, ready, settled, and the requests forgotten.
     private func listening() async {
-        hub.start(address: address)
+        hub.apply([clock])
         hub.listenerReady(port: port)
         await settle()
         device.clearRequests()
@@ -128,7 +135,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// Starting listens, and publishes nothing before the listener is ready:
     /// a door published early is a relay knocking on nothing.
     func testStartingListensAndPublishesNothingYet() {
-        hub.start(address: address)
+        hub.apply([clock])
 
         XCTAssertEqual(listened, 1)
         XCTAssertFalse(FileManager.default.fileExists(atPath: handshakeURL.path))
@@ -140,7 +147,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// is told to post its buttons to this Mac, on that port, with that
     /// token.
     func testReadyPublishesTheDoorAndSetsTheButtonCallback() async throws {
-        hub.start(address: address)
+        hub.apply([clock])
         hub.listenerReady(port: port)
         await settle()
 
@@ -158,7 +165,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// A listener that can't open leaves the hub off, saying why.
     func testAListenerThatCannotOpenFails() {
         listenFailure = CocoaError(.featureUnsupported)
-        hub.start(address: address)
+        hub.apply([clock])
 
         guard case .failed = hub.status else { return XCTFail("status \(hub.status)") }
         XCTAssertFalse(FileManager.default.fileExists(atPath: handshakeURL.path))
@@ -335,8 +342,8 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "POST /api/v1/notifications",
                                       "PUT /api/v1/indicators/1", "DELETE /api/v1/indicators/1"])
         XCTAssertNil(device.indicator)
-        XCTAssertTrue(statuses.contains(.failed("no memory")), "\(statuses)")
-        XCTAssertEqual(hub.status, .listening(port: 51234))
+        XCTAssertTrue(clockStatuses.contains(.rejected("no memory")), "\(clockStatuses)")
+        XCTAssertEqual(statuses, [.listening(port: 51234)])
     }
 
     /// Out of reach, the clock costs one try per event, not one per call:
@@ -376,7 +383,10 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         await settle()
 
         XCTAssertEqual(device.requests.count, 1)
-        XCTAssertNotEqual(hub.status, .listening(port: 51234))
+        guard case .unreachable = hub.clockStatus(of: clock.id) else {
+            return XCTFail("clock \(hub.clockStatus(of: clock.id))")
+        }
+        XCTAssertEqual(hub.status, .listening(port: 51234))
     }
 
     /// The outage of one run is not the next one's: started again, as on a
@@ -447,7 +457,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
 
         hub.stop()
         statuses = []
-        hub.start(address: address)
+        hub.apply([clock])
         hub.listenerReady(port: port)
         device.releaseAnswers()
         await settle()
@@ -455,6 +465,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "PUT /api/v1/system"])
         XCTAssertEqual(statuses, [.listening(port: 51234)])
         XCTAssertEqual(hub.status, .listening(port: 51234))
+        XCTAssertFalse(clockStatuses.contains(.rejected("no memory")), "\(clockStatuses)")
     }
 
     /// What isn't an event, or an event of no interest, sends nothing.
@@ -474,10 +485,11 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
     /// event, after its calls, and only until it lands.
     func testAFailedButtonCallbackIsRetriedAtTheNextEvent() async throws {
         device.answer("PUT /api/v1/system", status: 503, body: FakeUlanzi.refusal("serviceBusy", "busy"))
-        hub.start(address: address)
+        hub.apply([clock])
         hub.listenerReady(port: port)
         await settle()
-        XCTAssertEqual(hub.status, .failed("busy"))
+        XCTAssertEqual(hub.clockStatus(of: clock.id), .rejected("busy"))
+        XCTAssertEqual(hub.status, .listening(port: 51234))
         XCTAssertNil(device.buttonCallback)
 
         device.forget("PUT /api/v1/system")
@@ -488,7 +500,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "POST /api/v1/notifications",
                                       "DELETE /api/v1/indicators/1", "PUT /api/v1/system"])
         XCTAssertEqual(device.buttonCallback, "http://192.168.1.50:51234/ulanzi/button/\(try token())")
-        XCTAssertEqual(hub.status, .listening(port: 51234))
+        XCTAssertEqual(hub.clockStatus(of: clock.id), .ready)
 
         device.clearRequests()
         stop("🟩 FINI")
@@ -637,6 +649,7 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         await listening()
         let first = try token()
 
+        hub.stop()
         await listening()
         let second = try token()
         XCTAssertNotEqual(second, first)

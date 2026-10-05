@@ -1,63 +1,58 @@
 import AppKit
 
-/// Claudio as the hub between Claude Code and the Ulanzi. The hook relay
-/// posts each session's events here; the board turns them into what the
-/// clock shows; and the clock's middle button comes back here, to take the
-/// alert on screen away and bring its conversation to the front in the
-/// Claude app.
+/// Claudio as the hub between Claude Code and the Ulanzi clocks. The hook
+/// relay posts each session's events here; the board turns them into what
+/// the clocks show; and the middle button of any of them comes back here,
+/// to take the alert on screen away and bring its conversation to the front
+/// in the Claude app.
 ///
-/// It holds the server, the handshake file, the board and the client, and
-/// sends to the clock one call at a time, in order. The board outlives
-/// Claudio in a file of its own, as the clock outlives it. What the hub
-/// reaches outside is injected: the device, the Mac's address, the sessions
-/// folder, how a link opens, the time, the two files, and the listening
-/// itself, which a test skips.
+/// It holds the server, the handshake file and the one board, and a link
+/// per clock with the flags ticked (`ClaudeCodeHub+Clocks.swift`): every
+/// clock hears every command, one call at a time, in order, on its own. The
+/// board outlives Claudio in a file of its own, as the clocks outlive it.
+/// What the hub reaches outside is injected: the devices, the Mac's
+/// address, the sessions folder, how a link opens, the time, the two files,
+/// and the listening itself, which a test skips.
 @MainActor
 final class ClaudeCodeHub {
-    /// For Settings, which shows none of it yet.
+    /// The relay's door, for Settings. Each clock has a status of its own.
     enum Status: Equatable {
         case off
         case listening(port: UInt16)
+        /// The server could not listen, or stopped listening: why.
         case failed(String)
     }
 
     /// The file the relay reads, in Claudio's Application Support folder.
     nonisolated static let handshakeName = "claude-code-hub.json"
 
-    private let makeClient: (URL) -> UlanziClient
-    private let localAddress: () -> String?
+    // Internal rather than private, for the clocks' own file.
+    let makeClient: (URL) -> UlanziClient
+    let localAddress: () -> String?
+    let now: () -> Date
     private let sessionsDirectory: URL
     private let openURL: (URL) -> Void
-    private let now: () -> Date
     private let handshake: BridgeHandshakeFile
     private let boardFile: ClaudeCodeBoardFile
     private let listen: (HubServer) throws -> Void
 
     private var server: HubServer?
-    private var client: UlanziClient?
-    private var token: String?
-    private var port: UInt16?
-    private var board = ClaudeCodeBoard()
+    private(set) var token: String?
+    private(set) var port: UInt16?
+    var board = ClaudeCodeBoard()
     /// The board as last written, so as not to write it again unchanged.
     private var savedBoard: ClaudeCodeBoard.Snapshot?
-    /// The Mac's address in the button callback last sent to the clock. nil
-    /// while one is still to set: from the moment the listener is ready,
-    /// and again after a setting that failed.
-    private var callbackHost: String?
+    /// The clocks with the flags, in Settings' order.
+    var links: [ClaudeCodeClockLink] = []
+    /// The board's commands on their way, until every clock has answered.
+    var deliveries = ClaudeCodeDeliveries()
     /// Bumped by every start and stop: a call still on its way from an
     /// earlier run writes nothing over the current one.
-    private var run = 0
+    private(set) var run = 0
     /// Every hook event and every report of a button, numbered, and the
     /// listener's readiness too: each call carries the number of the one
     /// that brought it.
-    private var events = 0
-    /// The clock found out of reach, and the last event then: every call of
-    /// that event or an earlier one, still queued, fails at once, and the
-    /// next event tries the clock again.
-    private var outOfReach: (through: Int, reason: String)?
-
-    /// The last call queued for the clock. Each waits for the one before.
-    private(set) var sending: Task<Void, Never>?
+    private(set) var events = 0
 
     private(set) var status: Status = .off {
         didSet {
@@ -66,6 +61,8 @@ final class ClaudeCodeHub {
         }
     }
     var onStatusChange: ((Status) -> Void)?
+    /// A clock's status moved: its id, and where it stands.
+    var onClockStatusChange: ((UUID, ClockStatus) -> Void)?
 
     init(makeClient: @escaping (URL) -> UlanziClient = { UlanziClient(baseURL: $0) },
          localAddress: @escaping () -> String? = LocalNetworkAddress.current,
@@ -87,11 +84,34 @@ final class ClaudeCodeHub {
 
     // MARK: - Switching on and off
 
-    /// Listens for the relay and the clock, on the clock at `address`. The
-    /// board is taken back as the last run left it, since the clock kept its
-    /// alerts meanwhile. The way in is published once the listener is ready.
-    func start(address: URL) {
-        if client != nil { stop() }
+    /// Brings the hub in line with `clocks`: it speaks to those with the
+    /// flags ticked. The first one starts the server; the last one gone
+    /// stops it; in between, the server and its token stay as they are,
+    /// and only the clocks that came or moved get a link of their own.
+    func apply(_ clocks: [UlanziClock]) {
+        let flagged = Self.flagged(in: clocks)
+        guard !flagged.isEmpty else { return stop() }
+        let starting = server == nil
+        if starting { prepareRun() }
+        relink(to: flagged)
+        if starting {
+            listenNow()
+        } else {
+            setButtonCallbackIfNeeded()
+        }
+    }
+
+    /// The clocks with the flags, each id once: its first entry decides.
+    private static func flagged(in clocks: [UlanziClock]) -> [UlanziClock] {
+        var seen = Set<UUID>()
+        return clocks.filter { seen.insert($0.id).inserted && $0.alerts }
+    }
+
+    /// A new run: the board taken back as the last run left it, since the
+    /// clocks kept their alerts meanwhile, and a server with a new token,
+    /// not listening yet. The way in is published once the listener is
+    /// ready.
+    private func prepareRun() {
         run += 1
         board = ClaudeCodeBoard(restoring: boardFile.load() ?? ClaudeCodeBoard.Snapshot(), now: now())
         savedBoard = board.snapshot
@@ -101,7 +121,10 @@ final class ClaudeCodeHub {
         server.onFailure = { [weak self] in self?.fail($0) }
         self.token = token
         self.server = server
-        client = makeClient(address)
+    }
+
+    private func listenNow() {
+        guard let server else { return }
         do {
             try listen(server)
         } catch {
@@ -109,23 +132,25 @@ final class ClaudeCodeHub {
         }
     }
 
-    /// Stops listening, takes the way in away and forgets the run. The board
-    /// file stays, the clock keeping its alerts; so does the button callback
-    /// on the clock: a press posted to a port nobody listens on does
-    /// nothing, and the next start sets it again.
+    /// Stops listening, takes the way in away, lets every clock go and
+    /// forgets the run. The board file stays, the clocks keeping their
+    /// alerts; so does the button callback on each clock: a press posted
+    /// to a port nobody listens on does nothing, and the next start sets it
+    /// again.
     func stop() {
         run += 1
         server?.stop()
         server = nil
         handshake.remove()
-        client = nil
+        let dropped = links
+        links = []
+        deliveries = ClaudeCodeDeliveries()
         token = nil
         port = nil
         board = ClaudeCodeBoard()
         savedBoard = nil
-        callbackHost = nil
-        outOfReach = nil
         status = .off
+        dropped.forEach(forget)
     }
 
     /// Off, saying why.
@@ -136,8 +161,8 @@ final class ClaudeCodeHub {
 
     // MARK: - What the server hands on
 
-    /// The listener is up on `port`: the relay can find it, and the clock is
-    /// told where to post its buttons. A file that can't be written is a
+    /// The listener is up on `port`: the relay can find it, and every clock
+    /// is told where to post its buttons. A file that can't be written is a
     /// hub nobody finds: better off than listening in silence.
     func listenerReady(port: UInt16) {
         guard let token else { return }
@@ -148,28 +173,29 @@ final class ClaudeCodeHub {
         }
         self.port = port
         status = .listening(port: port)
-        callbackHost = nil
+        links.forEach { $0.callbackHost = nil }
         events += 1
         setButtonCallbackIfNeeded()
     }
 
-    /// A route the server let in, and has answered already.
+    /// A route the server let in, and has answered already. A press on any
+    /// clock acts on the one board.
     func receive(_ route: HubRoute) {
-        guard client != nil else { return }
+        guard !links.isEmpty else { return }
         events += 1
         defer { saveBoard() }
         switch route {
         case .hookEvent(let body):
             if let event = ClaudeCodeEvent(body) {
-                board.handle(event, now: now()).forEach { enqueue(.command($0)) }
+                board.handle(event, now: now()).forEach(enqueue)
             }
             setButtonCallbackIfNeeded()
         case .button(let body):
             guard UlanziButtonReport.isMiddlePress(body) else { return }
             let press = board.middleButtonPressed(now: now())
-            press.commands.forEach { enqueue(.command($0)) }
-            // Opened at once, without waiting for the clock: the firmware
-            // took the alert off the screen already.
+            press.commands.forEach(enqueue)
+            // Opened at once, without waiting for the clocks: the firmware
+            // of the one pressed took the alert off its screen already.
             if let id = press.sessionID,
                let link = ClaudeCodeSessionLink.url(forSession: id, in: sessionsDirectory) {
                 openURL(link)
@@ -179,89 +205,9 @@ final class ClaudeCodeHub {
 
     /// Writes the board down when it changed. One that can't be written is
     /// tried again at the next change.
-    private func saveBoard() {
+    func saveBoard() {
         let snapshot = board.snapshot
         guard snapshot != savedBoard, (try? boardFile.save(snapshot)) != nil else { return }
         savedBoard = snapshot
-    }
-
-    // MARK: - Sending
-
-    private enum Call: Sendable {
-        case command(UlanziCommand)
-        case buttonCallback(URL)
-    }
-
-    /// The Mac's address, the port and the token, for the clock to post its
-    /// buttons to: sent while still to set, and again once the Mac's
-    /// address has changed, a press going nowhere otherwise. Without an
-    /// address, nothing yet: it is looked for again at the next hook event.
-    private func setButtonCallbackIfNeeded() {
-        guard let port, let token, let host = localAddress(), host != callbackHost,
-              let url = URL(string: "http://\(host):\(port)/ulanzi/button/\(token)") else { return }
-        callbackHost = host
-        enqueue(.buttonCallback(url))
-    }
-
-    /// Queues `call` behind every call before it. One that fails is said in
-    /// the status, and the next goes all the same; a callback or an
-    /// indicator that failed goes again with the next event. The answer to
-    /// every dismissal and every hold goes back to the board, which keeps
-    /// its queue in step with what the clock shows.
-    ///
-    /// A clock out of reach costs one try per event, not 2.5 s per call:
-    /// the calls queued behind the one that found nobody fail at once,
-    /// without the network, and the board hears of each all the same.
-    private func enqueue(_ call: Call) {
-        guard let client else { return }
-        let run = self.run
-        let event = events
-        let previous = sending
-        sending = Task { [weak self] in
-            await previous?.value
-            guard let self, self.run == run else { return }
-            if let outOfReach, event <= outOfReach.through { return failed(call, reason: outOfReach.reason) }
-            do {
-                switch call {
-                case .command(let command): try await client.perform(command)
-                case .buttonCallback(let url): try await client.setButtonCallback(url)
-                }
-                guard self.run == run else { return }
-                landed(call)
-            } catch {
-                guard self.run == run else { return }
-                if case .unreachable? = error as? UlanziClient.Failure {
-                    outOfReach = (through: events, reason: error.localizedDescription)
-                }
-                failed(call, reason: error.localizedDescription)
-            }
-        }
-    }
-
-    /// The clock took `call`.
-    private func landed(_ call: Call) {
-        switch call {
-        case .command(.dismiss(let name)): board.dismissLanded(name: name)
-        case .command(.notify(let notification)):
-            if let name = notification.name { board.notifyLanded(name: name) }
-        case .command(.indicator), .buttonCallback: break
-        }
-        saveBoard()
-        if let port { status = .listening(port: port) }
-    }
-
-    /// The clock never heard of `call`. A hold that never made it may change
-    /// the indicator: the new one goes at once.
-    private func failed(_ call: Call, reason: String) {
-        switch call {
-        case .buttonCallback: callbackHost = nil
-        case .command(.indicator): board.indicatorFailed()
-        case .command(.dismiss(let name)): board.dismissFailed(name: name)
-        case .command(.notify(let notification)):
-            guard let name = notification.name else { break }
-            board.notifyFailed(name: name, now: now()).forEach { enqueue(.command($0)) }
-        }
-        saveBoard()
-        status = .failed(reason)
     }
 }

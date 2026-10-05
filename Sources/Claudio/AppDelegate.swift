@@ -220,7 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.address = address?.absoluteString ?? ""
         if let address {
             ulanzi.start(address: address)
-            hub.start(address: address)
+            hub.apply([UlanziClock(name: UlanziClock.firstName, address: address)])
         }
     }
 
@@ -233,7 +233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hub.stop()
         if let address {
             ulanzi.start(address: address)
-            hub.start(address: address)
+            hub.apply([UlanziClock(name: UlanziClock.firstName, address: address)])
         }
     }
 
