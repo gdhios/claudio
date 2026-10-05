@@ -314,6 +314,83 @@ final class ClaudeCodeHubTests: XCTestCase, AsyncWaiting {
         XCTAssertEqual(hub.status, .listening(port: 51234))
     }
 
+    /// Out of reach, the clock costs one try per event, not one per call:
+    /// the calls queued behind the one that found nobody fail at once, the
+    /// board hearing of each. Ten Stops, ten tries. The next event tries
+    /// again, and finds a board that holds none of the ten.
+    func testAnUnreachableClockIsTriedOncePerEvent() async {
+        await listening()
+        device.isUnplugged = true
+
+        for index in 0..<10 {
+            stop("🟧 DÉCISION", session: "0000000\(index)-aaaa-4bbb-8ccc-000000000000")
+            await settle()
+        }
+        XCTAssertEqual(device.requests.count, 10)
+
+        device.isUnplugged = false
+        device.clearRequests()
+        stop("🟩 FINI")
+        await settle()
+        XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "POST /api/v1/notifications",
+                                      "DELETE /api/v1/indicators/1"])
+        XCTAssertEqual(hub.status, .listening(port: 51234))
+    }
+
+    /// Ten Stops while the first try is still out: one try in all.
+    func testABurstAgainstAnUnreachableClockIsTriedOnce() async {
+        await listening()
+        device.isUnplugged = true
+        device.holdAnswers()
+
+        for index in 0..<10 {
+            stop("🟧 DÉCISION", session: "0000000\(index)-aaaa-4bbb-8ccc-000000000000")
+        }
+        await device.waitUntilReceived(1)
+        device.releaseAnswers()
+        await settle()
+
+        XCTAssertEqual(device.requests.count, 1)
+        XCTAssertNotEqual(hub.status, .listening(port: 51234))
+    }
+
+    /// The outage of one run is not the next one's: started again, as on a
+    /// new address, the hub tries the clock again, the button callback
+    /// first.
+    func testStartingAgainAfterTheClockWasOutOfReachTriesItAgain() async throws {
+        await listening()
+        device.isUnplugged = true
+        stop("🟧 DÉCISION")
+        await settle()
+        device.isUnplugged = false
+
+        hub.stop()
+        await listening()
+
+        XCTAssertEqual(device.buttonCallback, "http://192.168.1.50:51234/ulanzi/button/\(try token())")
+    }
+
+    /// A press after the clock was out of reach tries it again: the press
+    /// itself says it is back.
+    func testAPressAfterTheClockWasOutOfReachTriesItAgain() async throws {
+        await listening()
+        try writeSession(app: "local_a")
+        stop("🟧 DÉCISION")
+        await settle()
+        device.isUnplugged = true
+        hook(#"{"hook_event_name":"UserPromptSubmit","session_id":"\#(otherSession)","prompt":"go"}"#)
+        await settle()
+        device.isUnplugged = false
+        device.clearRequests()
+
+        device.dismissOnScreen()
+        button("middle", down: true)
+        await settle()
+
+        XCTAssertEqual(device.calls, ["DELETE /api/v1/notifications/\(alert)", "DELETE /api/v1/indicators/1"])
+        XCTAssertEqual(opened, [URL(string: "claude://claude.ai/epitaxy/local_a")!])
+    }
+
     /// An indicator the clock refused goes again with the next event, even
     /// unchanged: a moment off the network doesn't leave it wrong for hours.
     func testARefusedIndicatorGoesAgainWithTheNextEvent() async {

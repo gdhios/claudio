@@ -47,6 +47,14 @@ final class ClaudeCodeHub {
     /// Bumped by every start and stop: a call still on its way from an
     /// earlier run writes nothing over the current one.
     private var run = 0
+    /// Every hook event and every report of a button, numbered, and the
+    /// listener's readiness too: each call carries the number of the one
+    /// that brought it.
+    private var events = 0
+    /// The clock found out of reach, and the last event then: every call of
+    /// that event or an earlier one, still queued, fails at once, and the
+    /// next event tries the clock again.
+    private var outOfReach: (through: Int, reason: String)?
 
     /// The last call queued for the clock. Each waits for the one before.
     private(set) var sending: Task<Void, Never>?
@@ -116,6 +124,7 @@ final class ClaudeCodeHub {
         board = ClaudeCodeBoard()
         savedBoard = nil
         callbackPending = false
+        outOfReach = nil
         status = .off
     }
 
@@ -140,12 +149,14 @@ final class ClaudeCodeHub {
         self.port = port
         status = .listening(port: port)
         callbackPending = true
+        events += 1
         setButtonCallbackIfPending()
     }
 
     /// A route the server let in, and has answered already.
     func receive(_ route: HubRoute) {
         guard client != nil else { return }
+        events += 1
         defer { saveBoard() }
         switch route {
         case .hookEvent(let body):
@@ -196,13 +207,19 @@ final class ClaudeCodeHub {
     /// indicator that failed goes again with the next event. The answer to
     /// every dismissal and every hold goes back to the board, which keeps
     /// its queue in step with what the clock shows.
+    ///
+    /// A clock out of reach costs one try per event, not 2.5 s per call:
+    /// the calls queued behind the one that found nobody fail at once,
+    /// without the network, and the board hears of each all the same.
     private func enqueue(_ call: Call) {
         guard let client else { return }
         let run = self.run
+        let event = events
         let previous = sending
         sending = Task { [weak self] in
             await previous?.value
             guard let self, self.run == run else { return }
+            if let outOfReach, event <= outOfReach.through { return failed(call, reason: outOfReach.reason) }
             do {
                 switch call {
                 case .command(let command): try await client.perform(command)
@@ -212,6 +229,9 @@ final class ClaudeCodeHub {
                 landed(call)
             } catch {
                 guard self.run == run else { return }
+                if case .unreachable? = error as? UlanziClient.Failure {
+                    outOfReach = (through: events, reason: error.localizedDescription)
+                }
                 failed(call, reason: error.localizedDescription)
             }
         }
