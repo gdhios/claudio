@@ -1,12 +1,12 @@
 import Foundation
 
 /// The board's commands on their way to the clocks, in the order sent. Each
-/// went to every clock linked then, on that clock's own queue, and waits
-/// for all of them: one that took it, one that missed it, or one let go
-/// meanwhile, which answers nothing more. Once all have answered it is
-/// done, and the done ones go back to the board in the order they were
-/// sent, which is the order the board expects them in.
-struct ClaudeCodeDeliveries {
+/// went to every recipient then, the hub's links, and waits for all of
+/// them: one that took it, one that missed it, or one let go meanwhile,
+/// which answers nothing more. Once all have answered it is done, and the
+/// done ones go back to the board in the order they were sent, which is the
+/// order the board expects them in.
+struct ClaudeCodeDeliveries<Recipient: Hashable> {
     /// What the clocks made of one command.
     struct Outcome: Equatable {
         let command: UlanziCommand
@@ -19,7 +19,7 @@ struct ClaudeCodeDeliveries {
     private struct Entry {
         let number: Int
         let command: UlanziCommand
-        var waiting: Set<UUID>
+        var waiting: Set<Recipient>
         var taken = false
         var missed = false
     }
@@ -27,18 +27,18 @@ struct ClaudeCodeDeliveries {
     private var entries: [Entry] = []
     private var sent = 0
 
-    /// `command` sent to `clocks`: the number its answers come under.
-    mutating func send(_ command: UlanziCommand, to clocks: [UUID]) -> Int {
+    /// `command` sent to `recipients`: the number its answers come under.
+    mutating func send(_ command: UlanziCommand, to recipients: [Recipient]) -> Int {
         sent += 1
-        entries.append(Entry(number: sent, command: command, waiting: Set(clocks)))
+        entries.append(Entry(number: sent, command: command, waiting: Set(recipients)))
         return sent
     }
 
-    /// `clock` answered command `number`, taking it or not. Returns the
+    /// `recipient` answered command `number`, taking it or not. Returns the
     /// commands done since, in the order sent.
-    mutating func answer(_ number: Int, from clock: UUID, taken: Bool) -> [Outcome] {
+    mutating func answer(_ number: Int, from recipient: Recipient, taken: Bool) -> [Outcome] {
         guard let index = entries.firstIndex(where: { $0.number == number }),
-              entries[index].waiting.remove(clock) != nil else { return [] }
+              entries[index].waiting.remove(recipient) != nil else { return [] }
         if taken {
             entries[index].taken = true
         } else {
@@ -47,11 +47,11 @@ struct ClaudeCodeDeliveries {
         return done()
     }
 
-    /// `clock` is let go: nothing waits for it any more. Returns the
+    /// `recipient` is let go: nothing waits for it any more. Returns the
     /// commands done since, in the order sent.
-    mutating func forget(_ clock: UUID) -> [Outcome] {
+    mutating func forget(_ recipient: Recipient) -> [Outcome] {
         for index in entries.indices {
-            entries[index].waiting.remove(clock)
+            entries[index].waiting.remove(recipient)
         }
         return done()
     }

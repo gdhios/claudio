@@ -14,13 +14,13 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
     private let dismissal = UlanziCommand.dismiss(name: "cc-5f0c2a9e")
     private let indicatorOff = UlanziCommand.indicator(nil)
 
-    private func outcome(_ command: UlanziCommand, taken: Bool, missed: Bool) -> ClaudeCodeDeliveries.Outcome {
-        ClaudeCodeDeliveries.Outcome(command: command, taken: taken, missed: missed)
+    private func outcome(_ command: UlanziCommand, taken: Bool, missed: Bool) -> ClaudeCodeDeliveries<UUID>.Outcome {
+        ClaudeCodeDeliveries<UUID>.Outcome(command: command, taken: taken, missed: missed)
     }
 
     /// One clock: done at its answer.
     func testOneClockAnswersForItself() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let number = deliveries.send(hold, to: [desk])
 
         XCTAssertEqual(deliveries.answer(number, from: desk, taken: true),
@@ -30,7 +30,7 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
     /// Two clocks: nothing until both have answered; taken when one took
     /// it, missed when one missed it.
     func testACommandWaitsForEveryClock() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let number = deliveries.send(hold, to: [desk, lounge])
 
         XCTAssertEqual(deliveries.answer(number, from: desk, taken: false), [])
@@ -40,7 +40,7 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
 
     /// Both missed it: not taken.
     func testACommandEveryClockMissedIsNotTaken() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let number = deliveries.send(dismissal, to: [desk, lounge])
 
         _ = deliveries.answer(number, from: lounge, taken: false)
@@ -51,7 +51,7 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
     /// The done ones come back in the order sent: a later command done
     /// first waits for the one before it.
     func testTheDoneOnesComeBackInTheOrderSent() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let first = deliveries.send(dismissal, to: [desk, lounge])
         let second = deliveries.send(hold, to: [lounge])
 
@@ -66,7 +66,7 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
     /// others made of it; a command no clock answered is neither taken nor
     /// missed.
     func testAClockLetGoIsWaitedForNoMore() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let first = deliveries.send(hold, to: [desk, lounge])
         _ = deliveries.send(indicatorOff, to: [desk])
         _ = deliveries.answer(first, from: lounge, taken: true)
@@ -79,7 +79,7 @@ final class ClaudeCodeDeliveriesTests: XCTestCase {
     /// An answer twice, or from a clock the command never went to, changes
     /// nothing.
     func testAnAnswerFromNobodyChangesNothing() {
-        var deliveries = ClaudeCodeDeliveries()
+        var deliveries = ClaudeCodeDeliveries<UUID>()
         let number = deliveries.send(hold, to: [desk, lounge])
 
         XCTAssertEqual(deliveries.answer(number, from: UUID(), taken: true), [])

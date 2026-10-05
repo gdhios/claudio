@@ -73,7 +73,7 @@ extension ClaudeCodeHub {
     /// it, and it is pending again.
     func forget(_ link: ClaudeCodeClockLink) {
         link.onStatusChange = nil
-        report(deliveries.forget(link.id))
+        report(deliveries.forget(ObjectIdentifier(link)))
         onClockStatusChange?(link.id, .pending)
     }
 
@@ -108,12 +108,12 @@ extension ClaudeCodeHub {
     /// answered.
     func enqueue(_ command: UlanziCommand) {
         guard !links.isEmpty else { return }
-        let number = deliveries.send(command, to: links.map(\.id))
+        let number = deliveries.send(command, to: links.map(ObjectIdentifier.init))
         for link in links {
-            let id = link.id
+            let recipient = ObjectIdentifier(link)
             attempt({ try await $0.perform(command) }, on: link) { [weak self] failure in
                 guard let self else { return }
-                report(deliveries.answer(number, from: id, taken: failure == nil))
+                report(deliveries.answer(number, from: recipient, taken: failure == nil))
             }
         }
     }
@@ -168,7 +168,7 @@ extension ClaudeCodeHub {
     /// hold or a dismissal is taken when one clock took it; an indicator
     /// one of them missed goes again with the next event; a hold they all
     /// missed may change the indicator, and the new one goes at once.
-    private func report(_ outcomes: [ClaudeCodeDeliveries.Outcome]) {
+    private func report(_ outcomes: [ClaudeCodeDeliveries<ObjectIdentifier>.Outcome]) {
         guard !outcomes.isEmpty else { return }
         for outcome in outcomes {
             switch outcome.command {

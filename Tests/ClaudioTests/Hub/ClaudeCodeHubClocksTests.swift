@@ -354,6 +354,34 @@ final class ClaudeCodeHubClocksTests: XCTestCase {
                        "nothing more for a clock let go, its button given back aside")
     }
 
+    /// One change of the list moves the desk and removes the lounge, whose
+    /// answer a hold still waited for: the hold missed everywhere, the
+    /// indicator goes off at once on the desk where it is now. Its answer
+    /// counts, though its clock's old link is let go in the same change: a
+    /// refusal there sends the indicator again with the next event.
+    func testAClockMovedInTheSameChangeIsHeardForItsNewLink() async {
+        await listening([lounge, desk])
+        deskDevice.answer("POST /api/v1/notifications", status: 500, body: FakeUlanzi.refusal("internal", "no memory"))
+        loungeDevice.holdAnswers()
+        decision()
+        await deskDevice.waitUntilReceived(3)
+        await hub.lines[desk.address]?.value
+        let moved = device(elsewhere)
+        moved.answer("DELETE /api/v1/indicators/1", status: 500, body: FakeUlanzi.refusal("internal", "no memory"))
+        var away = desk
+        away.address = elsewhere
+
+        hub.apply([away])
+        await settle()
+        XCTAssertTrue(moved.calls.contains("DELETE /api/v1/indicators/1"), "\(moved.calls)")
+        moved.clearRequests()
+        hook(#"{"hook_event_name":"UserPromptSubmit","session_id":"99999999-aaaa-4bbb-8ccc-000000000002","prompt":"go"}"#)
+        await settle()
+
+        XCTAssertTrue(moved.calls.contains("DELETE /api/v1/indicators/1"), "\(moved.calls)")
+        loungeDevice.releaseAnswers()
+    }
+
     // MARK: - The middle button given back
 
     /// A clock leaving the flags while the door stays open is told to post

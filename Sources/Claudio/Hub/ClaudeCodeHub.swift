@@ -45,8 +45,11 @@ final class ClaudeCodeHub {
     private var savedBoard: ClaudeCodeBoard.Snapshot?
     /// The clocks with the flags, in Settings' order.
     var links: [ClaudeCodeClockLink] = []
-    /// The board's commands on their way, until every clock has answered.
-    var deliveries = ClaudeCodeDeliveries()
+    /// The board's commands on their way, until every link has answered.
+    /// Counted by link, not by clock: a clock moved gets a new link, whose
+    /// answers are not those its old one is let go with. A link is let go
+    /// before it ends, so no identifier outlives its link in there.
+    var deliveries = ClaudeCodeDeliveries<ObjectIdentifier>()
     /// The last call queued for each device, by its address, whichever
     /// link queued it: one call at a time reaches a device, in order. A
     /// link that follows another on the same device, the flags ticked
