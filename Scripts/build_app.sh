@@ -137,7 +137,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 	<key>LSMinimumSystemVersion</key><string>14.0</string>
 	<key>LSUIElement</key><true/>
 	<key>NSHighResolutionCapable</key><true/>
-	<key>NSHumanReadableCopyright</key><string>© Guillaume Dhios</string>
+	<key>NSHumanReadableCopyright</key><string>© Okonoma</string>
 	<key>NSMicrophoneUsageDescription</key><string>Claudio écoute ton micro pour dicter du texte.</string>
 	<key>NSSpeechRecognitionUsageDescription</key><string>Claudio transcrit ta voix en texte, sur cet ordinateur.</string>
 </dict>
